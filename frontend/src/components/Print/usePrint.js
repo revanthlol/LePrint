@@ -155,11 +155,12 @@ export function usePrint() {
                 if (jobStatus === 'COMPLETED') {
                     setStatus('COMPLETED');
                     clearInterval(pollInterval);
-                } else if (jobStatus === 'FAILED') {
+                } else if (jobStatus === 'FAILED' || jobStatus === 'CANCELLED') {
                     setStatus('ERROR');
                     clearInterval(pollInterval);
                     addLog(`Print failed: ${response.data.error_message || 'Unknown error'}`);
                 }
+
             } catch (e) {
                 console.error('Status poll error:', e);
             }
@@ -308,6 +309,7 @@ export function usePrint() {
         const fd = new FormData();
         fd.append('file', selectedFile);
         fd.append('kiosk_id', config.kiosk_id);
+        fd.append('job_type', 'print');
 
         try {
             const authHeader = await getAuthHeader();
@@ -328,6 +330,7 @@ export function usePrint() {
             });
             setStatus('PAYMENT');
             addLog(`Job created: ${pages} pages × ₹${price_per_page} = ₹${total_cost}`);
+
         } catch (e) {
             if (e.response?.status === 401) {
                 addLog('Session expired. Please log in again.');

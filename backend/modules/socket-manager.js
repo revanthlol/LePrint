@@ -4,6 +4,13 @@ const db = require('../db');
 // In-memory tracking
 const kioskSockets = new Map();
 
+function emitToKiosk(kioskId, eventName, payload) {
+    const socket = kioskSockets.get(kioskId);
+    if (!socket) return false;
+    socket.emit(eventName, payload);
+    return true;
+}
+
 function initSocketServer(io) {
     io.on('connection', (socket) => {
         console.log('[Socket] New connection:', socket.id);
@@ -34,10 +41,7 @@ function initSocketServer(io) {
         
         socket.on('job_received', async (data) => {
             try {
-                await db.updateJob(data.job_id, { 
-                    status: 'QUEUED', 
-                    queued_at: new Date() 
-                });
+                await db.transitionJobState(data.job_id, 'QUEUED', { message: 'Pi agent acknowledged job' });
                 console.log(`[Job] ${data.job_id} received by Pi`);
             } catch (error) {
                 console.error('[Job] job_received error:', error);
@@ -46,10 +50,7 @@ function initSocketServer(io) {
         
         socket.on('print_started', async (data) => {
             try {
-                await db.updateJob(data.job_id, { 
-                    status: 'PRINTING', 
-                    print_started_at: new Date() 
-                });
+                await db.transitionJobState(data.job_id, 'PRINTING', { message: 'Printing started' });
                 console.log(`[Job] ${data.job_id} printing started`);
             } catch (error) {
                 console.error('[Job] print_started error:', error);
@@ -62,10 +63,9 @@ function initSocketServer(io) {
             try {
                 if (success) {
                     // 1. Update job status to COMPLETED
-                    await db.updateJob(job_id, { 
-                        status: 'COMPLETED', 
-                        print_completed_at: new Date(),
-                        pages_printed: pages_printed
+                    await db.transitionJobState(job_id, 'COMPLETED', {
+                        message: 'Print completed',
+                        pages_printed
                     });
 
                     // 2. Subtract pages from kiosk paper count
@@ -97,12 +97,24 @@ function initSocketServer(io) {
 
                     console.log(`[Job] ${job_id} completed successfully`);
                 } else {
-                    // Handle Failure
-                    await db.updateJob(job_id, { 
-                        status: 'FAILED', 
-                        error_message: error 
-                    });
-                    console.log(`[Job] ${job_id} failed: ${error}`);
+                    // Handle Failure with retry logic
+                    const jobData = await db.getJob(job_id);
+                    const retryCount = jobData?.retry_count || 0;
+
+                    if (retryCount < 3) {
+                        await db.updateJob(job_id, {
+                            status: 'PAID',
+                            retry_count: retryCount + 1,
+                            error_message: `Retry ${retryCount + 1}/3: ${error}`
+                        });
+                        console.log(`[Job] ${job_id} failed, requeued (retry ${retryCount + 1}/3)`);
+                    } else {
+                        await db.transitionJobState(job_id, 'FAILED', {
+                            message: 'Print failed after 3 retries',
+                            error_message: error
+                        });
+                        console.log(`[Job] ${job_id} permanently failed after 3 retries`);
+                    }
                 }
             } catch (error) {
                 console.error('[Job] print_complete error:', error);
@@ -154,9 +166,15 @@ function initSocketServer(io) {
     });
 }
 
+function getKioskSocket(kioskId) {
+    return kioskSockets.get(kioskId) || null;
+}
+
 module.exports = {
     initSocketServer,
-    kioskSockets
+    kioskSockets,
+    emitToKiosk,
+    getKioskSocket
 };
 
 /*

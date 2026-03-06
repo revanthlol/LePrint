@@ -408,6 +408,7 @@ export function FileUploadView({ file, status, handleFileSelect }) {
         />
       </label>
     
+
       {status === 'CALCULATING' && (
         <div className="flex items-center justify-center gap-3 text-foreground bg-white/5 rounded-lg p-4 border border-white/10">
           <Loader2 className="animate-spin h-5 w-5"/>

@@ -88,20 +88,21 @@ CREATE TABLE IF NOT EXISTS jobs (
     print_completed_at TIMESTAMP,
 
     -- Foreign Keys
-    FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE
+    FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ==================== ADMIN ACTIONS TABLE ====================
 -- Phase 2: Admin audit logging
 CREATE TABLE IF NOT EXISTS admin_actions (
     id SERIAL PRIMARY KEY,
-    admin_id VARCHAR(255) NOT NULL,
+    admin_id VARCHAR(255),                          -- nullable: preserved if admin is deleted
     action_type VARCHAR(50) NOT NULL,
     target_type VARCHAR(50),
     target_id VARCHAR(255),
     details JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (admin_id) REFERENCES users(id)
+    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ==================== INDEXES ====================
@@ -155,6 +156,11 @@ CHECK (job_type IN ('print','scan','xerox'));
 ALTER TABLE jobs DROP CONSTRAINT IF EXISTS valid_payment_status;
 ALTER TABLE jobs ADD CONSTRAINT valid_payment_status
 CHECK (payment_status IN ('pending','paid','failed','refunded'));
+
+-- Jobs: Retry cap
+ALTER TABLE jobs DROP CONSTRAINT IF EXISTS max_retry_count;
+ALTER TABLE jobs ADD CONSTRAINT max_retry_count
+CHECK (retry_count <= 3);
 
 -- Kiosks
 ALTER TABLE kiosks DROP CONSTRAINT IF EXISTS valid_kiosk_status;
@@ -250,7 +256,7 @@ SELECT
     COALESCE(SUM(CASE WHEN j.status = 'COMPLETED' THEN j.pages ELSE 0 END), 0) AS pages_printed
 FROM kiosks k
 LEFT JOIN jobs j ON k.id = j.kiosk_id
-WHERE j.created_at >= CURRENT_DATE - INTERVAL '30 days'
+    AND j.created_at >= CURRENT_DATE - INTERVAL '30 days'
 GROUP BY k.id, k.hostname, DATE(j.created_at)
 ORDER BY date DESC, kiosk_id;
 

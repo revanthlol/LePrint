@@ -53,10 +53,12 @@ function startScheduledTasks() {
                     status = 'PAID',
                     retry_count = retry_count + 1,
                     status_message = 'Recovered after kiosk timeout',
-                    last_status_update = NOW()
+                    last_status_update = NOW(),
+                    -- Reset retry_after so it's dispatched immediately on recovery
+                    metadata = metadata - 'retry_after'
                 WHERE status IN ('SENT_TO_PI','PRINTING','SCANNING')
                 AND last_status_update < NOW() - INTERVAL '2 minutes'
-                AND retry_count < 3
+                AND retry_count < 2
                 RETURNING id
             `);
 

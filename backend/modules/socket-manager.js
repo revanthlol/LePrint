@@ -97,23 +97,33 @@ function initSocketServer(io) {
 
                     console.log(`[Job] ${job_id} completed successfully`);
                 } else {
-                    // Handle Failure with retry logic
+                    // Handle Failure with retry logic + exponential backoff
                     const jobData = await db.getJob(job_id);
                     const retryCount = jobData?.retry_count || 0;
 
-                    if (retryCount < 3) {
+                    // Max 3 total attempts: original + 2 retries (retry_count 0 → 1 → 2 → FAILED)
+                    if (retryCount < 2) {
+                        // Exponential backoff: retry 1 = 30s, retry 2 = 60s
+                        const backoffSeconds = 30 * (retryCount + 1);
+                        const retryAfter = Date.now() + (backoffSeconds * 1000);
+
+                        // Merge retry_after into existing metadata (preserves any other metadata fields)
+                        const existingMetadata = jobData?.metadata || {};
+                        const updatedMetadata = { ...existingMetadata, retry_after: retryAfter };
+
                         await db.updateJob(job_id, {
                             status: 'PAID',
                             retry_count: retryCount + 1,
-                            error_message: `Retry ${retryCount + 1}/3: ${error}`
+                            error_message: `Retry ${retryCount + 1}/2: ${error}`,
+                            metadata: updatedMetadata
                         });
-                        console.log(`[Job] ${job_id} failed, requeued (retry ${retryCount + 1}/3)`);
+                        console.log(`[Job] ${job_id} failed, requeued (retry ${retryCount + 1}/2, backoff ${backoffSeconds}s)`);
                     } else {
                         await db.transitionJobState(job_id, 'FAILED', {
-                            message: 'Print failed after 3 retries',
+                            message: 'Print failed after 3 attempts',
                             error_message: error
                         });
-                        console.log(`[Job] ${job_id} permanently failed after 3 retries`);
+                        console.log(`[Job] ${job_id} permanently failed after 3 attempts`);
                     }
                 }
             } catch (error) {

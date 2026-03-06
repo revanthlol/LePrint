@@ -190,12 +190,16 @@ router.get('/jobs/poll', async (req, res) => {
                 FROM jobs
                 WHERE kiosk_id = $1
                 AND status = 'PAID'
+                AND (
+                    metadata->>'retry_after' IS NULL
+                    OR (metadata->>'retry_after')::bigint <= $2
+                )
                 ORDER BY created_at
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
             )
             RETURNING *
-        `, [kiosk_id]);
+        `, [kiosk_id, Date.now()]);
 
         if (result.rows.length === 0) {
             return res.json({ jobs: [] });

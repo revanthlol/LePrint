@@ -10,6 +10,29 @@ const router = express.Router();
 
 
 // ===============================
+// User Profile (role fetch)
+// ===============================
+router.get('/user/profile', verifyToken, async (req, res) => {
+    try {
+        const user = await db.getUser(req.user.uid);
+
+        if (!user) {
+            return res.json({ role: 'user' });
+        }
+
+        res.json({
+            role: user.role || 'user',
+            email: user.email,
+            name: user.name
+        });
+    } catch (error) {
+        console.error('[Profile] Error:', error);
+        res.json({ role: 'user' });
+    }
+});
+
+
+// ===============================
 // Kiosk Connect
 // ===============================
 router.post('/connect', async (req, res) => {

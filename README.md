@@ -53,8 +53,10 @@ JusPri is a three-component kiosk system for libraries, universities, coworking 
 - 📤 **Cloud upload** — Scanned PDFs uploaded to backend automatically
 - ⬇️ **Download link** — Users get a download URL for their scanned document
 
-### Xerox *(planned)*
-- 📋 **Scan → Print pipeline** — Scan a document and immediately print copies
+### Xerox (Photocopy)
+- 📋 **Scan → Print pipeline** — Scan a document and print up to 20 copies
+- 💰 **₹5 per copy** — Automatic pricing based on copy count
+- 🔄 **Real-time progress** — Scanning and printing status updates via WebSocket
 
 ### Admin
 - 📊 **Dashboard** — System metrics, revenue, job counts
@@ -105,7 +107,9 @@ JusPri is a three-component kiosk system for libraries, universities, coworking 
 
 **Print:** User uploads file → Backend creates job → User pays → Pi Agent polls & claims job (row-locked) → Downloads file → Converts to PDF → Prints via CUPS → Status updates via WebSocket
 
-**Scan:** User clicks Scan → Backend creates scan job → WebSocket event to Pi → Pi scans via eSCL → Uploads PDF to backend → User gets download link
+**Scan:** User selects Scan → Chooses options (DPI, color) → Backend creates scan job → Pi Agent polls & scans via eSCL → Uploads PDF to backend → User gets download link
+
+**Xerox:** User selects Xerox → Sets copies & options → Backend creates xerox job → Pi Agent polls, scans via eSCL, prints N copies via CUPS → Status updates via WebSocket
 
 ---
 
@@ -282,7 +286,7 @@ node index.js
 | `FRONTEND_URL` | Frontend URL (for QR code) | `https://qr-wifi-printer.vercel.app` |
 | `KIOSK_ID` | Unique kiosk identifier | `kiosk_{hostname}` |
 | `PRINTER_NAME` | CUPS printer name | `auto` (auto-detect) |
-| `POLL_INTERVAL` | Job polling interval in ms | `2000` |
+| `POLL_INTERVAL` | Job polling interval in ms | `5000` |
 
 ---
 
@@ -292,10 +296,10 @@ node index.js
 
 1. **Scan** the QR code displayed at the kiosk
 2. **Login** with your Google account
-3. **Upload** a document (PDF, DOCX, TXT, or image)
-4. **Review** page count and price
-5. **Pay** via Razorpay
-6. **Collect** your printed document
+3. **Choose** a service: Print, Scan, or Xerox
+4. **Print:** Upload a document → Review pricing → Pay → Collect printout
+5. **Scan:** Choose DPI & color → Start scan → Download scanned PDF
+6. **Xerox:** Set copies & color → Pay → Collect photocopies
 
 ### For Admins
 
@@ -322,6 +326,7 @@ node index.js
 | `POST` | `/api/jobs/create` | Upload file and create print job |
 | `POST` | `/api/jobs/:id/verify-payment` | Mark job as paid |
 | `POST` | `/api/jobs/scan` | Create a scan job |
+| `POST` | `/api/jobs/xerox` | Create a xerox (photocopy) job |
 | `GET` | `/api/jobs/:id/download` | Download job file |
 
 ### Pi Agent Endpoints
@@ -349,6 +354,8 @@ node index.js
 | `register` | Pi → Backend | Kiosk registration |
 | `heartbeat` | Pi → Backend | Periodic health update |
 | `job_state_change` | Pi → Backend | Job status update |
+| `print_complete` | Pi → Backend | Print finished (success/fail + retry) |
+| `scan_complete` | Pi → Backend | Scan finished (success/fail) |
 | `scan_job` | Backend → Pi | Trigger scan on kiosk |
 | `update_config` | Backend → Pi | Remote config update |
 
@@ -430,5 +437,5 @@ ALLOWED_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173
 **Job statuses:**
 - Print: `PENDING` → `PAID` → `QUEUED` → `SENT_TO_PI` → `PRINTING` → `COMPLETED`
 - Scan: `QUEUED` → `DISCOVERING_SCANNER` → `SCANNING` → `PROCESSING` → `COMPLETED`
-- Xerox: `SCANNING_ORIGINAL` → `PROCESSING_COPY` → `PRINTING_COPY` → `COMPLETED`
+- Xerox: `PENDING` → `PAID` → `SENT_TO_PI` → `SCANNING` → `PRINTING` → `COMPLETED`
 - Error: `FAILED`, `EXPIRED`, `CANCELLED`

@@ -143,7 +143,20 @@ curl -X POST "http://localhost:3001/api/jobs/JOB_ID/scan-upload" \
 # Expected: { success: true, download_url: "..." }
 ```
 
-### 2.8 Admin Endpoints
+### 2.8 Xerox Endpoint
+
+```bash
+# Create a xerox (photocopy) job
+curl -X POST http://localhost:3001/api/jobs/xerox \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"kiosk_id":"YOUR_KIOSK_ID","copies":3,"scan_options":{"colorMode":"Grayscale8"}}'
+
+# Expected: { job_id, copies: 3, price_per_copy: 5, total_cost: 15, currency: "INR" }
+# Copies clamped to 1-20 range
+```
+
+### 2.9 Admin Endpoints
 
 ```bash
 # First, promote a user to admin in the database:
@@ -235,21 +248,34 @@ WHERE id = 'JOB_ID';
 
 ## 4. Frontend Tests
 
-### 4.1 User Flow
+### 4.1 User Flow (Print)
 
 1. **Open** `http://localhost:5173?kiosk_id=YOUR_KIOSK_ID`
 2. **Login** with Google OAuth
-3. **Upload** a PDF file
-4. **Verify** page count and pricing display correctly
-5. **Pay** (or simulate payment)
-6. **Track** job status updates in real-time
+3. **Select** "Print" from the service selector
+4. **Upload** a PDF file
+5. **Verify** page count and pricing display correctly
+6. **Pay** (or simulate payment)
+7. **Track** job status updates in real-time
 
 ### 4.2 Scan Flow
 
-1. Open frontend and select **Scan** mode
-2. Click **Start Scan**
-3. Verify the scan request is sent to backend
-4. Check pi-agent logs for scan job processing
+1. Open frontend and connect to a kiosk
+2. **Select** "Scan" from the service selector
+3. **Choose** resolution (150/300/600 DPI) and color mode
+4. Click **Start Scan**
+5. Verify scanning spinner shows progress
+6. On completion, verify download link appears
+7. Click download and confirm the scanned PDF opens
+
+### 4.3 Xerox Flow
+
+1. Open frontend and connect to a kiosk
+2. **Select** "Xerox" from the service selector
+3. **Set** number of copies (1-20) and color mode
+4. Click **Xerox N Copies**
+5. Verify "Scanning & Printing..." progress shows
+6. On completion, verify success screen appears
 
 ### 4.3 Admin Dashboard
 
@@ -294,10 +320,11 @@ WHERE id = 'JOB_ID';
 |---------|---------------|
 | **Row locking** | Run two pi-agents for the same kiosk; only one should pick up each job |
 | **File streaming** | In poll response, check for `download_url` (not `file_data`) |
-| **2s poll interval** | Check pi-agent logs for poll frequency |
-| **File cleanup** | Files in `print-queue/` older than 30 min should auto-delete |
+| **5s poll interval** | Check pi-agent logs for poll frequency (~12 polls/min) |
+| **File cleanup** | Uploaded files in `uploads/` cleaned after 2 hours; `print-queue/` after 30 min |
 | **Job retry** | Set a job to FAILED with retry_count < 3; it should be requeued |
 | **Disk protection** | Fill `print-queue/` to > 500MB; agent should skip new downloads |
+| **Scan events** | `scan_complete` and `job_state_change` update job status in DB |
 
 ---
 
@@ -310,16 +337,17 @@ Complete this checklist for a full system verification:
 - [ ] Frontend loads and login works
 - [ ] Pi Agent connects to backend (WebSocket)
 - [ ] QR code scans and opens frontend
-- [ ] File upload works (PDF, DOCX, images)
-- [ ] Page count and pricing calculated correctly
-- [ ] Payment flow completes
-- [ ] Pi Agent picks up paid job
-- [ ] File downloads to Pi Agent
-- [ ] Document converts to PDF (if needed)
-- [ ] Document prints successfully
-- [ ] Job status updates in real-time (frontend)
+- [ ] **Service selector** shows Print / Scan / Xerox options
+- [ ] **Print:** File upload works (PDF, DOCX, images)
+- [ ] **Print:** Page count and pricing calculated correctly
+- [ ] **Print:** Payment flow completes
+- [ ] **Print:** Pi Agent picks up paid job and prints
+- [ ] **Print:** Job status updates in real-time (frontend)
+- [ ] **Scan:** Options screen shows DPI and color mode
+- [ ] **Scan:** Scan job completes and download link appears
+- [ ] **Xerox:** Copies counter works (1-20 range)
+- [ ] **Xerox:** Job scans then prints correct number of copies
 - [ ] Admin dashboard shows metrics
 - [ ] Kiosk health grid works
 - [ ] Paper count tracking works
-- [ ] Scan job creates successfully (if scanner available)
-- [ ] Old files cleaned up automatically
+- [ ] Old files cleaned up automatically (2hr for uploads, 30min for print-queue)

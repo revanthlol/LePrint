@@ -295,22 +295,22 @@ show_completion() {
 
   echo -e "${GREEN}✓${NC} DirectPrint has been completely removed!"
   echo ""
-  echo "What was removed:"
-  echo "  ${RED}✗${NC} All DirectPrint code and files"
-  echo "  ${RED}✗${NC} Systemd services"
-  echo "  ${RED}✗${NC} Temporary and cache files"
+  echo -e "What was removed:"
+  echo -e "  ${RED}✗${NC} All DirectPrint code and files"
+  echo -e "  ${RED}✗${NC} Systemd services"
+  echo -e "  ${RED}✗${NC} Temporary and cache files"
   echo ""
-  echo "What was kept (system packages):"
-  echo "  ${GREEN}✓${NC} Node.js"
-  echo "  ${GREEN}✓${NC} CUPS"
-  echo "  ${GREEN}✓${NC} LibreOffice"
-  echo "  ${GREEN}✓${NC} All other system dependencies"
+  echo -e "What was kept (system packages):"
+  echo -e "  ${GREEN}✓${NC} Node.js"
+  echo -e "  ${GREEN}✓${NC} CUPS"
+  echo -e "  ${GREEN}✓${NC} LibreOffice"
+  echo -e "  ${GREEN}✓${NC} All other system dependencies"
   echo ""
 
   # Check if backup was created
   if [ -d "$BACKUP_DIR" ]; then
     print_info "Configuration backup saved to:"
-    echo "    ${CYAN}$BACKUP_DIR${NC}"
+    echo -e "    ${CYAN}$BACKUP_DIR${NC}"
     echo ""
   fi
 

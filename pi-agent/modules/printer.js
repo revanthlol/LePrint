@@ -1,11 +1,19 @@
 // pi-agent/modules/printer.js
 // Printer detection, status checking, and print execution via CUPS
+// Supports SIMULATE_PRINTER=true for testing without a real printer
 
 const { exec } = require('child_process');
 const { PrinterError } = require('./errors');
 
+const SIMULATE = process.env.SIMULATE_PRINTER === 'true';
+
 // ==================== PRINTER DETECTION ====================
 async function detectPrinter(printerName, logger) {
+  if (SIMULATE) {
+    logger.success('🖨️  [SIM] Simulated printer: VIRTUAL_PRINTER');
+    return 'VIRTUAL_PRINTER';
+  }
+
   return new Promise((resolve, reject) => {
     if (printerName !== 'auto') {
       logger.success(`Using configured printer: ${printerName}`);
@@ -50,6 +58,10 @@ async function detectPrinter(printerName, logger) {
 
 // ==================== PRINTER STATUS CHECK ====================
 async function checkPrinterStatus(printerName, logger) {
+  if (SIMULATE) {
+    return { status: 'healthy', detail: 'simulated' };
+  }
+
   return new Promise((resolve) => {
     if (!printerName) {
       return resolve({ status: 'unknown', detail: 'no_printer_configured' });
@@ -93,6 +105,21 @@ async function checkPrinterStatus(printerName, logger) {
 
 // ==================== PRINT EXECUTION ====================
 async function printDocument(printerName, filePath, pages, logger) {
+  if (SIMULATE) {
+    const fileName = filePath.split('/').pop();
+    logger.info(`\n🖨️  [SIM] Simulating Print Job`);
+    logger.info(`   File: ${fileName}`);
+    logger.info(`   Pages: ${pages}`);
+    logger.info(`   Printer: VIRTUAL_PRINTER`);
+
+    // Simulate print delay (2-3 seconds)
+    const delay = 2000 + Math.random() * 1000;
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    logger.success(`[SIM] ✓ Print simulation complete (${(delay / 1000).toFixed(1)}s)`);
+    return { success: true, pages };
+  }
+
   return new Promise((resolve, reject) => {
     logger.info(`\n🖨️  Printing Job`);
     logger.info(`   File: ${filePath.split('/').pop()}`);

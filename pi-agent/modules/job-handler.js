@@ -212,9 +212,14 @@ async function processJob(jobId, state, socket, logger) {
 
     if (state.pendingJobs.size > 0) {
       const nextJobId = state.pendingJobs.keys().next().value;
+      const nextJob = state.pendingJobs.get(nextJobId);
       logger.info(`→ Next job: ${nextJobId}`);
 
-      await processJob(nextJobId, state, socket, logger);
+      if (nextJob && nextJob.job_type === "scan") {
+        await processScanJob(nextJobId, state._cloudServer, state, socket, logger);
+      } else {
+        await processJob(nextJobId, state, socket, logger);
+      }
     }
   }
 }

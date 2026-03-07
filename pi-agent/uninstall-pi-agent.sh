@@ -64,7 +64,7 @@ confirm_uninstall() {
   echo "This script will remove:"
   echo ""
   echo -e "  ${RED}✗${NC} DirectPrint pi-agent installation"
-  echo -e "  ${RED}✗${NC} Git repository (~/directprint-agent or ~/qr-wifi-printer)"
+  echo -e "  ${RED}✗${NC} Agent installation directory (~/directprint-agent)"
   echo -e "  ${RED}✗${NC} Systemd services (directprint-agent, directprint-qr)"
   echo -e "  ${RED}✗${NC} Service configuration files"
   echo -e "  ${RED}✗${NC} Print queue files and temporary data"
@@ -161,7 +161,7 @@ backup_config() {
   # Check for .env files in various locations
   local found_config=false
 
-  for dir in "$HOME/directprint-agent" "$HOME/qr-wifi-printer/pi-agent" "/opt/directprint" "$HOME/directprint"; do
+  for dir in "$HOME/directprint-agent" "/opt/directprint" "$HOME/directprint"; do
     if [ -f "$dir/.env" ]; then
       if [ "$found_config" = false ]; then
         mkdir -p "$BACKUP_DIR"
@@ -191,7 +191,6 @@ remove_directories() {
   # List of possible installation directories
   local dirs=(
     "$HOME/directprint-agent"
-    "$HOME/qr-wifi-printer"
     "$HOME/directprint"
     "/opt/directprint"
   )
@@ -212,7 +211,6 @@ cleanup_temp_files() {
   # Remove print queue files
   local temp_dirs=(
     "$HOME/directprint-agent/print-queue"
-    "$HOME/qr-wifi-printer/pi-agent/print-queue"
     "/tmp/directprint*"
     "/tmp/print-queue*"
   )
@@ -281,7 +279,7 @@ cleanup_old_dependencies() {
   print_section "Cleaning Up Old Dependencies"
 
   # Check for old installations that used Sharp
-  for dir in "$HOME/directprint-agent" "$HOME/qr-wifi-printer/pi-agent"; do
+  for dir in "$HOME/directprint-agent" "$HOME/directprint"; do
     if [ -d "$dir/node_modules/sharp" ]; then
       print_info "Found old Sharp dependency in $dir"
       print_info "This will be removed with the directory"
@@ -316,7 +314,7 @@ show_completion() {
     echo ""
   fi
 
-  print_warning "To reinstall DirectPrint, run: ./setup-pi-agent.sh"
+  print_warning "To reinstall DirectPrint, run: ./install-or-update-pi-agent.sh"
   echo ""
 
   echo -e "${RED}╔════════════════════════════════════════════════╗${NC}"
@@ -354,8 +352,8 @@ main() {
   backup_config
   check_orphaned_processes
   cleanup_temp_files
-  remove_directories
   cleanup_old_dependencies
+  remove_directories
   remove_user_group
   show_completion
   inform_user

@@ -356,40 +356,31 @@ if [ -d "$INSTALL_DIR" ]; then
             print_info "Backed up .env file"
         fi
 
-        # --- Smart Update Logic (pull or clone) ---
-        if [ -d ".git" ]; then
-            print_step "Git repo detected — pulling latest changes..."
-            git pull origin main || {
-                print_error "Git pull failed"
-                exit 1
-            }
-        else
-            print_step "No git repo found — cloning fresh copy..."
+        # --- Smart Update Logic: sparse-checkout only pi-agent/ ---
+        TMP_DIR="$(mktemp -d)"
+        print_step "Cloning qr-wifi-printer repo (sparse: pi-agent/ only)..."
 
-            TMP_DIR="$(mktemp -d)"
-            git clone https://github.com/revanthlol/pi-agent.git "$TMP_DIR" || {
-                print_error "Git clone failed"
-                rm -rf "$TMP_DIR"
-                exit 1
-            }
-
-            cp -rn "$TMP_DIR"/* . 2>/dev/null || true
-            cp -rn "$TMP_DIR"/.* . 2>/dev/null || true
+        git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/revanthlol/qr-wifi-printer.git "$TMP_DIR" || {
+            print_error "Git clone failed"
             rm -rf "$TMP_DIR"
+            exit 1
+        }
+
+        cd "$TMP_DIR" && git sparse-checkout set pi-agent && cd "$INSTALL_DIR"
+
+        # Copy updated pi-agent files into install dir
+        if [ -d "$TMP_DIR/pi-agent" ]; then
+            print_info "Syncing pi-agent files..."
+            cp -rf "$TMP_DIR/pi-agent/"* . 2>/dev/null || true
+            cp -rf "$TMP_DIR/pi-agent/".* . 2>/dev/null || true
+        else
+            print_error "pi-agent/ directory not found in cloned repo"
+            rm -rf "$TMP_DIR"
+            exit 1
         fi
 
-        # Flatten the directory: move files from pi-agent/ to root
-        if [ -d "pi-agent" ]; then
-            print_info "Syncing files from subfolder to root..."
-
-            cp -rn pi-agent/* . 2>/dev/null || true
-            cp -rn pi-agent/.* . 2>/dev/null || true
-
-            mv -f pi-agent/* . 2>/dev/null || true
-            mv -f pi-agent/.* . 2>/dev/null || true
-
-            rmdir pi-agent 2>/dev/null || true
-        fi
+        rm -rf "$TMP_DIR"
         # ----------------------------------------
 
         # Restore .env
@@ -428,20 +419,28 @@ print_step "Installing pi-agent..."
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR" || { print_error "Failed to cd into $INSTALL_DIR"; exit 1; }
 
-print_step "Cloning repository..."
-git clone https://github.com/revanthlol/pi-agent.git . || {
+print_step "Cloning qr-wifi-printer repo (sparse: pi-agent/ only)..."
+
+TMP_DIR="$(mktemp -d)"
+git clone --depth 1 --filter=blob:none --sparse \
+    https://github.com/revanthlol/qr-wifi-printer.git "$TMP_DIR" || {
     print_error "Git clone failed"
+    rm -rf "$TMP_DIR"
     exit 1
 }
 
-# Flatten the directory: move files from pi-agent/ to root
-if [ -d "pi-agent" ]; then
-    print_info "Flattening pi-agent directory..."
+cd "$TMP_DIR" && git sparse-checkout set pi-agent && cd "$INSTALL_DIR"
 
-    mv pi-agent/* .
-    mv pi-agent/.* . 2>/dev/null || true
-    rmdir pi-agent
+if [ -d "$TMP_DIR/pi-agent" ]; then
+    cp -rf "$TMP_DIR/pi-agent/"* . 2>/dev/null || true
+    cp -rf "$TMP_DIR/pi-agent/".* . 2>/dev/null || true
+else
+    print_error "pi-agent/ directory not found in cloned repo"
+    rm -rf "$TMP_DIR"
+    exit 1
 fi
+
+rm -rf "$TMP_DIR"
 
 print_success "Pi agent downloaded"
 

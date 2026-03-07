@@ -111,6 +111,7 @@ router.post('/jobs/create', verifyToken, upload.single('file'), async (req, res)
         res.json({
             job_id: jobId,
             pages,
+            price_per_page: pricePerPage,
             total_cost: totalCost,
             currency: 'INR'
         });
@@ -163,6 +164,35 @@ router.post('/jobs/:job_id/verify-payment', verifyToken, async (req, res) => {
     } catch (error) {
         console.error('[Payment] Error:', error);
         res.status(500).json({ error: 'Payment verification failed' });
+    }
+});
+
+
+// ===============================
+// Get Job Status (Frontend polling)
+// ===============================
+router.get('/jobs/:job_id/status', verifyToken, async (req, res) => {
+    const { job_id } = req.params;
+
+    try {
+        const job = await db.getJob(job_id);
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        if (job.user_id !== req.user.uid) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        res.json({
+            status: job.status,
+            error_message: job.error_message || null
+        });
+
+    } catch (error) {
+        console.error('[Job Status] Error:', error);
+        res.status(500).json({ error: 'Failed to get job status' });
     }
 });
 

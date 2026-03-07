@@ -1,8 +1,5 @@
 // frontend/src/components/Print/PrintInterface.jsx
-// Phase 1: Smart Printer Verification - full component ready to drop in.
-// - Shows new status-check / printer-error / printer-warning views
-// - Keeps existing flow for connect/upload/payment/printing/completed
-// - Expects PrintViews to export the new views listed below
+// Supports Print, Scan, and Xerox flows.
 
 import React from 'react';
 import { Printer } from 'lucide-react';
@@ -19,10 +16,15 @@ import {
   PrintingView,
   CompletedView,
   LogTerminal,
-  // Phase 1 new views — make sure these exist in ./PrintViews
   StatusCheckView,
   PrinterErrorView,
   PrinterWarningView,
+  ServiceSelectView,
+  ScanOptionsView,
+  ScanningView,
+  ScanCompleteView,
+  XeroxOptionsView,
+  XeroxingView,
 } from './PrintViews';
 
 export function PrintInterface() {
@@ -52,7 +54,7 @@ export function PrintInterface() {
           {/* VIEW: QR Scanner */}
           {status === 'IDLE' && <QRScannerView {...viewProps} />}
 
-          {/* VIEW: Checking kiosk / printer status (Phase 1) */}
+          {/* VIEW: Checking kiosk / printer status */}
           {status === 'CHECKING_STATUS' && <StatusCheckView {...viewProps} />}
 
           {/* VIEW: Hard printer error (block) */}
@@ -72,17 +74,20 @@ export function PrintInterface() {
             />
           )}
 
-          {/* VIEW: Manual / fallback connect (shown after scan if user chooses or on connect errors) */}
+          {/* VIEW: Manual / fallback connect */}
           {(status === 'SCANNED' || status === 'CONNECTING' || status === 'ERROR') && (
             <ConnectView {...viewProps} />
           )}
 
-          {/* VIEW: File upload / calculation */}
+          {/* VIEW: Service selector (Print / Scan / Xerox) */}
+          {status === 'SERVICE_SELECT' && <ServiceSelectView {...viewProps} />}
+
+          {/* VIEW: File upload / calculation (Print flow) */}
           {(status === 'CONNECTED' || status === 'CALCULATING') && (
             <FileUploadView {...viewProps} />
           )}
 
-          {/* VIEW: Payment */}
+          {/* VIEW: Payment (Print flow) */}
           {status === 'PAYMENT' && <PaymentView {...viewProps} />}
 
           {/* VIEW: Printing progress */}
@@ -90,6 +95,21 @@ export function PrintInterface() {
 
           {/* VIEW: Completed / success */}
           {status === 'COMPLETED' && <CompletedView {...viewProps} />}
+
+          {/* VIEW: Scan options */}
+          {status === 'SCAN_OPTIONS' && <ScanOptionsView {...viewProps} />}
+
+          {/* VIEW: Scanning in progress */}
+          {status === 'SCANNING' && <ScanningView {...viewProps} />}
+
+          {/* VIEW: Scan complete with download */}
+          {status === 'SCAN_COMPLETE' && <ScanCompleteView {...viewProps} />}
+
+          {/* VIEW: Xerox options */}
+          {status === 'XEROX_OPTIONS' && <XeroxOptionsView {...viewProps} />}
+
+          {/* VIEW: Xeroxing in progress */}
+          {status === 'XEROXING' && <XeroxingView {...viewProps} />}
 
           {/* Logs - always visible */}
           <LogTerminal logs={logs} />

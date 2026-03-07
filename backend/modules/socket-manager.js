@@ -131,6 +131,42 @@ function initSocketServer(io) {
             }
         });
         
+        // ===== SCAN COMPLETE: Updates scan job status =====
+        socket.on('scan_complete', async (data) => {
+            const { job_id, success, error } = data;
+            try {
+                if (success) {
+                    await db.transitionJobState(job_id, 'COMPLETED', {
+                        message: 'Scan completed'
+                    });
+                    console.log(`[Job] ${job_id} scan completed`);
+                } else {
+                    await db.transitionJobState(job_id, 'FAILED', {
+                        message: 'Scan failed',
+                        error_message: error
+                    });
+                    console.log(`[Job] ${job_id} scan failed: ${error}`);
+                }
+            } catch (err) {
+                console.error('[Job] scan_complete error:', err);
+            }
+        });
+
+        // ===== JOB STATE CHANGE: Generic status update from pi-agent =====
+        socket.on('job_state_change', async (data) => {
+            const { job_id, status: newStatus, status_message } = data;
+            try {
+                await db.updateJob(job_id, {
+                    status: newStatus,
+                    status_message: status_message || null,
+                    last_status_update: new Date()
+                });
+                console.log(`[Job] ${job_id} state → ${newStatus}: ${status_message || ''}`);
+            } catch (err) {
+                console.error('[Job] job_state_change error:', err);
+            }
+        });
+
         // ===== HEARTBEAT: Updates detailed status =====
         socket.on('heartbeat', async (data) => {
             try {

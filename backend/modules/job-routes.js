@@ -10,6 +10,44 @@ const router = express.Router();
 
 
 // ===============================
+// User's Job History
+// ===============================
+router.get('/jobs/my-jobs', verifyToken, async (req, res) => {
+    try {
+        const filters = {};
+        if (req.query.status) filters.status = req.query.status;
+
+        const jobs = await db.getUserJobs(req.user.uid, filters);
+        res.json({ jobs });
+    } catch (error) {
+        console.error('[My Jobs] Error:', error);
+        res.status(500).json({ error: 'Failed to fetch jobs' });
+    }
+});
+
+
+// ===============================
+// User Stats
+// ===============================
+router.get('/users/stats', verifyToken, async (req, res) => {
+    try {
+        const stats = await db.getUserStats(req.user.uid);
+        res.json({
+            totalJobs: parseInt(stats.total_jobs || 0),
+            totalPages: parseInt(stats.total_pages || 0),
+            totalSpent: parseFloat(stats.total_spent || 0),
+            successRate: parseFloat(stats.success_rate || 0),
+            jobsThisMonth: parseInt(stats.jobs_this_month || 0),
+            spentThisMonth: parseFloat(stats.spent_this_month || 0)
+        });
+    } catch (error) {
+        console.error('[User Stats] Error:', error);
+        res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+});
+
+
+// ===============================
 // User Profile (role fetch)
 // ===============================
 router.get('/user/profile', verifyToken, async (req, res) => {
@@ -266,7 +304,9 @@ router.get('/jobs/poll', async (req, res) => {
                 filename: job.filename,
                 pages: job.pages,
                 job_type: job.job_type,
-                download_url: `/api/jobs/${job.id}/download`
+                download_url: `/api/jobs/${job.id}/download`,
+                scan_options: job.scan_options || null,
+                metadata: job.metadata || null
             }]
         });
 
@@ -352,6 +392,58 @@ router.post('/jobs/scan', verifyToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+
+// ===============================
+// Create Xerox (Photocopy) Job
+// ===============================
+router.post('/jobs/xerox', verifyToken, async (req, res) => {
+
+    try {
+
+        const { kiosk_id, copies, scan_options } = req.body;
+
+        if (!kiosk_id) {
+            return res.status(400).json({ error: 'kiosk_id required' });
+        }
+
+        const numCopies = Math.max(1, Math.min(parseInt(copies) || 1, 20));
+
+        await ensureUserExists(db, req.user);
+
+        const XEROX_PRICE_PER_COPY = 5;
+        const totalCost = numCopies * XEROX_PRICE_PER_COPY;
+        const jobId = generateJobId();
+
+        await db.createJob({
+            id: jobId,
+            user_id: req.user.uid,
+            kiosk_id,
+            job_type: 'xerox',
+            filename: `xerox_${Date.now()}.pdf`,
+            file_path: '',
+            file_size: 0,
+            pages: numCopies,
+            price_per_page: XEROX_PRICE_PER_COPY,
+            total_cost: totalCost,
+            status: 'PENDING',
+            payment_status: 'pending',
+            metadata: { copies: numCopies, scan_options: scan_options || {} }
+        });
+
+        res.json({
+            job_id: jobId,
+            copies: numCopies,
+            price_per_copy: XEROX_PRICE_PER_COPY,
+            total_cost: totalCost,
+            currency: 'INR'
+        });
+
+    } catch (error) {
+        console.error('[Xerox] Error:', error);
+        res.status(500).json({ error: 'Failed to create xerox job' });
     }
 });
 

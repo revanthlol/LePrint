@@ -75,6 +75,8 @@ async function pollForJobs(cloudServer, kioskId, state, socket, logger) {
 
         if (job.job_type === "scan") {
           await processScanJob(firstJobId, cloudServer, state, socket, logger);
+        } else if (job.job_type === "xerox") {
+          await processXeroxJob(firstJobId, cloudServer, state, socket, logger);
         } else {
           await processJob(firstJobId, state, socket, logger);
         }
@@ -217,6 +219,8 @@ async function processJob(jobId, state, socket, logger) {
 
       if (nextJob && nextJob.job_type === "scan") {
         await processScanJob(nextJobId, state._cloudServer, state, socket, logger);
+      } else if (nextJob && nextJob.job_type === "xerox") {
+        await processXeroxJob(nextJobId, state._cloudServer, state, socket, logger);
       } else {
         await processJob(nextJobId, state, socket, logger);
       }
@@ -296,6 +300,89 @@ async function processScanJob(jobId, cloudServer, state, socket, logger) {
   }
 }
 
+// ==================== XEROX (PHOTOCOPY) JOB ====================
+
+async function processXeroxJob(jobId, cloudServer, state, socket, logger) {
+  const job = state.pendingJobs.get(jobId);
+
+  if (!job) return;
+
+  ensureTempDir();
+
+  state.currentJob = jobId;
+
+  try {
+    const metadata = job.metadata || {};
+    const copies = metadata.copies || 1;
+    const scanOpts = metadata.scan_options || {};
+
+    logger.info(`📋 Xerox job received: ${jobId} (${copies} copies)`);
+
+    socket.emit("job_state_change", {
+      job_id: jobId,
+      status: "DISCOVERING_SCANNER",
+      status_message: "Detecting scanner",
+    });
+
+    const scanOptions = {
+      resolution: scanOpts.resolution || 300,
+      colorMode: scanOpts.colorMode || "RGB24",
+      format: "application/pdf",
+    };
+
+    socket.emit("job_state_change", {
+      job_id: jobId,
+      status: "SCANNING",
+      status_message: "Scanning document for xerox",
+    });
+
+    const scanOutputPath = await scanner.scan(scanOptions, "./print-queue");
+
+    logger.info(`✓ Scan complete, printing ${copies} copies...`);
+
+    socket.emit("job_state_change", {
+      job_id: jobId,
+      status: "PRINTING",
+      status_message: `Printing ${copies} copy${copies > 1 ? "ies" : ""}`,
+    });
+
+    const printResult = await printer.printDocument(
+      state.printerName,
+      scanOutputPath,
+      copies,
+      logger,
+    );
+
+    socket.emit("print_complete", {
+      job_id: jobId,
+      success: true,
+      pages_printed: printResult.pages * copies,
+    });
+
+    logger.info(`✓ Xerox job ${jobId} completed`);
+
+    setTimeout(() => {
+      try {
+        if (fs.existsSync(scanOutputPath)) fs.unlinkSync(scanOutputPath);
+        logger.info("🗑 Xerox temp files cleaned");
+      } catch (err) {
+        logger.warn(`Cleanup error: ${err.message}`);
+      }
+    }, 5000);
+  } catch (error) {
+    logger.error(`Xerox error: ${error.message}`);
+
+    socket.emit("print_complete", {
+      job_id: jobId,
+      success: false,
+      error: error.message,
+    });
+  } finally {
+    state.currentJob = null;
+    state.pendingJobs.delete(jobId);
+  }
+}
+
 // ==================== POLLING INTERVAL ====================
 
 function startPolling(
@@ -326,6 +413,7 @@ module.exports = {
   pollForJobs,
   processJob,
   processScanJob,
+  processXeroxJob,
   startPolling,
   initScanner,
 };

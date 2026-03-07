@@ -1,7 +1,8 @@
 import React, { Suspense } from 'react';
-import { 
-  Loader2, QrCode, AlertCircle, Zap, FileUp, 
-  IndianRupee, CheckCircle, Printer 
+import {
+  Loader2, QrCode, AlertCircle, Zap, FileUp,
+  IndianRupee, CheckCircle, Printer,
+  ScanLine, Copy, Download, Minus, Plus, ArrowLeft
 } from 'lucide-react';
 import { getFileIcon, getFileExt } from './printUtils';
 import { AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
@@ -513,6 +514,345 @@ export function CompletedView({ printAnotherOnSameKiosk, resetFlow }) {
     </div>
   );
 }
+
+// ─── VIEW: Service Selector (Print / Scan / Xerox) ──────────
+export function ServiceSelectView({ selectService, resetFlow }) {
+    const services = [
+        {
+            type: 'print',
+            icon: Printer,
+            title: 'Print',
+            desc: 'Upload a document to print',
+        },
+        {
+            type: 'scan',
+            icon: ScanLine,
+            title: 'Scan',
+            desc: 'Scan a document to PDF',
+        },
+        {
+            type: 'xerox',
+            icon: Copy,
+            title: 'Xerox',
+            desc: 'Photocopy a document',
+        },
+    ];
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-3"
+        >
+            <p className="text-sm text-muted-foreground text-center mb-2">
+                What would you like to do?
+            </p>
+            {services.map((svc) => {
+                const Icon = svc.icon;
+                return (
+                    <motion.button
+                        key={svc.type}
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => selectService(svc.type)}
+                        className="w-full flex items-center gap-4 bg-white/5 hover:bg-white/10 border border-border hover:border-white/20 rounded-xl p-4 text-left transition-all"
+                    >
+                        <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
+                            <Icon className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <p className="text-foreground font-semibold">{svc.title}</p>
+                            <p className="text-xs text-muted-foreground">{svc.desc}</p>
+                        </div>
+                    </motion.button>
+                );
+            })}
+
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFlow}
+                className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5 mt-2"
+            >
+                <ArrowLeft className="mr-1 w-4 h-4" /> Scan Different Kiosk
+            </Button>
+        </motion.div>
+    );
+}
+
+
+// ─── VIEW: Scan Options ─────────────────────────────────────
+export function ScanOptionsView({ scanOptions, setScanOptions, handleScanStart, backToServiceSelect }) {
+    const resolutions = [150, 300, 600];
+    const colorModes = [
+        { value: 'RGB24', label: 'Color' },
+        { value: 'Grayscale8', label: 'Grayscale' },
+        { value: 'BlackAndWhite1', label: 'B&W' },
+    ];
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-5"
+        >
+            <div className="text-center">
+                <ScanLine className="w-10 h-10 mx-auto text-white mb-2" />
+                <h3 className="text-lg font-bold text-foreground">Scan Options</h3>
+                <p className="text-xs text-muted-foreground">Place your document on the scanner</p>
+            </div>
+
+            {/* Resolution */}
+            <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Resolution (DPI)</label>
+                <div className="flex gap-2">
+                    {resolutions.map((dpi) => (
+                        <button
+                            key={dpi}
+                            onClick={() => setScanOptions(prev => ({ ...prev, resolution: dpi }))}
+                            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                                scanOptions.resolution === dpi
+                                    ? 'bg-white text-black'
+                                    : 'bg-white/5 text-muted-foreground border border-border hover:bg-white/10'
+                            }`}
+                        >
+                            {dpi}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Color Mode */}
+            <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Color Mode</label>
+                <div className="flex gap-2">
+                    {colorModes.map((mode) => (
+                        <button
+                            key={mode.value}
+                            onClick={() => setScanOptions(prev => ({ ...prev, colorMode: mode.value }))}
+                            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                                scanOptions.colorMode === mode.value
+                                    ? 'bg-white text-black'
+                                    : 'bg-white/5 text-muted-foreground border border-border hover:bg-white/10'
+                            }`}
+                        >
+                            {mode.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Price info */}
+            <div className="bg-white/5 border border-border rounded-xl p-3 flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Scan Price</span>
+                <span className="text-lg font-bold text-foreground">₹5</span>
+            </div>
+
+            <Button
+                onClick={handleScanStart}
+                className="w-full bg-white text-black hover:bg-neutral-200 font-bold py-6 text-lg transition-colors"
+            >
+                <ScanLine className="mr-2 h-5 w-5" />
+                Start Scan — ₹5
+            </Button>
+
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={backToServiceSelect}
+                className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5"
+            >
+                <ArrowLeft className="mr-1 w-4 h-4" /> Back
+            </Button>
+        </motion.div>
+    );
+}
+
+
+// ─── VIEW: Scanning in progress ─────────────────────────────
+export function ScanningView() {
+    return (
+        <div className="space-y-6 text-center py-8">
+            <div className="relative">
+                <Loader2 className="animate-spin h-16 w-16 mx-auto text-white" />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="h-20 w-20 bg-white/10 rounded-full blur-xl"></div>
+                </div>
+            </div>
+            <div>
+                <p className="text-xl font-semibold mb-2 text-foreground">Scanning...</p>
+                <p className="text-sm text-muted-foreground">Please wait while the document is scanned</p>
+            </div>
+        </div>
+    );
+}
+
+
+// ─── VIEW: Scan Complete ────────────────────────────────────
+export function ScanCompleteView({ scanResult, printAnotherOnSameKiosk, resetFlow }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="space-y-6 text-center py-6"
+        >
+            <div className="relative">
+                <CheckCircle className="h-20 w-20 mx-auto text-foreground" />
+            </div>
+            <div>
+                <p className="text-2xl font-bold mb-2 text-foreground">Scan Complete!</p>
+                <p className="text-sm text-muted-foreground">Your document has been scanned</p>
+            </div>
+
+            <div className="space-y-3">
+                {scanResult?.downloadUrl && (
+                    <a
+                        href={scanResult.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                    >
+                        <Button className="w-full bg-white text-black hover:bg-neutral-200 font-bold py-6 text-lg transition-colors">
+                            <Download className="mr-2 h-5 w-5" />
+                            Download Scanned PDF
+                        </Button>
+                    </a>
+                )}
+
+                <Button
+                    onClick={printAnotherOnSameKiosk}
+                    variant="outline"
+                    className="w-full border-border hover:bg-white/5 py-5 transition-colors"
+                >
+                    <ScanLine className="mr-2 h-5 w-5" />
+                    Scan Another Document
+                </Button>
+
+                <Button
+                    onClick={resetFlow}
+                    variant="ghost"
+                    className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5"
+                >
+                    <ArrowLeft className="mr-1 w-4 h-4" /> Exit to Scanner
+                </Button>
+            </div>
+        </motion.div>
+    );
+}
+
+
+// ─── VIEW: Xerox Options ────────────────────────────────────
+export function XeroxOptionsView({ xeroxCopies, setXeroxCopies, scanOptions, setScanOptions, handleXeroxStart, backToServiceSelect }) {
+    const PRICE_PER_COPY = 5;
+    const totalPrice = xeroxCopies * PRICE_PER_COPY;
+
+    const colorModes = [
+        { value: 'RGB24', label: 'Color' },
+        { value: 'Grayscale8', label: 'Grayscale' },
+        { value: 'BlackAndWhite1', label: 'B&W' },
+    ];
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-5"
+        >
+            <div className="text-center">
+                <Copy className="w-10 h-10 mx-auto text-white mb-2" />
+                <h3 className="text-lg font-bold text-foreground">Xerox Options</h3>
+                <p className="text-xs text-muted-foreground">Place your document on the scanner</p>
+            </div>
+
+            {/* Copies counter */}
+            <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Number of Copies</label>
+                <div className="flex items-center justify-center gap-4">
+                    <button
+                        onClick={() => setXeroxCopies(prev => Math.max(1, prev - 1))}
+                        disabled={xeroxCopies <= 1}
+                        className="w-12 h-12 rounded-lg bg-white/5 border border-border hover:bg-white/10 flex items-center justify-center disabled:opacity-30 transition-all"
+                    >
+                        <Minus className="w-5 h-5 text-foreground" />
+                    </button>
+                    <span className="text-4xl font-bold text-foreground w-16 text-center">{xeroxCopies}</span>
+                    <button
+                        onClick={() => setXeroxCopies(prev => Math.min(20, prev + 1))}
+                        disabled={xeroxCopies >= 20}
+                        className="w-12 h-12 rounded-lg bg-white/5 border border-border hover:bg-white/10 flex items-center justify-center disabled:opacity-30 transition-all"
+                    >
+                        <Plus className="w-5 h-5 text-foreground" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Color Mode */}
+            <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Color Mode</label>
+                <div className="flex gap-2">
+                    {colorModes.map((mode) => (
+                        <button
+                            key={mode.value}
+                            onClick={() => setScanOptions(prev => ({ ...prev, colorMode: mode.value }))}
+                            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                                scanOptions.colorMode === mode.value
+                                    ? 'bg-white text-black'
+                                    : 'bg-white/5 text-muted-foreground border border-border hover:bg-white/10'
+                            }`}
+                        >
+                            {mode.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Price */}
+            <div className="bg-white/5 border border-border rounded-xl p-4">
+                <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-muted-foreground">₹{PRICE_PER_COPY} x {xeroxCopies} {xeroxCopies === 1 ? 'copy' : 'copies'}</span>
+                    <span className="text-2xl font-bold text-foreground">₹{totalPrice}</span>
+                </div>
+            </div>
+
+            <Button
+                onClick={handleXeroxStart}
+                className="w-full bg-white text-black hover:bg-neutral-200 font-bold py-6 text-lg transition-colors"
+            >
+                <IndianRupee className="mr-2 h-5 w-5" />
+                Xerox {xeroxCopies} {xeroxCopies === 1 ? 'Copy' : 'Copies'} — ₹{totalPrice}
+            </Button>
+
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={backToServiceSelect}
+                className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5"
+            >
+                <ArrowLeft className="mr-1 w-4 h-4" /> Back
+            </Button>
+        </motion.div>
+    );
+}
+
+
+// ─── VIEW: Xeroxing in progress ─────────────────────────────
+export function XeroxingView() {
+    return (
+        <div className="space-y-6 text-center py-8">
+            <div className="relative">
+                <Loader2 className="animate-spin h-16 w-16 mx-auto text-white" />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="h-20 w-20 bg-white/10 rounded-full blur-xl"></div>
+                </div>
+            </div>
+            <div>
+                <p className="text-xl font-semibold mb-2 text-foreground">Xeroxing...</p>
+                <p className="text-sm text-muted-foreground">Scanning & printing your copies</p>
+            </div>
+        </div>
+    );
+}
+
 
 export function LogTerminal({ logs }) {
   return (

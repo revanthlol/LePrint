@@ -23,12 +23,21 @@ export function usePrint() {
     const [scannerActive, setScannerActive] = useState(true);
     const [printerStatusResult, setPrinterStatusResult] = useState(null);
 
+    // Scan & Xerox state
+    const [serviceType, setServiceType] = useState('print');
+    const [scanResult, setScanResult] = useState(null);
+    const [scanOptions, setScanOptions] = useState({
+        resolution: 300,
+        colorMode: 'RGB24'
+    });
+    const [xeroxCopies, setXeroxCopies] = useState(1);
+
     const addLog = useCallback((msg) => {
         setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 49)]);
     }, []);
 
     // ==========================================
-    // 2. Core Helper Functions 
+    // 2. Core Helper Functions
     // (Moved UP so they exist before they are called)
     // ==========================================
 
@@ -43,7 +52,7 @@ export function usePrint() {
             }, { timeout: 5000 });
 
             if (response.data.status === 'connected') {
-                setStatus('CONNECTED');
+                setStatus('SERVICE_SELECT');
                 addLog(`✓ Connected to "${response.data.kiosk_name || kioskId}"`);
                 addLog(`Printer: ${response.data.printer || 'Unknown'}`);
             }
@@ -138,9 +147,10 @@ export function usePrint() {
         }
     }, [addLog, checkKioskStatus]);
 
-    // Status polling for print jobs
+    // Status polling for print/scan/xerox jobs
     useEffect(() => {
-        if (!pricing?.job_id || status !== 'PRINTING') return;
+        const pollStatuses = ['PRINTING', 'SCANNING', 'XEROXING'];
+        if (!pricing?.job_id || !pollStatuses.includes(status)) return;
 
         const pollInterval = setInterval(async () => {
             try {
@@ -153,12 +163,20 @@ export function usePrint() {
                 addLog(`Status: ${jobStatus}`);
 
                 if (jobStatus === 'COMPLETED') {
-                    setStatus('COMPLETED');
+                    if (serviceType === 'scan') {
+                        // Fetch the download URL for scan result
+                        setScanResult({
+                            downloadUrl: `${API_URL}/api/jobs/${pricing.job_id}/download`
+                        });
+                        setStatus('SCAN_COMPLETE');
+                    } else {
+                        setStatus('COMPLETED');
+                    }
                     clearInterval(pollInterval);
                 } else if (jobStatus === 'FAILED' || jobStatus === 'CANCELLED') {
                     setStatus('ERROR');
                     clearInterval(pollInterval);
-                    addLog(`Print failed: ${response.data.error_message || 'Unknown error'}`);
+                    addLog(`Job failed: ${response.data.error_message || 'Unknown error'}`);
                 }
 
             } catch (e) {
@@ -167,7 +185,7 @@ export function usePrint() {
         }, 3000);
 
         return () => clearInterval(pollInterval);
-    }, [pricing?.job_id, status, API_URL, addLog, getAuthHeader]);
+    }, [pricing?.job_id, status, serviceType, API_URL, addLog, getAuthHeader]);
 
     // ==========================================
     // 4. Handlers
@@ -247,7 +265,7 @@ export function usePrint() {
 
             setConfig(printerData);
             setStatus('SCANNED');
-            
+
             // This call was also causing errors. Now it works.
             checkKioskStatus(printerData.kiosk_id);
 
@@ -287,6 +305,99 @@ export function usePrint() {
         setScannerActive(true);
         addLog('Ready to scan');
     }, [addLog]);
+
+    // ---- Service Selection ----
+
+    const selectService = useCallback((type) => {
+        setServiceType(type);
+        if (type === 'print') {
+            setStatus('CONNECTED');
+            addLog('Selected: Print');
+        } else if (type === 'scan') {
+            setStatus('SCAN_OPTIONS');
+            addLog('Selected: Scan');
+        } else if (type === 'xerox') {
+            setStatus('XEROX_OPTIONS');
+            addLog('Selected: Xerox (Photocopy)');
+        }
+    }, [addLog]);
+
+    // ---- Scan Job ----
+
+    const handleScanStart = useCallback(async () => {
+        setStatus('SCANNING');
+        addLog('Creating scan job...');
+
+        try {
+            const authHeader = await getAuthHeader();
+            const response = await axios.post(`${API_URL}/api/jobs/scan`, {
+                kiosk_id: config.kiosk_id,
+                scan_options: scanOptions
+            }, {
+                headers: { 'Authorization': authHeader },
+                timeout: 10000
+            });
+
+            const { job_id } = response.data;
+            setPricing({ job_id, totalPrice: 5 });
+            addLog(`Scan job created: ${job_id}`);
+            addLog('Scanning in progress...');
+
+        } catch (e) {
+            if (e.response?.status === 401) {
+                addLog('Session expired. Please log in again.');
+                await signOut();
+                return;
+            }
+
+            setStatus('ERROR');
+            addLog(`Scan error: ${e.response?.data?.error || e.message}`);
+        }
+    }, [config, scanOptions, API_URL, addLog, getAuthHeader, signOut]);
+
+    // ---- Xerox Job ----
+
+    const handleXeroxStart = useCallback(async () => {
+        setStatus('XEROXING');
+        addLog(`Creating xerox job (${xeroxCopies} copies)...`);
+
+        try {
+            const authHeader = await getAuthHeader();
+            const response = await axios.post(`${API_URL}/api/jobs/xerox`, {
+                kiosk_id: config.kiosk_id,
+                copies: xeroxCopies,
+                scan_options: scanOptions
+            }, {
+                headers: { 'Authorization': authHeader },
+                timeout: 10000
+            });
+
+            const { job_id, total_cost } = response.data;
+
+            // Auto-pay for xerox (same as scan — mock payment)
+            await axios.post(
+                `${API_URL}/api/jobs/${job_id}/verify-payment`,
+                { payment_id: 'mock_payment_' + Date.now() },
+                { headers: { 'Authorization': authHeader } }
+            );
+
+            setPricing({ job_id, totalPrice: total_cost });
+            addLog(`Xerox job created & paid: ₹${total_cost}`);
+            addLog('Scanning & printing in progress...');
+
+        } catch (e) {
+            if (e.response?.status === 401) {
+                addLog('Session expired. Please log in again.');
+                await signOut();
+                return;
+            }
+
+            setStatus('ERROR');
+            addLog(`Xerox error: ${e.response?.data?.error || e.message}`);
+        }
+    }, [config, xeroxCopies, scanOptions, API_URL, addLog, getAuthHeader, signOut]);
+
+    // ---- Existing Print Handlers ----
 
     const handleFileSelect = useCallback(async (selectedFile) => {
         if (!selectedFile) return;
@@ -370,21 +481,36 @@ export function usePrint() {
     }, [pricing, API_URL, addLog, getAuthHeader, signOut]);
 
     const resetFlow = useCallback(() => {
-        console.log('🔄 resetFlow called!'); 
+        console.log('🔄 resetFlow called!');
         setStatus('IDLE');
         setConfig(null);
         setFile(null);
         setPricing(null);
-        setPrinterStatusResult(null); 
+        setPrinterStatusResult(null);
         setScannerActive(true);
+        setServiceType('print');
+        setScanResult(null);
+        setXeroxCopies(1);
         addLog('Reset to scanner');
     }, [addLog]);
 
     const printAnotherOnSameKiosk = useCallback(() => {
-        setStatus('CONNECTED');
+        setStatus('SERVICE_SELECT');
         setFile(null);
         setPricing(null);
-        addLog('Ready for next document');
+        setServiceType('print');
+        setScanResult(null);
+        setXeroxCopies(1);
+        addLog('Ready for next job');
+    }, [addLog]);
+
+    const backToServiceSelect = useCallback(() => {
+        setStatus('SERVICE_SELECT');
+        setFile(null);
+        setPricing(null);
+        setScanResult(null);
+        setXeroxCopies(1);
+        addLog('Back to service selection');
     }, [addLog]);
 
     // ==========================================
@@ -400,6 +526,10 @@ export function usePrint() {
         cameraError,
         scannerActive,
         printerStatusResult,
+        serviceType,
+        scanResult,
+        scanOptions,
+        xeroxCopies,
 
         // Handlers
         handleScan,
@@ -412,12 +542,18 @@ export function usePrint() {
         checkKioskStatus,
         proceedDespiteWarning,
         rescanQR,
+        selectService,
+        handleScanStart,
+        handleXeroxStart,
+        backToServiceSelect,
 
         // Setters
         setStatus,
         setFile,
         setPricing,
         setScannerActive,
-        setCameraError
+        setCameraError,
+        setScanOptions,
+        setXeroxCopies
     };
 }

@@ -29,11 +29,8 @@ function startScheduledTasks() {
                 }
             }
 
-            const deletedCount = await db.deleteExpiredJobs(24);
-
-            if (deletedCount > 0) {
-                console.log(`[Cleanup] Deleted ${deletedCount} old job records`);
-            }
+            // Job records are kept permanently for history.
+            // Only uploaded files are cleaned up (see tasks 3 & 5).
 
         } catch (error) {
             console.error('[Cleanup] DB Error:', error);

@@ -149,7 +149,7 @@ function startScheduledTasks() {
     setInterval(() => {
 
         const uploadDir = path.join(__dirname, '../uploads');
-        const maxAgeMinutes = 10;
+        const maxAgeMinutes = 120; // 2 hours — was 10 min, which deleted files before pi-agent could download
 
         try {
 

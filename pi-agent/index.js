@@ -18,7 +18,7 @@ const CONFIG = {
   frontendUrl: process.env.FRONTEND_URL || 'https://qr-wifi-printer.vercel.app',
   tempDir: './print-queue',
   heartbeatInterval: 30000,
-  pollInterval: parseInt(process.env.POLL_INTERVAL) || 2000
+  pollInterval: parseInt(process.env.POLL_INTERVAL) || 5000
 };
 
 // ==================== STATE ====================

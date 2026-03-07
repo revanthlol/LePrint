@@ -334,6 +334,7 @@ router.get('/jobs/:job_id/download', async (req, res) => {
         }
 
         if (!fs.existsSync(job.file_path)) {
+            console.error(`[Download] File missing for job ${job_id}: ${job.file_path}`);
             return res.status(404).json({ error: 'File missing' });
         }
 

@@ -14,8 +14,9 @@ let scanner = null;
 
 // ==================== INITIALIZATION ====================
 
-function initScanner(printerIP, logger) {
+async function initScanner(printerIP, logger) {
   scanner = new Scanner(printerIP, logger);
+  await scanner.init();
   logger.info("✓ Scanner initialized");
 }
 

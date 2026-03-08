@@ -1,23 +1,24 @@
 // pi-agent/modules/scanner.js
+// Uses SANE (scanimage) as primary method, raw eSCL HTTP as fallback.
 const axios = require('axios');
 const xml2js = require('xml2js');
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
+
+// Map frontend color modes to SANE --mode values
+const SANE_MODE_MAP = {
+  'RGB24': 'Color',
+  'Grayscale8': 'Gray',
+  'BlackAndWhite1': 'Lineart'
+};
 
 class Scanner {
   constructor(printerIP, logger) {
     this.printerIP = printerIP;
-    this.baseURL = `http://${printerIP}/eSCL`;
     this.logger = logger;
-    this.capabilities = null;
-    this.supportedColorModes = [];
-    this.supportedResolutions = [];
-    this.supportedFormats = [];
-    this.maxWidth = 2550;
-    this.maxHeight = 3508;
-    this.hasPlaten = false;
-    this.hasAdf = false;
+    this.saneDevice = null;  // e.g. "escl:http://192.168.0.4:80"
+    this.useSANE = false;
   }
 
   // ==================== AUTO-DISCOVERY ====================
@@ -55,346 +56,303 @@ class Scanner {
     return null;
   }
 
-  // ==================== CAPABILITIES ====================
+  // ==================== INITIALIZATION ====================
 
-  async getCapabilities() {
+  /**
+   * Probe for SANE scanimage availability and find the scanner device.
+   * Call this once at startup.
+   */
+  async init() {
+    // 1. Check if scanimage exists
     try {
-      const response = await axios.get(`${this.baseURL}/ScannerCapabilities`, {
+      execSync('which scanimage', { encoding: 'utf-8', timeout: 3000 });
+    } catch {
+      this.logger.warn('[Scanner] scanimage not found — install sane-utils');
+      return;
+    }
+
+    // 2. Try to build device URI from known IP
+    const deviceURI = `escl:http://${this.printerIP}:80`;
+
+    // 3. Verify the device responds by listing it
+    try {
+      // Quick test: try to get parameters from the device
+      execSync(`scanimage --device-name='${deviceURI}' --help 2>&1 | head -5`, {
+        encoding: 'utf-8',
         timeout: 15000
       });
-
-      // Log raw XML for debugging on first fetch
-      this.logger.info(`[Scanner] Raw capabilities length: ${response.data.length} chars`);
-
-      const result = await xml2js.parseStringPromise(response.data);
-      this.capabilities = result;
-
-      this._parseCapabilities(result);
-
-      this.logger.info('✓ Scanner capabilities fetched');
-      return this.capabilities;
-    } catch (error) {
-      throw new Error(`Scanner discovery failed: ${error.message}`);
+      this.saneDevice = deviceURI;
+      this.useSANE = true;
+      this.logger.info(`✓ SANE scanner ready: ${deviceURI}`);
+      return;
+    } catch (e) {
+      this.logger.info(`[Scanner] Direct device URI failed, trying discovery...`);
     }
-  }
 
-  _parseCapabilities(caps) {
+    // 4. Fallback: full SANE device discovery
     try {
-      // The root element may or may not have namespace prefix
-      const root = caps['scan:ScannerCapabilities']
-                || caps['ScannerCapabilities']
-                || caps[Object.keys(caps)[0]]
-                || {};
+      const output = execSync('scanimage -L 2>&1', {
+        encoding: 'utf-8',
+        timeout: 20000
+      });
 
-      // Log top-level keys for debugging
-      this.logger.info(`[Scanner] Capability root keys: ${Object.keys(root).join(', ')}`);
-
-      // Try Platen (flatbed)
-      let inputCaps = this._dig(root, 'scan:Platen', 'scan:PlatenInputCaps');
-      if (inputCaps) this.hasPlaten = true;
-
-      // Try ADF if no platen
-      if (!inputCaps) {
-        inputCaps = this._dig(root, 'scan:Adf', 'scan:AdfSimplexInputCaps');
-        if (inputCaps) this.hasAdf = true;
-      }
-
-      // Try without namespace prefix
-      if (!inputCaps) {
-        inputCaps = this._dig(root, 'Platen', 'PlatenInputCaps');
-        if (inputCaps) this.hasPlaten = true;
-      }
-
-      if (!inputCaps) {
-        this.logger.warn('[Scanner] Could not find input caps, logging full structure...');
-        this.logger.warn(`[Scanner] Root keys: ${JSON.stringify(Object.keys(root))}`);
-        // Try to find any key containing "Platen" or "InputCaps"
-        for (const key of Object.keys(root)) {
-          if (key.toLowerCase().includes('platen') || key.toLowerCase().includes('input')) {
-            this.logger.info(`[Scanner] Found potential input: ${key}`);
-            const nested = Array.isArray(root[key]) ? root[key][0] : root[key];
-            if (typeof nested === 'object') {
-              this.logger.info(`[Scanner]   Sub-keys: ${Object.keys(nested).join(', ')}`);
-            }
+      // Parse: device `escl:http://192.168.0.4:80' is a HP LaserJet
+      const lines = output.split('\n');
+      for (const line of lines) {
+        const match = line.match(/device\s+[`']([^'`]+)[`']/);
+        if (match) {
+          const dev = match[1];
+          // Prefer escl/airscan devices, skip v4l (webcam) etc
+          if (dev.includes('escl') || dev.includes('airscan') || dev.includes('hp')) {
+            this.saneDevice = dev;
+            this.useSANE = true;
+            this.logger.info(`✓ SANE scanner discovered: ${dev}`);
+            return;
           }
         }
-        return;
       }
 
-      this.logger.info(`[Scanner] Input source: ${this.hasPlaten ? 'Platen' : 'ADF'}`);
-
-      this.maxWidth = parseInt(this._val(inputCaps, 'scan:MaxWidth') || this._val(inputCaps, 'MaxWidth')) || 2550;
-      this.maxHeight = parseInt(this._val(inputCaps, 'scan:MaxHeight') || this._val(inputCaps, 'MaxHeight')) || 3508;
-
-      // Setting profiles may be directly under inputCaps or nested
-      const profile = this._dig(inputCaps, 'scan:SettingProfiles', 'scan:SettingProfile')
-                   || this._dig(inputCaps, 'SettingProfiles', 'SettingProfile');
-
-      if (!profile) {
-        this.logger.warn('[Scanner] No SettingProfile found');
-        this.logger.info(`[Scanner] InputCaps keys: ${Object.keys(inputCaps).join(', ')}`);
-        return;
+      // Use first device found if no eSCL-specific one
+      for (const line of lines) {
+        const match = line.match(/device\s+[`']([^'`]+)[`']/);
+        if (match) {
+          this.saneDevice = match[1];
+          this.useSANE = true;
+          this.logger.info(`✓ SANE scanner (generic): ${this.saneDevice}`);
+          return;
+        }
       }
 
-      // Color modes
-      const colorModes = this._dig(profile, 'scan:ColorModes') || this._dig(profile, 'ColorModes');
-      if (colorModes) {
-        const modes = colorModes['scan:ColorMode'] || colorModes['ColorMode'];
-        if (modes) this.supportedColorModes = [].concat(modes);
-      }
-
-      // Resolutions
-      const discreteRes = this._dig(profile, 'scan:SupportedResolutions', 'scan:DiscreteResolutions')
-                       || this._dig(profile, 'SupportedResolutions', 'DiscreteResolutions');
-      if (discreteRes) {
-        const resList = [].concat(
-          discreteRes['scan:DiscreteResolution'] || discreteRes['DiscreteResolution'] || []
-        );
-        this.supportedResolutions = resList
-          .map(r => {
-            const xr = r['scan:XResolution'] || r['XResolution'];
-            return parseInt(Array.isArray(xr) ? xr[0] : xr);
-          })
-          .filter(Boolean);
-      }
-
-      // Document formats — can be under profile or under inputCaps directly
-      const fmtContainer = this._dig(profile, 'scan:DocumentFormats')
-                        || this._dig(profile, 'DocumentFormats')
-                        || this._dig(inputCaps, 'scan:DocumentFormats')
-                        || this._dig(inputCaps, 'DocumentFormats');
-      if (fmtContainer) {
-        const fmts = fmtContainer['pwg:DocumentFormat']
-                  || fmtContainer['scan:DocumentFormat']
-                  || fmtContainer['DocumentFormat'];
-        if (fmts) this.supportedFormats = [].concat(fmts);
-      }
-
-      this.logger.info(`  Colors: [${this.supportedColorModes.join(', ')}]`);
-      this.logger.info(`  Resolutions: [${this.supportedResolutions.join(', ')}]`);
-      this.logger.info(`  Formats: [${this.supportedFormats.join(', ')}]`);
-      this.logger.info(`  Max scan area: ${this.maxWidth}x${this.maxHeight}`);
+      this.logger.warn('[Scanner] scanimage -L found no devices');
     } catch (e) {
-      this.logger.warn(`[Scanner] Capability parse error: ${e.message}`);
+      this.logger.warn(`[Scanner] SANE discovery failed: ${e.message}`);
     }
   }
 
-  _dig(obj, ...keys) {
-    let current = obj;
-    for (const key of keys) {
-      if (!current?.[key]) return null;
-      current = Array.isArray(current[key]) ? current[key][0] : current[key];
+  // ==================== SANE-BASED SCANNING ====================
+
+  async scanWithSANE(options, outputDir) {
+    const mode = SANE_MODE_MAP[options.colorMode] || 'Color';
+    const resolution = options.resolution || 300;
+    const timestamp = Date.now();
+    const pngPath = path.join(outputDir, `scan_${timestamp}.png`);
+    const pdfPath = path.join(outputDir, `scan_${timestamp}.pdf`);
+
+    this.logger.info(`[SANE] Scanning: device=${this.saneDevice}, mode=${mode}, res=${resolution}`);
+
+    try {
+      // scanimage outputs to file via --output-file or shell redirect
+      const cmd = `scanimage --device-name='${this.saneDevice}' --mode=${mode} --resolution=${resolution} --format=png --output-file='${pngPath}' 2>&1`;
+      const output = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });
+      if (output.trim()) this.logger.info(`[SANE] ${output.trim()}`);
+    } catch (e) {
+      // Some scanimage versions don't support --output-file, try redirect
+      this.logger.info('[SANE] Retrying with shell redirect...');
+      try {
+        execSync(
+          `scanimage --device-name='${this.saneDevice}' --mode=${mode} --resolution=${resolution} --format=png > '${pngPath}' 2>/dev/null`,
+          { timeout: 120000, shell: true }
+        );
+      } catch (e2) {
+        throw new Error(`SANE scan failed: ${e2.message}`);
+      }
     }
-    return current;
+
+    // Verify output file exists and has content
+    if (!fs.existsSync(pngPath) || fs.statSync(pngPath).size === 0) {
+      throw new Error('SANE scan produced no output');
+    }
+
+    this.logger.info(`✓ Scan captured: ${(fs.statSync(pngPath).size / 1024).toFixed(0)} KB`);
+
+    // Convert PNG to PDF
+    this.logger.info('[SANE] Converting to PDF...');
+    try {
+      execSync(`convert '${pngPath}' '${pdfPath}'`, { timeout: 30000 });
+      fs.unlinkSync(pngPath);
+      this.logger.info('✓ PDF created');
+      return pdfPath;
+    } catch (convErr) {
+      // If convert fails, return the PNG — backend can still serve it
+      this.logger.warn(`PNG→PDF conversion failed: ${convErr.message}`);
+      return pngPath;
+    }
   }
 
-  _val(obj, key) {
-    if (!obj?.[key]) return null;
-    return Array.isArray(obj[key]) ? obj[key][0] : obj[key];
-  }
+  // ==================== RAW eSCL FALLBACK ====================
 
-  // ==================== OPTION VALIDATION ====================
+  async scanWithESCL(options, outputDir) {
+    const baseURL = `http://${this.printerIP}/eSCL`;
 
-  _validateOptions(options) {
-    let { resolution, colorMode, format } = options;
+    // Fetch capabilities
+    this.logger.info('[eSCL] Fetching scanner capabilities...');
+    const capsResp = await axios.get(`${baseURL}/ScannerCapabilities`, { timeout: 15000 });
+    this.logger.info(`[eSCL] Capabilities: ${capsResp.data.length} chars`);
 
-    if (this.supportedColorModes.length > 0 && !this.supportedColorModes.includes(colorMode)) {
-      const fallback = this.supportedColorModes.includes('Grayscale8')
-        ? 'Grayscale8'
-        : this.supportedColorModes[0];
-      this.logger.warn(`ColorMode '${colorMode}' not supported, using '${fallback}'`);
-      colorMode = fallback;
-    }
+    // Build scan settings — try multiple XML formats
+    const colorMode = options.colorMode || 'RGB24';
+    const resolution = options.resolution || 300;
+    const format = 'application/pdf';
 
-    if (this.supportedResolutions.length > 0 && !this.supportedResolutions.includes(resolution)) {
-      // Pick closest supported resolution
-      const sorted = [...this.supportedResolutions].sort((a, b) => Math.abs(a - resolution) - Math.abs(b - resolution));
-      const fallback = sorted[0];
-      this.logger.warn(`Resolution ${resolution} not supported, using ${fallback}`);
-      resolution = fallback;
-    }
-
-    if (this.supportedFormats.length > 0 && !this.supportedFormats.includes(format)) {
-      const fallback = this.supportedFormats.includes('application/pdf')
-        ? 'application/pdf'
-        : this.supportedFormats[0];
-      this.logger.warn(`Format '${format}' not supported, using '${fallback}'`);
-      format = fallback;
-    }
-
-    return { resolution, colorMode, format };
-  }
-
-  // ==================== SCAN JOB ====================
-
-  _buildScanXML(colorMode, resolution, format, width, height) {
-    const inputSource = this.hasAdf ? 'Adf' : 'Platen';
-
-    return `<?xml version="1.0" encoding="UTF-8"?>
+    const xmlVariants = [
+      // Variant 1: pwg:InputSource (SANE-style)
+      `<?xml version="1.0" encoding="UTF-8"?>
 <scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
   <pwg:Version>2.0</pwg:Version>
-  <scan:InputSource>${inputSource}</scan:InputSource>
-  <pwg:ScanRegions pwg:MustHonor="true">
+  <pwg:InputSource>Platen</pwg:InputSource>
+  <scan:ColorMode>${colorMode}</scan:ColorMode>
+  <scan:XResolution>${resolution}</scan:XResolution>
+  <scan:YResolution>${resolution}</scan:YResolution>
+  <scan:DocumentFormatExt>${format}</scan:DocumentFormatExt>
+  <pwg:ScanRegions>
     <pwg:ScanRegion>
       <pwg:ContentRegionUnits>escl:ThreeHundredthsOfInches</pwg:ContentRegionUnits>
-      <pwg:Height>${height}</pwg:Height>
-      <pwg:Width>${width}</pwg:Width>
+      <pwg:Height>3508</pwg:Height>
+      <pwg:Width>2480</pwg:Width>
       <pwg:XOffset>0</pwg:XOffset>
       <pwg:YOffset>0</pwg:YOffset>
     </pwg:ScanRegion>
   </pwg:ScanRegions>
+</scan:ScanSettings>`,
+
+      // Variant 2: scan:InputSource, pwg:DocumentFormat
+      `<?xml version="1.0" encoding="UTF-8"?>
+<scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
+  <pwg:Version>2.0</pwg:Version>
+  <scan:InputSource>Platen</scan:InputSource>
+  <scan:Intent>Document</scan:Intent>
   <scan:ColorMode>${colorMode}</scan:ColorMode>
   <scan:XResolution>${resolution}</scan:XResolution>
   <scan:YResolution>${resolution}</scan:YResolution>
   <pwg:DocumentFormat>${format}</pwg:DocumentFormat>
-</scan:ScanSettings>`;
-  }
+  <pwg:ScanRegions pwg:MustHonor="true">
+    <pwg:ScanRegion>
+      <pwg:ContentRegionUnits>escl:ThreeHundredthsOfInches</pwg:ContentRegionUnits>
+      <pwg:Height>3508</pwg:Height>
+      <pwg:Width>2480</pwg:Width>
+      <pwg:XOffset>0</pwg:XOffset>
+      <pwg:YOffset>0</pwg:YOffset>
+    </pwg:ScanRegion>
+  </pwg:ScanRegions>
+</scan:ScanSettings>`,
 
-  async createScanJob(options = {}) {
-    const validated = this._validateOptions({
-      resolution: options.resolution || 300,
-      colorMode: options.colorMode || 'RGB24',
-      format: options.format || 'application/pdf'
-    });
+      // Variant 3: Minimal — no ScanRegions at all
+      `<?xml version="1.0" encoding="UTF-8"?>
+<scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
+  <pwg:Version>2.0</pwg:Version>
+  <pwg:InputSource>Platen</pwg:InputSource>
+  <scan:ColorMode>${colorMode}</scan:ColorMode>
+  <scan:XResolution>${resolution}</scan:XResolution>
+  <scan:YResolution>${resolution}</scan:YResolution>
+  <pwg:DocumentFormat>${format}</pwg:DocumentFormat>
+</scan:ScanSettings>`,
 
-    const width = Math.min(options.width || 2480, this.maxWidth);
-    const height = Math.min(options.height || 3508, this.maxHeight);
-
-    // Try validated settings first, then progressively simpler fallbacks
-    const attempts = [
-      validated,
-      { colorMode: 'Grayscale8', resolution: 300, format: 'application/pdf' },
-      { colorMode: 'Grayscale8', resolution: 200, format: 'image/jpeg' },
+      // Variant 4: Absolute minimal with Grayscale + JPEG
+      `<?xml version="1.0" encoding="UTF-8"?>
+<scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
+  <pwg:Version>2.0</pwg:Version>
+  <pwg:InputSource>Platen</pwg:InputSource>
+  <scan:ColorMode>Grayscale8</scan:ColorMode>
+  <scan:XResolution>200</scan:XResolution>
+  <scan:YResolution>200</scan:YResolution>
+  <pwg:DocumentFormat>image/jpeg</pwg:DocumentFormat>
+</scan:ScanSettings>`,
     ];
 
-    // Deduplicate — skip fallbacks that are identical to an earlier attempt
-    const seen = new Set();
-    const uniqueAttempts = attempts.filter(a => {
-      const key = `${a.colorMode}_${a.resolution}_${a.format}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
     let lastError = null;
+    let usedFormat = format;
 
-    for (let i = 0; i < uniqueAttempts.length; i++) {
-      const settings = uniqueAttempts[i];
-      const scanSettings = this._buildScanXML(settings.colorMode, settings.resolution, settings.format, width, height);
-
-      this.logger.info(`  Attempt ${i + 1}: ${settings.colorMode}, ${settings.resolution}DPI, ${settings.format}`);
-
+    for (let i = 0; i < xmlVariants.length; i++) {
+      this.logger.info(`[eSCL] Attempt ${i + 1}/${xmlVariants.length}...`);
       try {
-        const response = await axios.post(`${this.baseURL}/ScanJobs`, scanSettings, {
+        const response = await axios.post(`${baseURL}/ScanJobs`, xmlVariants[i], {
           headers: { 'Content-Type': 'text/xml' },
           maxRedirects: 0,
-          validateStatus: status => status === 201
+          validateStatus: s => s === 201
         });
 
         const jobLocation = response.headers.location;
         const jobId = jobLocation.split('/').pop();
+        this.logger.info(`✓ Scan job created: ${jobId} (variant ${i + 1})`);
 
-        this.logger.info(`✓ Scan job created: ${jobId}`);
-        return { jobId, format: settings.format };
+        // Variant 4 uses jpeg
+        if (i === 3) usedFormat = 'image/jpeg';
+
+        // Retrieve document
+        const timestamp = Date.now();
+        const ext = usedFormat.includes('jpeg') ? 'jpg' : 'pdf';
+        const outputPath = path.join(outputDir, `scan_${timestamp}.${ext}`);
+        await this._retrieveDocument(`${baseURL}/ScanJobs/${jobId}/NextDocument`, outputPath);
+
+        // Convert to PDF if needed
+        if (ext !== 'pdf') {
+          const pdfPath = path.join(outputDir, `scan_${timestamp}.pdf`);
+          execSync(`convert '${outputPath}' '${pdfPath}'`, { timeout: 30000 });
+          fs.unlinkSync(outputPath);
+          return pdfPath;
+        }
+
+        return outputPath;
       } catch (error) {
         const status = error.response?.status;
         const body = error.response?.data;
-        this.logger.warn(`  Attempt ${i + 1} failed (HTTP ${status || 'N/A'}): ${error.message}`);
-        if (body) {
-          const bodyStr = typeof body === 'string' ? body.substring(0, 500) : JSON.stringify(body).substring(0, 500);
-          this.logger.warn(`  Response body: ${bodyStr}`);
+        this.logger.warn(`  Attempt ${i + 1} failed (HTTP ${status || 'N/A'})`);
+        if (body && typeof body === 'string' && body.length > 0) {
+          this.logger.warn(`  Body: ${body.substring(0, 300)}`);
         }
         lastError = error;
-
-        // Only retry on 400 (bad request = wrong settings), not on other errors
         if (status !== 400) break;
       }
     }
 
-    throw new Error(`Failed to create scan job: ${lastError?.message || 'unknown error'}`);
+    throw new Error(`eSCL scan failed after ${xmlVariants.length} attempts: ${lastError?.message}`);
   }
 
-  // ==================== DOCUMENT RETRIEVAL ====================
+  async _retrieveDocument(url, outputPath) {
+    let attempts = 0;
+    while (attempts < 30) {
+      try {
+        const response = await axios.get(url, {
+          responseType: 'stream',
+          timeout: 15000
+        });
 
-  async retrieveDocument(jobId, outputPath) {
-    const documentURL = `${this.baseURL}/ScanJobs/${jobId}/NextDocument`;
+        const writer = fs.createWriteStream(outputPath);
+        response.data.pipe(writer);
 
-    try {
-      let attempts = 0;
-      while (attempts < 30) {
-        try {
-          const response = await axios.get(documentURL, {
-            responseType: 'stream',
-            timeout: 10000
-          });
+        await new Promise((resolve, reject) => {
+          writer.on('finish', resolve);
+          writer.on('error', reject);
+        });
 
-          const writer = fs.createWriteStream(outputPath);
-          response.data.pipe(writer);
-
-          await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-          });
-
-          this.logger.info(`✓ Document saved: ${outputPath}`);
-          return outputPath;
-        } catch (error) {
-          if (error.response?.status === 404) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            attempts++;
-            continue;
-          }
-          throw error;
+        this.logger.info(`✓ Document saved: ${outputPath}`);
+        return outputPath;
+      } catch (error) {
+        if (error.response?.status === 404) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempts++;
+          continue;
         }
+        throw error;
       }
-
-      throw new Error('Scan timeout - document not received');
-    } catch (error) {
-      throw new Error(`Failed to retrieve document: ${error.message}`);
     }
+    throw new Error('Scan timeout — document not received after 30s');
   }
 
-  // ==================== COMPLETE SCAN WORKFLOW ====================
+  // ==================== MAIN ENTRY POINT ====================
 
   async scan(options, outputDir) {
-    try {
-      this.logger.info('🔍 Starting scan...');
+    this.logger.info('🔍 Starting scan...');
 
-      // Fetch capabilities if not already cached
-      if (!this.capabilities) {
-        await this.getCapabilities();
-      }
-
-      // Create scan job with retry cascade
-      const { jobId, format } = await this.createScanJob(options);
-
-      const timestamp = Date.now();
-      let ext = 'pdf';
-      if (format.includes('jpeg') || format.includes('jpg')) ext = 'jpg';
-      else if (format.includes('png')) ext = 'png';
-
-      const outputPath = path.join(outputDir, `scan_${timestamp}.${ext}`);
-      await this.retrieveDocument(jobId, outputPath);
-
-      // Convert non-PDF to PDF for the pipeline
-      if (ext !== 'pdf') {
-        const pdfPath = path.join(outputDir, `scan_${timestamp}.pdf`);
-        this.logger.info(`Converting ${ext} → PDF...`);
-        try {
-          execSync(`convert "${outputPath}" "${pdfPath}"`, { timeout: 30000 });
-          fs.unlinkSync(outputPath);
-          this.logger.info('✓ Converted to PDF');
-          return pdfPath;
-        } catch (convErr) {
-          this.logger.warn(`Image→PDF conversion failed: ${convErr.message}, using raw ${ext}`);
-          return outputPath;
-        }
-      }
-
-      return outputPath;
-    } catch (error) {
-      throw new Error(`Scan failed: ${error.message}`);
+    // SANE path (preferred — handles protocol correctly)
+    if (this.useSANE) {
+      this.logger.info('[Scanner] Using SANE (scanimage)');
+      return this.scanWithSANE(options, outputDir);
     }
+
+    // Raw eSCL fallback
+    this.logger.info('[Scanner] Using raw eSCL HTTP (SANE not available)');
+    return this.scanWithESCL(options, outputDir);
   }
 }
 

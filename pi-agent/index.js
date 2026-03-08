@@ -74,8 +74,8 @@ async function initialize() {
     logger.warn(`Scanner discovery error: ${e.message}, using ${scannerIP}`);
   }
 
-  // Initialize scanner with resolved IP
-  jobHandler.initScanner(scannerIP, logger);
+  // Initialize scanner with resolved IP (probes for SANE availability)
+  await jobHandler.initScanner(scannerIP, logger);
 
   // Generate QR code
   const qrUrl = `${CONFIG.frontendUrl}?kiosk_id=${CONFIG.kioskId}`;

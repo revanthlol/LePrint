@@ -96,34 +96,30 @@ class Scanner {
         timeout: 20000
       });
 
-      // Parse: device `escl:http://192.168.0.4:80' is a HP LaserJet
+      // Parse all devices: device `escl:http://192.168.0.4:80' is a HP LaserJet
       const lines = output.split('\n');
+      const devices = [];
       for (const line of lines) {
         const match = line.match(/device\s+[`']([^'`]+)[`']/);
-        if (match) {
-          const dev = match[1];
-          // Prefer escl/airscan devices, skip v4l (webcam) etc
-          if (dev.includes('escl') || dev.includes('airscan') || dev.includes('hp')) {
-            this.saneDevice = dev;
-            this.useSANE = true;
-            this.logger.info(`✓ SANE scanner discovered: ${dev}`);
-            return;
-          }
-        }
+        if (match) devices.push(match[1]);
       }
 
-      // Use first device found if no eSCL-specific one
-      for (const line of lines) {
-        const match = line.match(/device\s+[`']([^'`]+)[`']/);
-        if (match) {
-          this.saneDevice = match[1];
-          this.useSANE = true;
-          this.logger.info(`✓ SANE scanner (generic): ${this.saneDevice}`);
-          return;
-        }
+      if (devices.length === 0) {
+        this.logger.warn('[Scanner] scanimage -L found no devices');
+        return;
       }
 
-      this.logger.warn('[Scanner] scanimage -L found no devices');
+      this.logger.info(`[Scanner] Found ${devices.length} device(s): ${devices.join(', ')}`);
+
+      // Priority: escl > airscan > hpaio > anything else
+      const pick =
+        devices.find(d => d.startsWith('escl:') || d.startsWith('airscan:')) ||
+        devices.find(d => d.startsWith('hpaio:')) ||
+        devices[0];
+
+      this.saneDevice = pick;
+      this.useSANE = true;
+      this.logger.info(`✓ SANE scanner selected: ${pick}`);
     } catch (e) {
       this.logger.warn(`[Scanner] SANE discovery failed: ${e.message}`);
     }
@@ -146,15 +142,18 @@ class Scanner {
       const output = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });
       if (output.trim()) this.logger.info(`[SANE] ${output.trim()}`);
     } catch (e) {
-      // Some scanimage versions don't support --output-file, try redirect
+      const stderr1 = (e.stderr || e.stdout || e.message || '').toString().trim();
+      this.logger.info(`[SANE] --output-file failed: ${stderr1}`);
       this.logger.info('[SANE] Retrying with shell redirect...');
       try {
         execSync(
-          `scanimage --device-name='${this.saneDevice}' --mode=${mode} --resolution=${resolution} --format=png > '${pngPath}' 2>/dev/null`,
-          { timeout: 120000, shell: true }
+          `scanimage --device-name='${this.saneDevice}' --mode=${mode} --resolution=${resolution} --format=png > '${pngPath}' 2>&1`,
+          { encoding: 'utf-8', timeout: 120000, shell: true }
         );
       } catch (e2) {
-        throw new Error(`SANE scan failed: ${e2.message}`);
+        const stderr2 = (e2.stderr || e2.stdout || e2.message || '').toString().trim();
+        this.logger.error(`[SANE] Redirect also failed: ${stderr2}`);
+        throw new Error(`SANE scan failed: ${stderr2}`);
       }
     }
 

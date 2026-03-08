@@ -40,8 +40,14 @@ class Scanner {
           const parts = line.split(';');
           // Format: =;iface;IPv4;name;type;domain;hostname;address;port;txt
           if (parts.length >= 8 && parts[7] && !parts[7].includes(':')) {
-            logger.info(`✓ Scanner auto-discovered: ${parts[7]} (${parts[3] || 'unknown'})`);
-            return parts[7];
+            const ip = parts[7];
+            // Skip loopback — CUPS often advertises a local eSCL proxy on 127.0.0.1
+            if (ip.startsWith('127.')) {
+              logger.info(`  Skipping loopback scanner: ${ip} (${parts[3] || 'unknown'})`);
+              continue;
+            }
+            logger.info(`✓ Scanner auto-discovered: ${ip} (${parts[3] || 'unknown'})`);
+            return ip;
           }
         }
       } catch (e) {

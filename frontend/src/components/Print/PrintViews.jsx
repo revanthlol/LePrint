@@ -854,6 +854,70 @@ export function XeroxingView() {
 }
 
 
+// ─── VIEW: Generic Job Error (scan/xerox failures) ──────────
+export function JobErrorView({ serviceType, logs, backToServiceSelect, resetFlow }) {
+    // Extract the latest error from logs
+    const errorLog = logs.find(l => l.includes('Job failed:') || l.includes('error'));
+    const errorMsg = errorLog
+        ? errorLog.replace(/^\[.*?\]\s*/, '')
+        : 'Something went wrong. Please try again.';
+
+    const title = serviceType === 'scan' ? 'Scan Failed' : 'Xerox Failed';
+    const icon = serviceType === 'scan' ? ScanLine : Copy;
+    const Icon = icon;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="space-y-5 py-4"
+        >
+            <div className="text-center">
+                <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                    className="w-16 h-16 mx-auto bg-red-500/10 rounded-2xl flex items-center justify-center mb-4"
+                >
+                    <Icon className="w-8 h-8 text-red-400" />
+                </motion.div>
+                <h3 className="text-xl font-bold text-foreground mb-2">{title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                    {errorMsg}
+                </p>
+            </div>
+
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
+                    <p className="text-sm text-red-400/80">
+                        The scanner could not be reached. Make sure the printer/scanner is powered on and connected to the network.
+                    </p>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Button
+                    onClick={backToServiceSelect}
+                    className="w-full bg-white text-black hover:bg-neutral-200 font-semibold py-5 transition-colors"
+                >
+                    <RefreshCw className="mr-2 w-4 h-4" />
+                    Try Again
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    onClick={resetFlow}
+                    className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5 text-sm"
+                >
+                    <ArrowLeft className="mr-1 w-4 h-4" /> Scan a Different Kiosk
+                </Button>
+            </div>
+        </motion.div>
+    );
+}
+
+
 export function LogTerminal({ logs }) {
   return (
     <div className="bg-black/40 backdrop-blur-sm text-muted-foreground text-[10px] font-mono p-4 rounded-xl h-24 overflow-y-auto border border-border shadow-inner">

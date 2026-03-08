@@ -25,6 +25,7 @@ import {
   ScanCompleteView,
   XeroxOptionsView,
   XeroxingView,
+  JobErrorView,
 } from './PrintViews';
 
 export function PrintInterface() {
@@ -74,9 +75,17 @@ export function PrintInterface() {
             />
           )}
 
-          {/* VIEW: Manual / fallback connect */}
-          {(status === 'SCANNED' || status === 'CONNECTING' || status === 'ERROR') && (
+          {/* VIEW: Manual / fallback connect (only for print errors or initial connect) */}
+          {(status === 'SCANNED' || status === 'CONNECTING') && (
             <ConnectView {...viewProps} />
+          )}
+
+          {/* VIEW: Generic error — context-aware */}
+          {status === 'ERROR' && viewProps.serviceType === 'print' && (
+            <ConnectView {...viewProps} />
+          )}
+          {status === 'ERROR' && viewProps.serviceType !== 'print' && (
+            <JobErrorView {...viewProps} />
           )}
 
           {/* VIEW: Service selector (Print / Scan / Xerox) */}

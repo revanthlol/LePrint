@@ -360,6 +360,19 @@ router.post('/jobs/scan', verifyToken, async (req, res) => {
             return res.status(400).json({ error: 'kiosk_id required' });
         }
 
+        // Check kiosk is online and reachable
+        const kiosk = await db.getKiosk(kiosk_id);
+        if (!kiosk || kiosk.status !== 'online') {
+            return res.status(503).json({ error: 'Kiosk is offline or not found' });
+        }
+
+        const kioskSocket = socketManager.getKioskSocket(kiosk_id);
+        if (!kioskSocket) {
+            return res.status(503).json({ error: 'Kiosk is not connected. Please try again.' });
+        }
+
+        await ensureUserExists(db, req.user);
+
         const jobId = generateJobId();
 
         await db.createJob({
@@ -377,14 +390,10 @@ router.post('/jobs/scan', verifyToken, async (req, res) => {
             scan_options: scan_options || {}
         });
 
-        const kioskSocket = socketManager.getKioskSocket(kiosk_id);
-
-        if (kioskSocket) {
-            kioskSocket.emit('scan_job', {
-                job_id: jobId,
-                scan_options: scan_options || {}
-            });
-        }
+        kioskSocket.emit('scan_job', {
+            job_id: jobId,
+            scan_options: scan_options || {}
+        });
 
         res.json({
             job_id: jobId,
@@ -408,6 +417,12 @@ router.post('/jobs/xerox', verifyToken, async (req, res) => {
 
         if (!kiosk_id) {
             return res.status(400).json({ error: 'kiosk_id required' });
+        }
+
+        // Check kiosk is online and reachable
+        const kiosk = await db.getKiosk(kiosk_id);
+        if (!kiosk || kiosk.status !== 'online') {
+            return res.status(503).json({ error: 'Kiosk is offline or not found' });
         }
 
         const numCopies = Math.max(1, Math.min(parseInt(copies) || 1, 20));

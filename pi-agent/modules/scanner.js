@@ -16,7 +16,7 @@ class Scanner {
   async getCapabilities() {
     try {
       const response = await axios.get(`${this.baseURL}/ScannerCapabilities`, {
-        timeout: 5000
+        timeout: 15000
       });
       
       const result = await xml2js.parseStringPromise(response.data);

@@ -156,11 +156,18 @@ function initSocketServer(io) {
         socket.on('job_state_change', async (data) => {
             const { job_id, status: newStatus, status_message } = data;
             try {
-                await db.updateJob(job_id, {
+                const updateFields = {
                     status: newStatus,
                     status_message: status_message || null,
                     last_status_update: new Date()
-                });
+                };
+
+                // Propagate error details when job fails
+                if (newStatus === 'FAILED' && status_message) {
+                    updateFields.error_message = status_message;
+                }
+
+                await db.updateJob(job_id, updateFields);
                 console.log(`[Job] ${job_id} state → ${newStatus}: ${status_message || ''}`);
             } catch (err) {
                 console.error('[Job] job_state_change error:', err);

@@ -14,6 +14,7 @@ const socketClient = require('./modules/socket-client');
 const CONFIG = {
   cloudServer: process.env.CLOUD_URL || 'https://justpri.duckdns.org',
   printerName: process.env.PRINTER_NAME || 'auto',
+  printerIP: process.env.PRINTER_IP || '192.168.1.100',
   kioskId: process.env.KIOSK_ID || `kiosk_${require('os').hostname()}`,
   frontendUrl: process.env.FRONTEND_URL || 'https://qr-wifi-printer.vercel.app',
   tempDir: './print-queue',
@@ -25,6 +26,7 @@ const CONFIG = {
 const STATE = {
   currentJob: null,
   printerName: null,
+  printerIP: CONFIG.printerIP,
   pendingJobs: new Map(),
   pollCount: 0,
   jobsFetchedToday: 0,
@@ -44,6 +46,7 @@ console.log(`
 ║   Model: Pull-Based + Modular          ║
 ║   Kiosk ID: ${CONFIG.kioskId.padEnd(26)}║
 ║   Cloud: ${CONFIG.cloudServer.padEnd(30)}║
+║   Printer IP: ${CONFIG.printerIP.padEnd(25)}║
 ╚════════════════════════════════════════╝
 `);
 
@@ -51,6 +54,9 @@ console.log(`
 async function initialize() {
   // Check conversion tools
   await utils.checkConversionTools(logger);
+
+  // Initialize scanner with printer IP
+  jobHandler.initScanner(CONFIG.printerIP, logger);
 
   // Generate QR code
   const qrUrl = `${CONFIG.frontendUrl}?kiosk_id=${CONFIG.kioskId}`;

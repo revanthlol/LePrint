@@ -55,8 +55,27 @@ async function initialize() {
   // Check conversion tools
   await utils.checkConversionTools(logger);
 
-  // Initialize scanner with printer IP
-  jobHandler.initScanner(CONFIG.printerIP, logger);
+  // Auto-discover scanner IP if not explicitly set
+  const Scanner = require('./modules/scanner');
+  let scannerIP = CONFIG.printerIP;
+
+  try {
+    const discoveredIP = await Scanner.discoverIP(logger);
+    if (discoveredIP) {
+      scannerIP = discoveredIP;
+      STATE.printerIP = discoveredIP;
+      logger.info(`Using discovered scanner IP: ${scannerIP}`);
+    } else if (process.env.PRINTER_IP) {
+      logger.info(`Using configured PRINTER_IP: ${scannerIP}`);
+    } else {
+      logger.warn(`No scanner discovered and PRINTER_IP not set, using default: ${scannerIP}`);
+    }
+  } catch (e) {
+    logger.warn(`Scanner discovery error: ${e.message}, using ${scannerIP}`);
+  }
+
+  // Initialize scanner with resolved IP
+  jobHandler.initScanner(scannerIP, logger);
 
   // Generate QR code
   const qrUrl = `${CONFIG.frontendUrl}?kiosk_id=${CONFIG.kioskId}`;

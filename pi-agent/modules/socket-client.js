@@ -67,61 +67,21 @@ function setupEventHandlers(socket, kioskId, hostname, state, logger) {
     try {
       logger.info(`📄 Received scan job: ${data.job_id}`);
 
-      const Scanner = require('./scanner');
-      const scanner = new Scanner(
-        state.printerIP || '192.168.1.100',
-        logger
-      );
-
-      // Status: Discovering scanner
-      socket.emit('job_state_change', {
+      // Delegate to job-handler which uses the already-initialized scanner
+      const jobHandler = require('./job-handler');
+      state.pendingJobs.set(data.job_id, {
         job_id: data.job_id,
-        status: 'DISCOVERING_SCANNER',
-        status_message: 'Detecting scanner...'
+        job_type: 'scan',
+        scan_options: data.scan_options || {}
       });
 
-      // Status: Scanning
-      logger.info('🔍 Starting scan...');
-      socket.emit('job_state_change', {
-        job_id: data.job_id,
-        status: 'SCANNING',
-        status_message: 'Scanning document...'
-      });
-
-      const scanPath = await scanner.scan(data.scan_options, './print-queue');
-
-      // Status: Uploading
-      logger.info('✓ Scan complete, uploading...');
-      socket.emit('job_state_change', {
-        job_id: data.job_id,
-        status: 'PROCESSING',
-        status_message: 'Uploading scanned file...'
-      });
-
-      // Upload to backend
-      const FormData = require('form-data');
-      const axios = require('axios');
-      const fs = require('fs');
-      const form = new FormData();
-      form.append('file', fs.createReadStream(scanPath));
-
-      await axios.post(
-        `${state._cloudServer}/api/jobs/${data.job_id}/scan-upload`,
-        form,
-        { headers: form.getHeaders() }
-      );
-
-      logger.info('✓ Scan uploaded successfully');
-
-      // Cleanup local file
-      fs.unlinkSync(scanPath);
-
+      await jobHandler.processScanJob(data.job_id, state._cloudServer, state, socket, logger);
     } catch (error) {
       logger.error(`❌ Scan failed: ${error.message}`);
       socket.emit('job_state_change', {
         job_id: data.job_id,
         status: 'FAILED',
-        status_message: error.message
+        status_message: `Scan failed: ${error.message}`
       });
     }
   });

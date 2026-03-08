@@ -16,14 +16,12 @@ class Scanner {
     this.supportedFormats = [];
     this.maxWidth = 2550;
     this.maxHeight = 3508;
+    this.hasPlaten = false;
+    this.hasAdf = false;
   }
 
   // ==================== AUTO-DISCOVERY ====================
 
-  /**
-   * Discover eSCL scanner IP on the local network via mDNS (avahi-browse).
-   * Returns the IP address string, or null if not found.
-   */
   static async discoverIP(logger) {
     const serviceTypes = ['_uscan._tcp', '_eSCL._tcp'];
 
@@ -38,10 +36,8 @@ class Scanner {
 
         for (const line of lines) {
           const parts = line.split(';');
-          // Format: =;iface;IPv4;name;type;domain;hostname;address;port;txt
           if (parts.length >= 8 && parts[7] && !parts[7].includes(':')) {
             const ip = parts[7];
-            // Skip loopback — CUPS often advertises a local eSCL proxy on 127.0.0.1
             if (ip.startsWith('127.')) {
               logger.info(`  Skipping loopback scanner: ${ip} (${parts[3] || 'unknown'})`);
               continue;
@@ -51,7 +47,7 @@ class Scanner {
           }
         }
       } catch (e) {
-        // avahi-browse not available or no results, try next type
+        // avahi-browse not available or no results
       }
     }
 
@@ -67,10 +63,12 @@ class Scanner {
         timeout: 15000
       });
 
+      // Log raw XML for debugging on first fetch
+      this.logger.info(`[Scanner] Raw capabilities length: ${response.data.length} chars`);
+
       const result = await xml2js.parseStringPromise(response.data);
       this.capabilities = result;
 
-      // Parse supported settings from capabilities XML
       this._parseCapabilities(result);
 
       this.logger.info('✓ Scanner capabilities fetched');
@@ -82,45 +80,93 @@ class Scanner {
 
   _parseCapabilities(caps) {
     try {
-      const root = caps['scan:ScannerCapabilities'] || {};
+      // The root element may or may not have namespace prefix
+      const root = caps['scan:ScannerCapabilities']
+                || caps['ScannerCapabilities']
+                || caps[Object.keys(caps)[0]]
+                || {};
 
-      // Try Platen (flatbed) first, then ADF
-      const inputCaps = this._dig(root, 'scan:Platen', 'scan:PlatenInputCaps')
-                     || this._dig(root, 'scan:Adf', 'scan:AdfSimplexInputCaps');
+      // Log top-level keys for debugging
+      this.logger.info(`[Scanner] Capability root keys: ${Object.keys(root).join(', ')}`);
+
+      // Try Platen (flatbed)
+      let inputCaps = this._dig(root, 'scan:Platen', 'scan:PlatenInputCaps');
+      if (inputCaps) this.hasPlaten = true;
+
+      // Try ADF if no platen
+      if (!inputCaps) {
+        inputCaps = this._dig(root, 'scan:Adf', 'scan:AdfSimplexInputCaps');
+        if (inputCaps) this.hasAdf = true;
+      }
+
+      // Try without namespace prefix
+      if (!inputCaps) {
+        inputCaps = this._dig(root, 'Platen', 'PlatenInputCaps');
+        if (inputCaps) this.hasPlaten = true;
+      }
 
       if (!inputCaps) {
-        this.logger.warn('Could not find input caps in scanner capabilities');
+        this.logger.warn('[Scanner] Could not find input caps, logging full structure...');
+        this.logger.warn(`[Scanner] Root keys: ${JSON.stringify(Object.keys(root))}`);
+        // Try to find any key containing "Platen" or "InputCaps"
+        for (const key of Object.keys(root)) {
+          if (key.toLowerCase().includes('platen') || key.toLowerCase().includes('input')) {
+            this.logger.info(`[Scanner] Found potential input: ${key}`);
+            const nested = Array.isArray(root[key]) ? root[key][0] : root[key];
+            if (typeof nested === 'object') {
+              this.logger.info(`[Scanner]   Sub-keys: ${Object.keys(nested).join(', ')}`);
+            }
+          }
+        }
         return;
       }
 
-      this.maxWidth = parseInt(this._val(inputCaps, 'scan:MaxWidth')) || 2550;
-      this.maxHeight = parseInt(this._val(inputCaps, 'scan:MaxHeight')) || 3508;
+      this.logger.info(`[Scanner] Input source: ${this.hasPlaten ? 'Platen' : 'ADF'}`);
 
-      const profile = this._dig(inputCaps, 'scan:SettingProfiles', 'scan:SettingProfile');
-      if (!profile) return;
+      this.maxWidth = parseInt(this._val(inputCaps, 'scan:MaxWidth') || this._val(inputCaps, 'MaxWidth')) || 2550;
+      this.maxHeight = parseInt(this._val(inputCaps, 'scan:MaxHeight') || this._val(inputCaps, 'MaxHeight')) || 3508;
+
+      // Setting profiles may be directly under inputCaps or nested
+      const profile = this._dig(inputCaps, 'scan:SettingProfiles', 'scan:SettingProfile')
+                   || this._dig(inputCaps, 'SettingProfiles', 'SettingProfile');
+
+      if (!profile) {
+        this.logger.warn('[Scanner] No SettingProfile found');
+        this.logger.info(`[Scanner] InputCaps keys: ${Object.keys(inputCaps).join(', ')}`);
+        return;
+      }
 
       // Color modes
-      const colorModes = this._dig(profile, 'scan:ColorModes');
-      if (colorModes?.['scan:ColorMode']) {
-        this.supportedColorModes = [].concat(colorModes['scan:ColorMode']);
+      const colorModes = this._dig(profile, 'scan:ColorModes') || this._dig(profile, 'ColorModes');
+      if (colorModes) {
+        const modes = colorModes['scan:ColorMode'] || colorModes['ColorMode'];
+        if (modes) this.supportedColorModes = [].concat(modes);
       }
 
       // Resolutions
-      const discreteRes = this._dig(profile, 'scan:SupportedResolutions', 'scan:DiscreteResolutions');
-      if (discreteRes?.['scan:DiscreteResolution']) {
-        const resList = [].concat(discreteRes['scan:DiscreteResolution']);
+      const discreteRes = this._dig(profile, 'scan:SupportedResolutions', 'scan:DiscreteResolutions')
+                       || this._dig(profile, 'SupportedResolutions', 'DiscreteResolutions');
+      if (discreteRes) {
+        const resList = [].concat(
+          discreteRes['scan:DiscreteResolution'] || discreteRes['DiscreteResolution'] || []
+        );
         this.supportedResolutions = resList
           .map(r => {
-            const xr = r['scan:XResolution'];
+            const xr = r['scan:XResolution'] || r['XResolution'];
             return parseInt(Array.isArray(xr) ? xr[0] : xr);
           })
           .filter(Boolean);
       }
 
-      // Document formats
-      const fmtContainer = this._dig(profile, 'scan:DocumentFormats');
+      // Document formats — can be under profile or under inputCaps directly
+      const fmtContainer = this._dig(profile, 'scan:DocumentFormats')
+                        || this._dig(profile, 'DocumentFormats')
+                        || this._dig(inputCaps, 'scan:DocumentFormats')
+                        || this._dig(inputCaps, 'DocumentFormats');
       if (fmtContainer) {
-        const fmts = fmtContainer['pwg:DocumentFormat'] || fmtContainer['scan:DocumentFormat'];
+        const fmts = fmtContainer['pwg:DocumentFormat']
+                  || fmtContainer['scan:DocumentFormat']
+                  || fmtContainer['DocumentFormat'];
         if (fmts) this.supportedFormats = [].concat(fmts);
       }
 
@@ -129,11 +175,10 @@ class Scanner {
       this.logger.info(`  Formats: [${this.supportedFormats.join(', ')}]`);
       this.logger.info(`  Max scan area: ${this.maxWidth}x${this.maxHeight}`);
     } catch (e) {
-      this.logger.warn(`Could not fully parse capabilities: ${e.message}`);
+      this.logger.warn(`[Scanner] Capability parse error: ${e.message}`);
     }
   }
 
-  // Navigate nested xml2js objects: _dig(obj, 'a', 'b') → obj.a[0].b[0]
   _dig(obj, ...keys) {
     let current = obj;
     for (const key of keys) {
@@ -143,7 +188,6 @@ class Scanner {
     return current;
   }
 
-  // Get scalar value: _val(obj, 'key') → obj.key[0] or obj.key
   _val(obj, key) {
     if (!obj?.[key]) return null;
     return Array.isArray(obj[key]) ? obj[key][0] : obj[key];
@@ -154,30 +198,27 @@ class Scanner {
   _validateOptions(options) {
     let { resolution, colorMode, format } = options;
 
-    // Validate color mode against capabilities
     if (this.supportedColorModes.length > 0 && !this.supportedColorModes.includes(colorMode)) {
       const fallback = this.supportedColorModes.includes('Grayscale8')
         ? 'Grayscale8'
         : this.supportedColorModes[0];
-      this.logger.warn(`ColorMode '${colorMode}' not supported, falling back to '${fallback}'`);
+      this.logger.warn(`ColorMode '${colorMode}' not supported, using '${fallback}'`);
       colorMode = fallback;
     }
 
-    // Validate resolution against capabilities
     if (this.supportedResolutions.length > 0 && !this.supportedResolutions.includes(resolution)) {
-      const fallback = this.supportedResolutions.includes(300)
-        ? 300
-        : this.supportedResolutions[0];
-      this.logger.warn(`Resolution ${resolution} DPI not supported, falling back to ${fallback}`);
+      // Pick closest supported resolution
+      const sorted = [...this.supportedResolutions].sort((a, b) => Math.abs(a - resolution) - Math.abs(b - resolution));
+      const fallback = sorted[0];
+      this.logger.warn(`Resolution ${resolution} not supported, using ${fallback}`);
       resolution = fallback;
     }
 
-    // Validate document format against capabilities
     if (this.supportedFormats.length > 0 && !this.supportedFormats.includes(format)) {
       const fallback = this.supportedFormats.includes('application/pdf')
         ? 'application/pdf'
         : this.supportedFormats[0];
-      this.logger.warn(`Format '${format}' not supported, falling back to '${fallback}'`);
+      this.logger.warn(`Format '${format}' not supported, using '${fallback}'`);
       format = fallback;
     }
 
@@ -186,8 +227,30 @@ class Scanner {
 
   // ==================== SCAN JOB ====================
 
+  _buildScanXML(colorMode, resolution, format, width, height) {
+    const inputSource = this.hasAdf ? 'Adf' : 'Platen';
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
+  <pwg:Version>2.0</pwg:Version>
+  <scan:InputSource>${inputSource}</scan:InputSource>
+  <pwg:ScanRegions pwg:MustHonor="true">
+    <pwg:ScanRegion>
+      <pwg:ContentRegionUnits>escl:ThreeHundredthsOfInches</pwg:ContentRegionUnits>
+      <pwg:Height>${height}</pwg:Height>
+      <pwg:Width>${width}</pwg:Width>
+      <pwg:XOffset>0</pwg:XOffset>
+      <pwg:YOffset>0</pwg:YOffset>
+    </pwg:ScanRegion>
+  </pwg:ScanRegions>
+  <scan:ColorMode>${colorMode}</scan:ColorMode>
+  <scan:XResolution>${resolution}</scan:XResolution>
+  <scan:YResolution>${resolution}</scan:YResolution>
+  <pwg:DocumentFormat>${format}</pwg:DocumentFormat>
+</scan:ScanSettings>`;
+  }
+
   async createScanJob(options = {}) {
-    // Validate against what the scanner actually supports
     const validated = this._validateOptions({
       resolution: options.resolution || 300,
       colorMode: options.colorMode || 'RGB24',
@@ -197,41 +260,58 @@ class Scanner {
     const width = Math.min(options.width || 2480, this.maxWidth);
     const height = Math.min(options.height || 3508, this.maxHeight);
 
-    this.logger.info(`  Scan settings: ${validated.colorMode}, ${validated.resolution}DPI, ${validated.format}, ${width}x${height}`);
+    // Try validated settings first, then progressively simpler fallbacks
+    const attempts = [
+      validated,
+      { colorMode: 'Grayscale8', resolution: 300, format: 'application/pdf' },
+      { colorMode: 'Grayscale8', resolution: 200, format: 'image/jpeg' },
+    ];
 
-    const scanSettings = `<?xml version="1.0" encoding="UTF-8"?>
-<scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
-  <pwg:Version>2.0</pwg:Version>
-  <scan:Intent>Document</scan:Intent>
-  <pwg:ScanRegions>
-    <pwg:ScanRegion>
-      <pwg:Height>${height}</pwg:Height>
-      <pwg:Width>${width}</pwg:Width>
-      <pwg:XOffset>0</pwg:XOffset>
-      <pwg:YOffset>0</pwg:YOffset>
-    </pwg:ScanRegion>
-  </pwg:ScanRegions>
-  <scan:ColorMode>${validated.colorMode}</scan:ColorMode>
-  <scan:XResolution>${validated.resolution}</scan:XResolution>
-  <scan:YResolution>${validated.resolution}</scan:YResolution>
-  <pwg:DocumentFormat>${validated.format}</pwg:DocumentFormat>
-</scan:ScanSettings>`;
+    // Deduplicate — skip fallbacks that are identical to an earlier attempt
+    const seen = new Set();
+    const uniqueAttempts = attempts.filter(a => {
+      const key = `${a.colorMode}_${a.resolution}_${a.format}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-    try {
-      const response = await axios.post(`${this.baseURL}/ScanJobs`, scanSettings, {
-        headers: { 'Content-Type': 'text/xml' },
-        maxRedirects: 0,
-        validateStatus: status => status === 201
-      });
+    let lastError = null;
 
-      const jobLocation = response.headers.location;
-      const jobId = jobLocation.split('/').pop();
+    for (let i = 0; i < uniqueAttempts.length; i++) {
+      const settings = uniqueAttempts[i];
+      const scanSettings = this._buildScanXML(settings.colorMode, settings.resolution, settings.format, width, height);
 
-      this.logger.info(`✓ Scan job created: ${jobId}`);
-      return { jobId, format: validated.format };
-    } catch (error) {
-      throw new Error(`Failed to create scan job: ${error.message}`);
+      this.logger.info(`  Attempt ${i + 1}: ${settings.colorMode}, ${settings.resolution}DPI, ${settings.format}`);
+
+      try {
+        const response = await axios.post(`${this.baseURL}/ScanJobs`, scanSettings, {
+          headers: { 'Content-Type': 'text/xml' },
+          maxRedirects: 0,
+          validateStatus: status => status === 201
+        });
+
+        const jobLocation = response.headers.location;
+        const jobId = jobLocation.split('/').pop();
+
+        this.logger.info(`✓ Scan job created: ${jobId}`);
+        return { jobId, format: settings.format };
+      } catch (error) {
+        const status = error.response?.status;
+        const body = error.response?.data;
+        this.logger.warn(`  Attempt ${i + 1} failed (HTTP ${status || 'N/A'}): ${error.message}`);
+        if (body) {
+          const bodyStr = typeof body === 'string' ? body.substring(0, 500) : JSON.stringify(body).substring(0, 500);
+          this.logger.warn(`  Response body: ${bodyStr}`);
+        }
+        lastError = error;
+
+        // Only retry on 400 (bad request = wrong settings), not on other errors
+        if (status !== 400) break;
+      }
     }
+
+    throw new Error(`Failed to create scan job: ${lastError?.message || 'unknown error'}`);
   }
 
   // ==================== DOCUMENT RETRIEVAL ====================
@@ -285,10 +365,9 @@ class Scanner {
         await this.getCapabilities();
       }
 
-      // Create scan job (validates options against capabilities)
+      // Create scan job with retry cascade
       const { jobId, format } = await this.createScanJob(options);
 
-      // Determine output file extension based on actual format used
       const timestamp = Date.now();
       let ext = 'pdf';
       if (format.includes('jpeg') || format.includes('jpg')) ext = 'jpg';
@@ -297,7 +376,7 @@ class Scanner {
       const outputPath = path.join(outputDir, `scan_${timestamp}.${ext}`);
       await this.retrieveDocument(jobId, outputPath);
 
-      // If scanner returned a non-PDF format, convert to PDF for the pipeline
+      // Convert non-PDF to PDF for the pipeline
       if (ext !== 'pdf') {
         const pdfPath = path.join(outputDir, `scan_${timestamp}.pdf`);
         this.logger.info(`Converting ${ext} → PDF...`);

@@ -98,8 +98,10 @@ curl -X POST http://localhost:3001/api/jobs/create \
 
 ### 2.4 Payment Verification
 
+**Mock payments (current):**
+
 ```bash
-# After creating a job, verify payment
+# After creating a job, verify payment with mock ID
 curl -X POST "http://localhost:3001/api/jobs/JOB_ID/verify-payment" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -107,6 +109,15 @@ curl -X POST "http://localhost:3001/api/jobs/JOB_ID/verify-payment" \
 
 # Expected: { status: "success", job_status: "PAID" }
 ```
+
+**Razorpay payments (after integration):**
+
+See [docs/RAZORPAY_INTEGRATION.md](docs/RAZORPAY_INTEGRATION.md) for the full payment testing guide.
+
+Test card for Razorpay test mode:
+- Success: `4111 1111 1111 1111` (any CVV, any future expiry)
+- Failure: `4000 0000 0000 0002`
+- Any UPI ID works in test mode
 
 ### 2.5 Job Polling (Pi Agent Endpoint)
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthProvider';
 import {
@@ -7,6 +7,24 @@ import {
     ALLOWED_EXTENSIONS,
     getFileExt
 } from './printUtils';
+
+// Session storage key for active job recovery
+const SESSION_KEY = 'juspri_active_job';
+
+function saveSession(data) {
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch {}
+}
+
+function loadSession() {
+    try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+}
+
+function clearSession() {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+}
 
 export function usePrint() {
     const { signOut, getAuthHeader } = useAuth();
@@ -26,6 +44,7 @@ export function usePrint() {
     // Scan & Xerox state
     const [serviceType, setServiceType] = useState('print');
     const [scanResult, setScanResult] = useState(null);
+    const [jobPhase, setJobPhase] = useState(null); // Backend status for progress display
     const [scanOptions, setScanOptions] = useState({
         resolution: 300,
         colorMode: 'RGB24'
@@ -35,6 +54,9 @@ export function usePrint() {
     const addLog = useCallback((msg) => {
         setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 49)]);
     }, []);
+
+    // Track whether we've already tried session recovery (prevent double-fire)
+    const recoveryAttempted = useRef(false);
 
     // ==========================================
     // 2. Core Helper Functions
@@ -112,7 +134,6 @@ export function usePrint() {
 
         } catch (err) {
             // Network error reaching backend → treat as unknown, soft warning
-            console.error('[Status Check] Error:', err.message);
             addLog('⚠ Could not reach status check, proceeding with warning');
             setPrinterStatusResult({ printer_status: 'unknown', kiosk_online: true });
             setStatus('PRINTER_WARNING');
@@ -123,8 +144,50 @@ export function usePrint() {
     // 3. Effects (Now safe to define)
     // ==========================================
 
-    // Auto-connect if kiosk_id is in the URL
+    // Save active job to sessionStorage for refresh recovery
     useEffect(() => {
+        const activeStatuses = ['PRINTING', 'SCANNING', 'XEROXING'];
+        if (activeStatuses.includes(status) && pricing?.job_id && config?.kiosk_id) {
+            saveSession({
+                job_id: pricing.job_id,
+                serviceType,
+                kiosk_id: config.kiosk_id,
+                status
+            });
+        }
+    }, [status, pricing?.job_id, serviceType, config?.kiosk_id]);
+
+    // Recover active job from sessionStorage on mount
+    useEffect(() => {
+        if (recoveryAttempted.current) return;
+        recoveryAttempted.current = true;
+
+        const saved = loadSession();
+        if (!saved?.job_id) return;
+
+        // Restore state for polling
+        setConfig({ kiosk_id: saved.kiosk_id });
+        setServiceType(saved.serviceType || 'print');
+        setPricing({ job_id: saved.job_id });
+        setScannerActive(false);
+
+        if (saved.serviceType === 'scan') {
+            setStatus('SCANNING');
+        } else if (saved.serviceType === 'xerox') {
+            setStatus('XEROXING');
+        } else {
+            setStatus('PRINTING');
+        }
+
+        addLog('Reconnecting to active job...');
+    }, [addLog]);
+
+    // Auto-connect if kiosk_id is in the URL (skip if recovering active job)
+    useEffect(() => {
+        // Don't auto-connect if we just recovered an active job
+        const saved = loadSession();
+        if (saved?.job_id) return;
+
         const params = new URLSearchParams(window.location.search);
         const kioskIdFromUrl = params.get('kiosk_id');
         const location = params.get('location');
@@ -160,9 +223,11 @@ export function usePrint() {
                 });
                 const jobStatus = response.data.status;
 
-                addLog(`Status: ${jobStatus}`);
+                // Track backend phase for progress display (xerox: SCANNING → PRINTING)
+                setJobPhase(jobStatus);
 
                 if (jobStatus === 'COMPLETED') {
+                    clearSession();
                     if (serviceType === 'scan') {
                         // Fetch the download URL for scan result
                         setScanResult({
@@ -174,13 +239,14 @@ export function usePrint() {
                     }
                     clearInterval(pollInterval);
                 } else if (jobStatus === 'FAILED' || jobStatus === 'CANCELLED') {
+                    clearSession();
                     setStatus('ERROR');
                     clearInterval(pollInterval);
                     addLog(`Job failed: ${response.data.error_message || 'Unknown error'}`);
                 }
 
             } catch (e) {
-                console.error('Status poll error:', e);
+                // Poll error — silent retry
             }
         }, 3000);
 
@@ -202,7 +268,6 @@ export function usePrint() {
 
         // Extra guard
         if (!rawValue || typeof rawValue !== 'string') {
-            console.warn('⚠️ Invalid QR payload:', detectedCodes);
             setScannerActive(true);
             return;
         }
@@ -210,14 +275,11 @@ export function usePrint() {
         // Stop scanner once we have *something*
         setScannerActive(false);
 
-        console.log('🔍 QR Scanned:', rawValue);
-
         try {
             let printerData = {};
 
             // 1️⃣ URL QR (recommended)
             if (rawValue.startsWith('http://') || rawValue.startsWith('https://')) {
-                console.log('📍 Detected as URL');
 
                 const url = new URL(rawValue);
                 const kioskId = url.searchParams.get('kiosk_id');
@@ -243,7 +305,6 @@ export function usePrint() {
             }
             // 2️⃣ JSON QR
             else if (rawValue.trim().startsWith('{')) {
-                console.log('📍 Detected as JSON');
                 const parsed = JSON.parse(rawValue);
                 printerData = {
                     kiosk_id: parsed.kiosk_id || parsed.ip || 'default_kiosk',
@@ -253,7 +314,6 @@ export function usePrint() {
             }
             // 3️⃣ Plain text QR
             else {
-                console.log('📍 Detected as plain text');
                 const value = rawValue.trim();
                 printerData = {
                     kiosk_id: value,
@@ -270,14 +330,12 @@ export function usePrint() {
             checkKioskStatus(printerData.kiosk_id);
 
         } catch (err) {
-            console.error('❌ QR decode error:', err);
-            addLog('❌ Invalid QR format');
+            addLog('Invalid QR format');
             setScannerActive(true);
         }
     }, [addLog, setConfig, setStatus, checkKioskStatus]);
 
     const handleScanError = useCallback((error) => {
-        console.warn('📷 Camera error:', error);
         setCameraError(
             'Camera not available. Allow permissions or use manual entry.'
         );
@@ -481,7 +539,7 @@ export function usePrint() {
     }, [pricing, API_URL, addLog, getAuthHeader, signOut]);
 
     const resetFlow = useCallback(() => {
-        console.log('🔄 resetFlow called!');
+        clearSession();
         setStatus('IDLE');
         setConfig(null);
         setFile(null);
@@ -495,6 +553,7 @@ export function usePrint() {
     }, [addLog]);
 
     const printAnotherOnSameKiosk = useCallback(() => {
+        clearSession();
         setStatus('SERVICE_SELECT');
         setFile(null);
         setPricing(null);
@@ -505,6 +564,7 @@ export function usePrint() {
     }, [addLog]);
 
     const backToServiceSelect = useCallback(() => {
+        clearSession();
         setStatus('SERVICE_SELECT');
         setFile(null);
         setPricing(null);
@@ -530,6 +590,7 @@ export function usePrint() {
         scanResult,
         scanOptions,
         xeroxCopies,
+        jobPhase,
 
         // Handlers
         handleScan,

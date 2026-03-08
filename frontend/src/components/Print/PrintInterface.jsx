@@ -15,7 +15,6 @@ import {
   PaymentView,
   PrintingView,
   CompletedView,
-  LogTerminal,
   StatusCheckView,
   PrinterErrorView,
   PrinterWarningView,
@@ -30,7 +29,7 @@ import {
 
 export function PrintInterface() {
   const printState = usePrint();
-  const { status, logs } = printState;
+  const { status } = printState;
 
   // Pass hook state + helpers down to child views
   const viewProps = {
@@ -119,9 +118,6 @@ export function PrintInterface() {
 
           {/* VIEW: Xeroxing in progress */}
           {status === 'XEROXING' && <XeroxingView {...viewProps} />}
-
-          {/* Logs - always visible */}
-          <LogTerminal logs={logs} />
         </CardContent>
       </Card>
     </div>

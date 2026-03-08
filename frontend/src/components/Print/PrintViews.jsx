@@ -464,9 +464,17 @@ export function PaymentView({ pricing, handlePayment, setStatus, setFile, setPri
   );
 }
 
-export function PrintingView() {
+export function PrintingView({ jobPhase }) {
+  const subtitle = jobPhase === 'QUEUED' ? 'Queued for printing'
+    : jobPhase === 'PRINTING' ? 'Printing your document'
+    : 'Sending to printer';
+
   return (
-    <div className="space-y-6 text-center py-8">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6 text-center py-8"
+    >
       <div className="relative">
         <Loader2 className="animate-spin h-16 w-16 mx-auto text-white"/>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -475,13 +483,16 @@ export function PrintingView() {
       </div>
       <div>
         <p className="text-xl font-semibold mb-2 text-foreground">Printing...</p>
-        <p className="text-sm text-muted-foreground">Checking status</p>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-export function CompletedView({ printAnotherOnSameKiosk, resetFlow }) {
+export function CompletedView({ serviceType, printAnotherOnSameKiosk, resetFlow }) {
+  const title = serviceType === 'xerox' ? 'Xerox Complete!' : 'Print Complete!';
+  const subtitle = serviceType === 'xerox' ? 'Collect your copies' : 'Collect your document';
+
   return (
     <div className="space-y-6 text-center py-8">
       <div className="relative">
@@ -489,22 +500,22 @@ export function CompletedView({ printAnotherOnSameKiosk, resetFlow }) {
       </div>
       <div>
         <p className="text-2xl font-bold mb-2 text-foreground">
-          Print Complete!
+          {title}
         </p>
-        <p className="text-sm text-muted-foreground">Collect your document</p>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
       </div>
-      
+
       <div className="space-y-3">
-        <Button 
-          onClick={printAnotherOnSameKiosk} 
+        <Button
+          onClick={printAnotherOnSameKiosk}
           className="w-full bg-white text-black hover:bg-neutral-200 font-semibold py-6 transition-colors"
         >
           <Printer className="mr-2 h-5 w-5"/>
-          Print Another Document
+          {serviceType === 'xerox' ? 'Xerox Another Document' : 'Print Another Document'}
         </Button>
-        
-        <Button 
-          onClick={resetFlow} 
+
+        <Button
+          onClick={resetFlow}
           variant="ghost"
           className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5"
         >
@@ -670,9 +681,17 @@ export function ScanOptionsView({ scanOptions, setScanOptions, handleScanStart, 
 
 
 // ─── VIEW: Scanning in progress ─────────────────────────────
-export function ScanningView() {
+export function ScanningView({ jobPhase }) {
+    const subtitle = jobPhase === 'PROCESSING' ? 'Processing scanned document'
+        : jobPhase === 'DISCOVERING_SCANNER' ? 'Detecting scanner'
+        : 'Scanning your document';
+
     return (
-        <div className="space-y-6 text-center py-8">
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6 text-center py-8"
+        >
             <div className="relative">
                 <Loader2 className="animate-spin h-16 w-16 mx-auto text-white" />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -681,9 +700,9 @@ export function ScanningView() {
             </div>
             <div>
                 <p className="text-xl font-semibold mb-2 text-foreground">Scanning...</p>
-                <p className="text-sm text-muted-foreground">Please wait while the document is scanned</p>
+                <p className="text-sm text-muted-foreground">{subtitle}</p>
             </div>
-        </div>
+        </motion.div>
     );
 }
 
@@ -836,9 +855,19 @@ export function XeroxOptionsView({ xeroxCopies, setXeroxCopies, scanOptions, set
 
 
 // ─── VIEW: Xeroxing in progress ─────────────────────────────
-export function XeroxingView() {
+export function XeroxingView({ jobPhase }) {
+    const isPrinting = jobPhase === 'PRINTING' || jobPhase === 'QUEUED';
+    const title = isPrinting ? 'Printing...' : 'Scanning...';
+    const subtitle = isPrinting
+        ? 'Printing your copies'
+        : 'Scanning your document';
+
     return (
-        <div className="space-y-6 text-center py-8">
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6 text-center py-8"
+        >
             <div className="relative">
                 <Loader2 className="animate-spin h-16 w-16 mx-auto text-white" />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -846,10 +875,23 @@ export function XeroxingView() {
                 </div>
             </div>
             <div>
-                <p className="text-xl font-semibold mb-2 text-foreground">Xeroxing...</p>
-                <p className="text-sm text-muted-foreground">Scanning & printing your copies</p>
+                <p className="text-xl font-semibold mb-2 text-foreground">{title}</p>
+                <p className="text-sm text-muted-foreground">{subtitle}</p>
             </div>
-        </div>
+
+            {/* Progress steps */}
+            <div className="flex items-center justify-center gap-3">
+                <div className={`flex items-center gap-1.5 text-xs ${!isPrinting ? 'text-white font-medium' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${!isPrinting ? 'bg-white animate-pulse' : 'bg-white/30'}`} />
+                    Scan
+                </div>
+                <div className="w-6 h-px bg-border" />
+                <div className={`flex items-center gap-1.5 text-xs ${isPrinting ? 'text-white font-medium' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${isPrinting ? 'bg-white animate-pulse' : 'bg-white/30'}`} />
+                    Print
+                </div>
+            </div>
+        </motion.div>
     );
 }
 

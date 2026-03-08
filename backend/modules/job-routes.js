@@ -248,7 +248,10 @@ router.get('/jobs/:job_id/status', verifyToken, async (req, res) => {
 
         res.json({
             status: job.status,
-            error_message: job.error_message || null
+            job_type: job.job_type || 'print',
+            error_message: job.error_message || null,
+            status_message: job.status_message || null,
+            output_file_url: job.output_file_url || null
         });
 
     } catch (error) {

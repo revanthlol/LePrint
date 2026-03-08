@@ -369,6 +369,18 @@ See [TESTING.md](TESTING.md) for the complete testing guide covering:
 
 ---
 
+## 💳 Payments
+
+Currently using mock payments. See [docs/RAZORPAY_INTEGRATION.md](docs/RAZORPAY_INTEGRATION.md) for the complete Razorpay integration guide covering:
+- Account setup and API keys
+- Backend order creation and signature verification
+- Frontend Razorpay Checkout integration
+- Webhook setup
+- Testing with test cards
+- Going live checklist
+
+---
+
 ## 🐛 Troubleshooting
 
 ### Backend won't start

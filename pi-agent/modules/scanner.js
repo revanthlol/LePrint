@@ -185,7 +185,7 @@ class Scanner {
 
     // Fetch capabilities
     this.logger.info('[eSCL] Fetching scanner capabilities...');
-    const capsResp = await axios.get(`${baseURL}/ScannerCapabilities`, { timeout: 15000 });
+    const capsResp = await axios.get(`${baseURL}/ScannerCapabilities`, { timeout: 30000 });
     this.logger.info(`[eSCL] Capabilities: ${capsResp.data.length} chars`);
 
     // Build scan settings — try multiple XML formats
@@ -260,14 +260,17 @@ class Scanner {
 
     let lastError = null;
     let usedFormat = format;
+    let attempted = 0;
 
     for (let i = 0; i < xmlVariants.length; i++) {
+      attempted++;
       this.logger.info(`[eSCL] Attempt ${i + 1}/${xmlVariants.length}...`);
       try {
         const response = await axios.post(`${baseURL}/ScanJobs`, xmlVariants[i], {
           headers: { 'Content-Type': 'text/xml' },
           maxRedirects: 0,
-          validateStatus: s => s === 201
+          validateStatus: s => s === 201,
+          timeout: 120000
         });
 
         const jobLocation = response.headers.location;
@@ -295,25 +298,28 @@ class Scanner {
       } catch (error) {
         const status = error.response?.status;
         const body = error.response?.data;
-        this.logger.warn(`  Attempt ${i + 1} failed (HTTP ${status || 'N/A'})`);
+        this.logger.warn(`  Attempt ${i + 1} failed (${error.code || `HTTP ${status}` || 'unknown'}): ${error.message}`);
         if (body && typeof body === 'string' && body.length > 0) {
           this.logger.warn(`  Body: ${body.substring(0, 300)}`);
         }
         lastError = error;
+        // Only retry next XML variant on 400 (rejected format).
+        // Any other error (timeout, connection, 5xx) means stop trying.
         if (status !== 400) break;
       }
     }
 
-    throw new Error(`eSCL scan failed after ${xmlVariants.length} attempts: ${lastError?.message}`);
+    throw new Error(`eSCL scan failed (${attempted} variant${attempted > 1 ? 's' : ''} tried): ${lastError?.message}`);
   }
 
   async _retrieveDocument(url, outputPath) {
     let attempts = 0;
-    while (attempts < 30) {
+    const maxAttempts = 90; // up to 90 seconds of polling
+    while (attempts < maxAttempts) {
       try {
         const response = await axios.get(url, {
           responseType: 'stream',
-          timeout: 15000
+          timeout: 60000
         });
 
         const writer = fs.createWriteStream(outputPath);
@@ -327,7 +333,15 @@ class Scanner {
         this.logger.info(`✓ Document saved: ${outputPath}`);
         return outputPath;
       } catch (error) {
-        if (error.response?.status === 404) {
+        const status = error.response?.status;
+        const isRetryable = status === 404 || status === 503
+          || error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
+          || error.code === 'ECONNRESET' || error.code === 'ECONNREFUSED';
+
+        if (isRetryable) {
+          if (attempts % 10 === 0) {
+            this.logger.info(`[eSCL] Waiting for scan result... (${attempts}s, ${error.code || `HTTP ${status}`})`);
+          }
           await new Promise(resolve => setTimeout(resolve, 1000));
           attempts++;
           continue;
@@ -335,7 +349,7 @@ class Scanner {
         throw error;
       }
     }
-    throw new Error('Scan timeout — document not received after 30s');
+    throw new Error(`Scan timeout — document not received after ${maxAttempts}s`);
   }
 
   // ==================== MAIN ENTRY POINT ====================

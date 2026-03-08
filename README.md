@@ -198,11 +198,7 @@ cd backend
 npm install
 
 # Setup PostgreSQL
-sudo -u postgres psql
-CREATE DATABASE printkiosk;
-CREATE USER printuser WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE printkiosk TO printuser;
-\q
+sudo -u postgres psql -f setup-db.sql
 
 # Run schema
 psql -U printuser -d printkiosk -f schema.sql

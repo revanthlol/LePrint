@@ -436,6 +436,7 @@ if [ -d "$INSTALL_DIR" ]; then
 
         # Backup current .env
         if [ -f ".env" ]; then
+            rm -f .env.backup
             cp .env .env.backup
             print_info "Backed up .env file"
         fi

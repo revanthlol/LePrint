@@ -145,7 +145,7 @@ remove_service_files() {
 backup_config() {
   print_section "Backing Up Configuration"
 
-  BACKUP_DIR="$HOME/leprint-backup-$(date +%Y%m%d-%H%M%S)"
+  BACKUP_DIR="$HOME/leprint-backup-latest"
 
   # Check for .env files in various locations
   local found_config=false
@@ -153,6 +153,7 @@ backup_config() {
   for dir in "$HOME/LePrint-agent" "$HOME/directprint-agent" "/opt/LePrint" "/opt/directprint" "$HOME/directprint"; do
     if [ -f "$dir/.env" ]; then
       if [ "$found_config" = false ]; then
+        rm -rf "$BACKUP_DIR"
         mkdir -p "$BACKUP_DIR"
         found_config=true
       fi

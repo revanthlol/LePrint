@@ -364,7 +364,7 @@ if [ -d "$INSTALL_DIR" ]; then
         print_step "Cloning LePrint repo (sparse: pi-agent/ only)..."
 
         git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/revanthlol/LePrint.git "$TMP_DIR" || {
+            https://github.com/revanthlol/leprint.git "$TMP_DIR" || {
             print_error "Git clone failed"
             rm -rf "$TMP_DIR"
             exit 1
@@ -397,6 +397,27 @@ if [ -d "$INSTALL_DIR" ]; then
         npm install
         print_success "Pi agent updated!"
 
+        # Restart services if running (optional)
+        if systemctl is-active --quiet LePrint-agent 2>/dev/null; then
+            echo ""
+            read -p "Restart LePrint-agent service now? (y/n): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                sudo systemctl restart LePrint-agent
+                print_success "LePrint-agent restarted"
+            fi
+        fi
+
+        if systemctl is-active --quiet LePrint-qr 2>/dev/null; then
+            echo ""
+            read -p "Restart LePrint-qr service now? (y/n): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                sudo systemctl restart LePrint-qr
+                print_success "LePrint-qr restarted"
+            fi
+        fi
+
         # Ask about reconfiguration
         echo ""
         read -p "Reconfigure settings (.env file)? (y/n): " -n 1 -r
@@ -426,7 +447,7 @@ print_step "Cloning LePrint repo (sparse: pi-agent/ only)..."
 
 TMP_DIR="$(mktemp -d)"
 git clone --depth 1 --filter=blob:none --sparse \
-    https://github.com/revanthlol/LePrint.git "$TMP_DIR" || {
+    https://github.com/revanthlol/leprint.git "$TMP_DIR" || {
     print_error "Git clone failed"
     rm -rf "$TMP_DIR"
     exit 1

@@ -1,12 +1,12 @@
 {
-    "name": "directprint-pi-agent",
+    "name": "leprint-pi-agent",
     "version": "1.0.0",
-    "description": "Print agent for Raspberry Pi or any CUPS-enabled system",
+    "description": "LePrint print agent for Raspberry Pi or any CUPS-enabled system",
     "main": "index.js",
     "scripts": {
         "start": "node index.js",
         "dev": "nodemon index.js",
-        "setup": "npm install && node setup-wizard.js"
+        "setup": "bash setup.sh"
     },
     "dependencies": {
         "axios": "^1.13.5",

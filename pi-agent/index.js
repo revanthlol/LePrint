@@ -9,14 +9,25 @@ const logger = require('./modules/logger');
 const utils = require('./modules/utils');
 const jobHandler = require('./modules/job-handler');
 const socketClient = require('./modules/socket-client');
+const os = require('os');
 
 // ==================== CONFIG ====================
+function getDefaultKioskId() {
+  try {
+    const username = os.userInfo().username;
+    if (username) return username;
+  } catch (_) {
+    // ignore
+  }
+  return process.env.USER || os.hostname();
+}
+
 const CONFIG = {
   cloudServer: process.env.CLOUD_URL || 'https://justpri.duckdns.org',
   printerName: process.env.PRINTER_NAME || 'auto',
   printerIP: process.env.PRINTER_IP || '192.168.1.100',
-  kioskId: process.env.KIOSK_ID || `kiosk_${require('os').hostname()}`,
-  frontendUrl: process.env.FRONTEND_URL || 'https://qr-wifi-printer.vercel.app',
+  kioskId: process.env.KIOSK_ID || getDefaultKioskId(),
+  frontendUrl: process.env.FRONTEND_URL || 'https://leprint.in',
   tempDir: './print-queue',
   heartbeatInterval: 30000,
   pollInterval: parseInt(process.env.POLL_INTERVAL) || 5000
@@ -42,7 +53,7 @@ if (!fs.existsSync(CONFIG.tempDir)) {
 
 console.log(`
 ╔════════════════════════════════════════╗
-║   DirectPrint Agent V6 Starting...     ║
+║   LePrint Agent V6 Starting...         ║
 ║   Model: Pull-Based + Modular          ║
 ║   Kiosk ID: ${CONFIG.kioskId.padEnd(26)}║
 ║   Cloud: ${CONFIG.cloudServer.padEnd(30)}║
@@ -90,7 +101,7 @@ async function initialize() {
   socketClient.setupEventHandlers(
     socket,
     CONFIG.kioskId,
-    require('os').hostname(),
+    os.hostname(),
     STATE,
     logger
   );

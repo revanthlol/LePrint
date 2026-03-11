@@ -1,4 +1,4 @@
-# DirectPrint Pi Agent 🖨️
+# LePrint Pi Agent 🖨️
 
 The print agent that runs on your Raspberry Pi (or any laptop) to handle actual printing via CUPS.
 
@@ -12,9 +12,8 @@ The print agent that runs on your Raspberry Pi (or any laptop) to handle actual 
 
 ### Software
 
--**Node.js 16+** (check: `node --version`)
-
--**CUPS** (Common Unix Printing System)
+- **Node.js 16+** (check: `node --version`)
+- **CUPS** (Common Unix Printing System)
 
 ## Installation
 
@@ -23,15 +22,10 @@ The print agent that runs on your Raspberry Pi (or any laptop) to handle actual 
 **Ubuntu/Debian/Raspberry Pi OS:**
 
 ```bash
-
-sudoaptupdate
-
-sudoaptinstallcups
-
-sudosystemctlstartcups
-
-sudosystemctlenablecups
-
+sudo apt update
+sudo apt install cups
+sudo systemctl start cups
+sudo systemctl enable cups
 ```
 
 **macOS:**
@@ -39,52 +33,39 @@ sudosystemctlenablecups
 Already installed! Just make sure it's running:
 
 ```bash
-
-sudocupsctlWebInterface=yes
-
+sudo cupsctl WebInterface=yes
 ```
 
 **Verify CUPS is working:**
 
 ```bash
-
-lpstat-p# Should list your connected printers
-
+lpstat -p # Should list your connected printers
 ```
 
 ### 2. Add your user to printer group
 
 ```bash
-
-sudousermod-aGlpadmin $USER
-
+sudo usermod -aG lpadmin "$USER"
 # Log out and back in for changes to take effect
-
 ```
 
 ### 3. Install Agent Dependencies
 
 ```bash
-
-cdpi-agent
-
-npminstall
-
+cd pi-agent
+npm install
 ```
 
 ### 4. Run Setup Wizard
 
 ```bash
-
-npmrunsetup
-
+npm run setup
 ```
 
 The wizard will:
 
 - Detect connected printers
 - Let you choose auto-detect or manual selection
-- Ask for your cloud backend URL
 - Generate a `.env` file
 
 ## Configuration
@@ -128,65 +109,43 @@ lpstat-p
 ### Development (with auto-restart)
 
 ```bash
-
-npmrundev
-
+npm run dev
 ```
 
 ### Production
 
 ```bash
-
-npmstart
-
+npm start
 ```
 
 ### Run on Boot (systemd service)
 
-Create `/etc/systemd/system/directprint-agent.service`:
+Create `/etc/systemd/system/LePrint-agent.service`:
 
 ```ini
-
 [Unit]
-
-Description=DirectPrint Agent
-
+Description=LePrint Agent
 After=network.target cups.service
 
-
 [Service]
-
 Type=simple
-
 User=pi
-
-WorkingDirectory=/home/pi/qr-wifi-printer/pi-agent
-
+WorkingDirectory=/home/pi/LePrint-agent
 ExecStart=/usr/bin/node index.js
-
 Restart=always
-
 RestartSec=10
-
 Environment=NODE_ENV=production
 
-
 [Install]
-
 WantedBy=multi-user.target
-
 ```
 
 Enable and start:
 
 ```bash
-
-sudosystemctlenabledirectprint-agent
-
-sudosystemctlstartdirectprint-agent
-
-sudosystemctlstatusdirectprint-agent
-
+sudo systemctl enable LePrint-agent
+sudo systemctl start LePrint-agent
+sudo systemctl status LePrint-agent
 ```
 
 ## Logs & Monitoring
@@ -194,21 +153,17 @@ sudosystemctlstatusdirectprint-agent
 View logs in real-time:
 
 ```bash
-
 # If running with systemd
-
-sudojournalctl-udirectprint-agent-f
-
+sudo journalctl -u LePrint-agent -f
 
 # If running manually, logs appear in console
-
 ```
 
 Healthy agent output:
 
 ```
 
-🖨️  DirectPrint Agent Starting...
+🖨️  LePrint Agent Starting...
 
 📡 Connecting to Cloud: http://your-server.com:3001
 
@@ -283,19 +238,12 @@ newgrplpadmin# Or log out/in
 ## File Structure
 
 ```
-
 pi-agent/
-
 ├── index.js           # Main agent logic
-
-├── setup-wizard.js    # Interactive setup
-
+├── setup.sh           # Install/update vs uninstall menu
 ├── package.json       # Dependencies
-
 ├── .env              # Configuration (created by setup)
-
 └── print-queue/      # Temp directory (auto-created)
-
 ```
 
 ## Security Notes
@@ -320,7 +268,7 @@ pi-agent/
 After getting the agent running:
 
 1. Generate printer QR code (see main README)
-2. Test with frontend at your Vercel URL
+2. Test with frontend at `https://leprint.in`
 3. Monitor logs for any issues
 4. Set up auto-start on boot for production
 
@@ -334,4 +282,4 @@ Having issues? Check:
 
 ---
 
-**Built for DirectPrint** | Works on Pi, Mac, Linux
+**Built for LePrint** | Works on Pi, Mac, Linux

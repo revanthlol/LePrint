@@ -228,7 +228,7 @@ remove_user_group() {
   if groups $USER | grep -q lpadmin; then
     echo ""
     print_warning "Your user is in the 'lpadmin' group (for CUPS printer management)."
-    echo -e "This was likely added by the DirectPrint installer."
+    echo -e "This was likely added by the LePrint installer."
     echo ""
     read -p "Remove user from lpadmin group? (y/n): " -n 1 -r
     echo

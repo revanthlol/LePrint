@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: "autoUpdate",
 
       manifest: {
-        name: "JusPri",
-        short_name: "JusPri",
+        name: "Leprint",
+        short_name: "Leprint",
         description: "Scan QR, upload files, and print instantly",
         theme_color: "#0a0a0a",
         background_color: "#0a0a0a",

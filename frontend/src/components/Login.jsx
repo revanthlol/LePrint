@@ -108,7 +108,7 @@ export function Login() {
                             transition={{ delay: 0.3, duration: 0.5 }}
                             className="text-4xl font-bold text-foreground mb-2"
                         >
-                            JusPri
+                            Leprint
                         </motion.h1>
                         <motion.p
                             initial={{ opacity: 0 }}
@@ -301,7 +301,7 @@ export function Login() {
                     transition={{ delay: 0.9 }}
                     className="mt-6 text-center text-xs text-muted-foreground/40"
                 >
-                    © {new Date().getFullYear()} JusPri ·{' '}
+                    © {new Date().getFullYear()} Leprint ·{' '}
                     <button
                         onClick={() => navigate('/faq')}
                         className="hover:text-muted-foreground transition-colors underline underline-offset-2"

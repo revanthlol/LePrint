@@ -61,6 +61,49 @@ print_step() {
     echo -e "${ARROW} $1"
 }
 
+has_systemd() {
+    command -v systemctl &> /dev/null
+}
+
+cleanup_legacy_services() {
+    if ! has_systemd; then
+        return 0
+    fi
+
+    print_section "Cleaning Up Legacy Services"
+
+    local legacy_units=("directprint-agent" "directprint-qr")
+    local legacy_files=(
+        "/etc/systemd/system/directprint-agent.service"
+        "/etc/systemd/system/directprint-qr.service"
+    )
+
+    for unit in "${legacy_units[@]}"; do
+        if systemctl is-active --quiet "$unit" 2>/dev/null; then
+            print_step "Stopping legacy service: ${unit}"
+            sudo systemctl stop "$unit" || true
+            print_success "Stopped ${unit}"
+        fi
+
+        if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+            print_step "Disabling legacy service: ${unit}"
+            sudo systemctl disable "$unit" || true
+            print_success "Disabled ${unit}"
+        fi
+    done
+
+    for file in "${legacy_files[@]}"; do
+        if [ -f "$file" ]; then
+            print_step "Removing legacy unit file: $(basename "$file")"
+            sudo rm -f "$file"
+            print_success "Removed $file"
+        fi
+    done
+
+    sudo systemctl daemon-reload || true
+    print_success "Legacy cleanup complete"
+}
+
 # Detect OS
 detect_os() {
     if [ -f /etc/os-release ]; then
@@ -301,6 +344,43 @@ setup_pi_agent() {
     INSTALL_DIR="$HOME/LePrint-agent"
     
     # --- Helper function to generate .env ---
+    upsert_env_var() {
+        local key="$1"
+        local value="$2"
+
+        if [ -f ".env" ] && grep -qE "^${key}=" .env; then
+            sed -i "s|^${key}=.*|${key}=${value}|" .env
+        else
+            echo "${key}=${value}" >> .env
+        fi
+    }
+
+    enforce_env_defaults() {
+        if [ ! -f ".env" ]; then
+            return 0
+        fi
+
+        # Always enforce LePrint production endpoints (no prompts).
+        upsert_env_var "CLOUD_URL" "${DEFAULT_CLOUD_URL}"
+        upsert_env_var "FRONTEND_URL" "${DEFAULT_FRONTEND_URL}"
+
+        # Ensure essentials exist (don't overwrite user-specific values if present).
+        if ! grep -qE "^KIOSK_ID=" .env; then
+            local default_kiosk_id
+            default_kiosk_id="$(id -un 2>/dev/null || echo "${USER:-kiosk_1}")"
+            upsert_env_var "KIOSK_ID" "${default_kiosk_id}"
+        fi
+        if ! grep -qE "^PRINTER_NAME=" .env; then
+            upsert_env_var "PRINTER_NAME" "auto"
+        fi
+        if ! grep -qE "^POLL_INTERVAL=" .env; then
+            upsert_env_var "POLL_INTERVAL" "5000"
+        fi
+        if ! grep -qE "^QR_SERVER_PORT=" .env; then
+            upsert_env_var "QR_SERVER_PORT" "3000"
+        fi
+    }
+
     generate_env_file() {
         print_step "Creating .env configuration..."
         echo ""
@@ -339,6 +419,7 @@ POLL_INTERVAL=5000
 QR_SERVER_PORT=3000
 EOF
 
+        enforce_env_defaults
         print_success "Configuration saved to .env"
     }
 
@@ -391,6 +472,7 @@ if [ -d "$INSTALL_DIR" ]; then
             mv .env.backup .env
             print_info "Restored .env file"
         fi
+        enforce_env_defaults
 
         # Update dependencies
         print_step "Updating dependencies..."
@@ -478,6 +560,7 @@ if [ ! -f ".env" ]; then
     generate_env_file
 else
     print_info ".env file already exists, skipping"
+    enforce_env_defaults
 fi
 
 PI_AGENT_DIR="$INSTALL_DIR"
@@ -488,6 +571,11 @@ print_success "Pi Agent setup complete"
 create_systemd_service() {
     print_section "Creating System Services"
     
+    if ! has_systemd; then
+        print_warning "systemd not detected; skipping service setup."
+        return 0
+    fi
+
     print_step "Creating systemd service..."
     
     sudo tee /etc/systemd/system/LePrint-agent.service > /dev/null <<EOF
@@ -550,11 +638,20 @@ create_qr_service() {
     LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}' || echo "localhost")
     echo "You can access it at http://${LOCAL_IP}:3000"
     echo ""
-    read -p "Install QR display service? (y/n): " -n 1 -r
-    echo
-    
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+
+    if ! has_systemd; then
+        print_warning "systemd not detected; skipping QR service setup."
         return 0
+    fi
+
+    if [ -f "/etc/systemd/system/LePrint-qr.service" ] || systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "LePrint-qr.service"; then
+        print_info "LePrint-qr service already installed; updating and restarting..."
+    else
+        read -p "Install QR display service? (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            return 0
+        fi
     fi
     
     print_step "Creating QR service..."
@@ -586,8 +683,8 @@ WantedBy=multi-user.target
 EOF
     
     sudo systemctl daemon-reload
-    sudo systemctl enable LePrint-qr
-    sudo systemctl start LePrint-qr
+    sudo systemctl enable LePrint-qr || true
+    sudo systemctl restart LePrint-qr || sudo systemctl start LePrint-qr
     
     print_success "QR service created and started"
 }
@@ -637,6 +734,8 @@ main() {
     detect_os
     show_system_info
     confirm_install
+
+    cleanup_legacy_services
     
     update_system
     install_nodejs

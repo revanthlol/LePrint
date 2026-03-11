@@ -7,7 +7,7 @@ const os = require('os');
 const app = express();
 const PORT = process.env.QR_SERVER_PORT || 8000;
 const KIOSK_ID = process.env.KIOSK_ID || `kiosk_${os.hostname()}`;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://qr-wifi-printer.vercel.app';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://leprint.in';
 const LOCATION = process.env.LOCATION || 'Unknown Location';
 const FLOOR = process.env.FLOOR || 'N/A';
 
@@ -34,7 +34,7 @@ app.get('/', async (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>JusPri - ${KIOSK_ID}</title>
+        <title>LePrint - ${KIOSK_ID}</title>
         <style>
             /* Shadcn UI Dark Theme Variables */
             :root {
@@ -376,7 +376,7 @@ app.get('/', async (req, res) => {
                             <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                         </svg>
                     </div>
-                    <h1>JusPri Kiosk</h1>
+                    <h1>LePrint Kiosk</h1>
                     <p class="subtitle">Fast & Easy Document Printing</p>
                 </div>
     
@@ -408,7 +408,7 @@ app.get('/', async (req, res) => {
                 </div>
     
                 <div class="footer">
-                    Powered by JusPri
+                    Powered by LePrint
                 </div>
             </div>
     

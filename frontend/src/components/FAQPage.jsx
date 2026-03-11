@@ -17,7 +17,7 @@ const faqs = [
     questions: [
       {
         q: 'What file formats can I print?',
-        a: `Leprint supports the following file types:\n\n• PDF (.pdf) — Prints directly, no conversion needed\n• Microsoft Word (.doc, .docx) — Auto-converted to PDF\n• OpenDocument Text (.odt) — Auto-converted to PDF\n• Rich Text Format (.rtf) — Auto-converted to PDF\n• Plain Text (.txt, .md) — Auto-converted to PDF\n• Images (.png, .jpg, .jpeg) — Scaled to A4 and printed\n\nMaximum file size right now is 100 MB , but we are working on increasing it.`
+        a: `LePrint supports the following file types:\n\n• PDF (.pdf) — Prints directly, no conversion needed\n• Microsoft Word (.doc, .docx) — Auto-converted to PDF\n• OpenDocument Text (.odt) — Auto-converted to PDF\n• Rich Text Format (.rtf) — Auto-converted to PDF\n• Plain Text (.txt, .md) — Auto-converted to PDF\n• Images (.png, .jpg, .jpeg) — Scaled to A4 and printed\n\nMaximum file size right now is 100 MB , but we are working on increasing it.`
       },
       {
         q: 'Are non-PDF files converted automatically?',
@@ -65,10 +65,10 @@ const faqs = [
       },
       {
         q: 'Is my payment information secure?',
-        a: 'Yes. Payments are processed through Razorpay, a PCI DSS compliant payment gateway. Leprint never stores your card details. Only a payment confirmation ID is saved for refund and audit purposes.'
+        a: 'Yes. Payments are processed through Razorpay, a PCI DSS compliant payment gateway. LePrint never stores your card details. Only a payment confirmation ID is saved for refund and audit purposes.'
       },
       {
-        q: 'What data does Leprint store about me?',
+        q: 'What data does LePrint store about me?',
         a: 'We store only:\n\n• Your name and email from Google Sign-In\n• Print job metadata: file name, page count, cost, status, and timestamps\n\nWe never store the content of your documents. Your print history is private and only visible to you.'
       }
     ]
@@ -80,8 +80,8 @@ const faqs = [
     bg: 'bg-purple-500/10',
     questions: [
       {
-        q: 'How does Leprint work?',
-        a: 'Leprint is a cloud-based kiosk printing system:\n\n1. Scan the QR code at a kiosk with your phone\n2. Log in with Google\n3. Upload your document\n4. Pay per page (₹3/page)\n5. Collect your printout\n\nYour phone controls the kiosk — no USB, no email, no app install required.'
+        q: 'How does LePrint work?',
+        a: 'LePrint is a cloud-based kiosk printing system:\n\n1. Scan the QR code at a kiosk with your phone\n2. Log in with Google\n3. Upload your document\n4. Pay per page (₹3/page)\n5. Collect your printout\n\nYour phone controls the kiosk — no USB, no email, no app install required.'
       },
       {
         q: 'Can I print without creating an account?',
@@ -340,19 +340,19 @@ export function FAQPage() {
 
   // SEO Meta Tags
   useEffect(() => {
-    document.title = 'FAQs & Support - Leprint';
+    document.title = 'FAQs & Support - LePrint';
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
-      metaDescription.setAttribute('content', 'Find answers about Leprint cloud printing: supported formats, refunds, privacy, and more. Get help instantly.');
+      metaDescription.setAttribute('content', 'Find answers about LePrint cloud printing: supported formats, refunds, privacy, and more. Get help instantly.');
     } else {
       const meta = document.createElement('meta');
       meta.name = 'description';
-      meta.content = 'Find answers about Leprint cloud printing: supported formats, refunds, privacy, and more. Get help instantly.';
+      meta.content = 'Find answers about LePrint cloud printing: supported formats, refunds, privacy, and more. Get help instantly.';
       document.head.appendChild(meta);
     }
 
     return () => {
-      document.title = 'Leprint';
+      document.title = 'LePrint';
     };
   }, []);
 
@@ -398,7 +398,7 @@ export function FAQPage() {
           </button>
           <div className="flex items-center gap-2">
             <Printer className="w-4 h-4 text-foreground" />
-            <span className="text-sm font-semibold text-foreground"><Leprint></Leprint></span>
+            <span className="text-sm font-semibold text-foreground">LePrint</span>
           </div>
         </div>
       </div>
@@ -413,7 +413,7 @@ export function FAQPage() {
         >
           <h1 className="text-3xl font-bold text-foreground mb-3">FAQs & Support</h1>
           <p className="text-muted-foreground">
-            Everything you need to know about printing with Leprint.
+            Everything you need to know about printing with LePrint.
           </p>
         </motion.div>
 
@@ -530,7 +530,7 @@ export function FAQPage() {
             </span>
           </p>
           <p className="text-xs text-muted-foreground/40 mt-6">
-            © {new Date().getFullYear()} Leprint. All rights reserved.· 
+            © {new Date().getFullYear()} LePrint. All rights reserved.· 
             <button onClick={() => navigate('/faq')} className="ml-1 hover:text-muted-foreground transition-colors">FAQ</button>
           </p>
         </motion.div>

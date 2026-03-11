@@ -1,4 +1,4 @@
-# 🖨️ JusPri
+# 🖨️ LePrint
 
 A cloud-based print, scan, and xerox kiosk system. Users scan a QR code, upload documents, pay, and print — all from their phone.
 
@@ -23,7 +23,7 @@ A cloud-based print, scan, and xerox kiosk system. Users scan a QR code, upload 
 
 ## 🎯 Overview
 
-JusPri is a three-component kiosk system for libraries, universities, coworking spaces, and print shops:
+LePrint is a three-component kiosk system for libraries, universities, coworking spaces, and print shops:
 
 1. **Scan a QR code** at a physical kiosk
 2. **Upload documents** via a web interface on your phone
@@ -127,7 +127,7 @@ JusPri is a three-component kiosk system for libraries, universities, coworking 
 ## 📁 Project Structure
 
 ```
-juspri/
+LePrint/
 ├── backend/
 │   ├── index.js               # Express server + Socket.IO setup
 │   ├── db.js                  # PostgreSQL abstraction layer

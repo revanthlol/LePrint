@@ -69,7 +69,7 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                         </motion.button>
                         <div className="flex items-center gap-2">
                             <Printer className="w-5 h-5 text-primary" />
-                            <span className="font-bold text-foreground">Leprint</span>
+                            <span className="font-bold text-foreground">LePrint</span>
                         </div>
                     </div>
                     <motion.button
@@ -98,7 +98,7 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                                     <Printer className="w-6 h-6 text-black" />
                                 </motion.div>
                                 <div>
-                                    <h1 className="font-bold text-foreground">Leprint</h1>
+                                    <h1 className="font-bold text-foreground">LePrint</h1>
                                     <p className="text-xs text-muted-foreground">Fast & Reliable</p>
                                 </div>
                             </div>

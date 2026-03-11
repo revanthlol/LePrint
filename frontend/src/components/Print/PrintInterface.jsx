@@ -46,7 +46,7 @@ export function PrintInterface() {
             <div className="w-10 h-10 bg-white text-black rounded-xl flex items-center justify-center shadow-lg">
               <Printer className="h-6 w-6" />
             </div>
-            <span className="text-foreground">Leprint</span>
+            <span className="text-foreground">LePrint</span>
           </CardTitle>
         </CardHeader>
 

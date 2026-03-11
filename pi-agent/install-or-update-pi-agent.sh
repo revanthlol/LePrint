@@ -1,11 +1,15 @@
 #!/bin/bash
-# DirectPrint Pi Agent - Universal Interactive Setup
+# LePrint Pi Agent - Universal Interactive Setup
 # Supports: Arch Linux, Ubuntu, Debian, Raspberry Pi OS
 
 set -e
 
 VERSION="1.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Hardcoded production endpoints (written into .env)
+DEFAULT_CLOUD_URL="https://justpri.duckdns.org"
+DEFAULT_FRONTEND_URL="https://leprint.in"
 
 # Colors
 RED='\033[0;31m'
@@ -26,10 +30,8 @@ STAR="${YELLOW}★${NC}"
 # Print functions
 print_header() {
     echo ""
-    echo -e "${PURPLE}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${PURPLE}║${WHITE}  DirectPrint Pi Agent Setup v${VERSION}         ${PURPLE}║${NC}"
-    echo -e "${PURPLE}║${WHITE}  Universal Installer for All Linux Distros    ${PURPLE}║${NC}"
-    echo -e "${PURPLE}╚════════════════════════════════════════════════╝${NC}"
+    echo -e "${PURPLE}║${WHITE}  LePrint Pi Agent Setup v${VERSION} "
+    echo -e "${PURPLE}║${WHITE}  Universal Installer for All Linux Distros"
     echo ""
 }
 
@@ -132,7 +134,7 @@ confirm_install() {
     echo "  2. CUPS (printing system)"
     echo "  3. LibreOffice (document conversion)"
     echo "  4. ImageMagick (image conversion)"
-    echo "  5. DirectPrint Pi Agent"
+    echo "  5. LePrint Pi Agent"
     echo "  6. System services (auto-start)"
     echo ""
     
@@ -296,7 +298,7 @@ setup_pi_agent() {
     print_section "Setting Up Pi Agent"
 
     # Define installation directory
-    INSTALL_DIR="$HOME/directprint-agent"
+    INSTALL_DIR="$HOME/LePrint-agent"
     
     # --- Helper function to generate .env ---
     generate_env_file() {
@@ -305,15 +307,16 @@ setup_pi_agent() {
         echo -e "${WHITE}Configuration:${NC}"
         echo ""
 
-        read -p "Backend URL -(leave blank for default) [https://justpri.duckdns.org]: " CLOUD_URL
-        CLOUD_URL=${CLOUD_URL:-https://justpri.duckdns.org}
+        CLOUD_URL="$DEFAULT_CLOUD_URL"
+        FRONTEND_URL="$DEFAULT_FRONTEND_URL"
 
-        read -p "Frontend URL -(leave blank for default) [https://leprint.in]: " FRONTEND_URL
-        FRONTEND_URL=${FRONTEND_URL:-https://leprint.in}
+        print_info "Backend URL: ${CLOUD_URL}"
+        print_info "Frontend URL: ${FRONTEND_URL}"
+        echo ""
 
-        # Ask for a manual Kiosk ID, default to 'kiosk_1' if they just hit enter
-        read -p "Enter a unique Kiosk ID for printer detection (e.g. kiosk_1): " KIOSK_ID
-        KIOSK_ID=${KIOSK_ID:-kiosk_1}
+        DEFAULT_KIOSK_ID="$(id -un 2>/dev/null || echo "${USER:-kiosk_1}")"
+        read -p "Kiosk ID for printer detection (default: ${DEFAULT_KIOSK_ID}): " KIOSK_ID
+        KIOSK_ID=${KIOSK_ID:-$DEFAULT_KIOSK_ID}
 
         read -p "Printer name -(leave blank for auto-detect): " PRINTER_NAME
         PRINTER_NAME=${PRINTER_NAME:-auto}
@@ -341,7 +344,7 @@ EOF
 
 # Check if already installed
 if [ -d "$INSTALL_DIR" ]; then
-    print_info "DirectPrint agent already installed at: $INSTALL_DIR"
+    print_info "LePrint agent already installed at: $INSTALL_DIR"
     echo ""
     read -p "Update existing installation? (y/n): " -n 1 -r
     echo
@@ -358,10 +361,10 @@ if [ -d "$INSTALL_DIR" ]; then
 
         # --- Smart Update Logic: sparse-checkout only pi-agent/ ---
         TMP_DIR="$(mktemp -d)"
-        print_step "Cloning qr-wifi-printer repo (sparse: pi-agent/ only)..."
+        print_step "Cloning LePrint repo (sparse: pi-agent/ only)..."
 
         git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/revanthlol/qr-wifi-printer.git "$TMP_DIR" || {
+            https://github.com/revanthlol/LePrint.git "$TMP_DIR" || {
             print_error "Git clone failed"
             rm -rf "$TMP_DIR"
             exit 1
@@ -419,11 +422,11 @@ print_step "Installing pi-agent..."
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR" || { print_error "Failed to cd into $INSTALL_DIR"; exit 1; }
 
-print_step "Cloning qr-wifi-printer repo (sparse: pi-agent/ only)..."
+print_step "Cloning LePrint repo (sparse: pi-agent/ only)..."
 
 TMP_DIR="$(mktemp -d)"
 git clone --depth 1 --filter=blob:none --sparse \
-    https://github.com/revanthlol/qr-wifi-printer.git "$TMP_DIR" || {
+    https://github.com/revanthlol/LePrint.git "$TMP_DIR" || {
     print_error "Git clone failed"
     rm -rf "$TMP_DIR"
     exit 1
@@ -466,9 +469,9 @@ create_systemd_service() {
     
     print_step "Creating systemd service..."
     
-    sudo tee /etc/systemd/system/directprint-agent.service > /dev/null <<EOF
+    sudo tee /etc/systemd/system/LePrint-agent.service > /dev/null <<EOF
 [Unit]
-Description=DirectPrint Pi Agent
+Description=LePrint Pi Agent
 After=network.target cups.service
 Requires=cups.service
 
@@ -486,7 +489,7 @@ Environment=NODE_ENV=production
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=directprint-agent
+SyslogIdentifier=LePrint-agent
 
 [Install]
 WantedBy=multi-user.target
@@ -502,7 +505,7 @@ EOF
     read -p "Enable auto-start on boot? (y/n): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        sudo systemctl enable directprint-agent
+        sudo systemctl enable LePrint-agent
         print_success "Auto-start enabled"
     fi
     
@@ -511,9 +514,9 @@ EOF
     read -p "Start service now? (y/n): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        sudo systemctl start directprint-agent
+        sudo systemctl start LePrint-agent
         sleep 2
-        sudo systemctl status directprint-agent --no-pager
+        sudo systemctl status LePrint-agent --no-pager
         print_success "Service started"
     fi
 }
@@ -535,9 +538,9 @@ create_qr_service() {
     
     print_step "Creating QR service..."
     
-    sudo tee /etc/systemd/system/directprint-qr.service > /dev/null <<EOF
+    sudo tee /etc/systemd/system/LePrint-qr.service > /dev/null <<EOF
 [Unit]
-Description=DirectPrint QR Display Server
+Description=LePrint QR Display Server
 After=network.target
 
 [Service]
@@ -555,15 +558,15 @@ Environment=QR_SERVER_PORT=3000
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=directprint-qr
+SyslogIdentifier=LePrint-qr
 
 [Install]
 WantedBy=multi-user.target
 EOF
     
     sudo systemctl daemon-reload
-    sudo systemctl enable directprint-qr
-    sudo systemctl start directprint-qr
+    sudo systemctl enable LePrint-qr
+    sudo systemctl start LePrint-qr
     
     print_success "QR service created and started"
 }
@@ -572,21 +575,21 @@ EOF
 show_completion() {
     print_section "Installation Complete!"
     
-    echo -e "${GREEN}${CHECK}${NC} DirectPrint Pi Agent is ready!"
+    echo -e "${GREEN}${CHECK}${NC} LePrint Pi Agent is ready!"
     echo ""
     echo -e "${WHITE}Next Steps:${NC}"
     echo ""
     echo -e "  1. ${ARROW} Check service status:"
-    echo -e "     ${CYAN}sudo systemctl status directprint-agent${NC}"
+    echo -e "     ${CYAN}sudo systemctl status LePrint-agent${NC}"
     echo ""
     echo -e "  2. ${ARROW} View logs:"
-    echo -e "     ${CYAN}sudo journalctl -u directprint-agent -f${NC}"
+    echo -e "     ${CYAN}sudo journalctl -u LePrint-agent -f${NC}"
     echo ""
     echo -e "  3. ${ARROW} Restart service:"
-    echo -e "     ${CYAN}sudo systemctl restart directprint-agent${NC}"
+    echo -e "     ${CYAN}sudo systemctl restart LePrint-agent${NC}"
     echo ""
     echo -e "  4. ${ARROW} Restart QR service:"
-    echo -e "     ${CYAN}sudo systemctl restart directprint-qr${NC}"
+    echo -e "     ${CYAN}sudo systemctl restart LePrint-qr${NC}"
     echo ""
     echo -e "  5. ${ARROW} QR Code (if enabled):"
     LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")

@@ -1,6 +1,6 @@
 #!/bin/bash
-# DirectPrint - Complete Uninstallation Script
-# Removes all DirectPrint components but keeps system packages (Node.js, CUPS, etc.)
+# LePrint Pi Agent - Complete Uninstallation Script
+# Removes LePrint Pi Agent components but keeps system packages (Node.js, CUPS, etc.)
 
 set -e
 
@@ -17,7 +17,7 @@ NC='\033[0m'
 print_header() {
   echo ""
   echo -e "${RED}╔════════════════════════════════════════════════╗${NC}"
-  echo -e "${RED}║${WHITE}  DirectPrint - Complete Uninstallation        ${RED}║${NC}"
+  echo -e "${RED}║${WHITE}  LePrint - Complete Uninstallation            ${RED}║${NC}"
   echo -e "${RED}║${WHITE}  Version ${VERSION}                                ${RED}║${NC}"
   echo -e "${RED}╚════════════════════════════════════════════════╝${NC}"
   echo ""
@@ -63,9 +63,9 @@ confirm_uninstall() {
 
   echo "This script will remove:"
   echo ""
-  echo -e "  ${RED}✗${NC} DirectPrint pi-agent installation"
-  echo -e "  ${RED}✗${NC} Agent installation directory (~/directprint-agent)"
-  echo -e "  ${RED}✗${NC} Systemd services (directprint-agent, directprint-qr)"
+  echo -e "  ${RED}✗${NC} LePrint pi-agent installation"
+  echo -e "  ${RED}✗${NC} Agent installation directory (~/LePrint-agent)"
+  echo -e "  ${RED}✗${NC} Systemd services (LePrint-agent, LePrint-qr)"
   echo -e "  ${RED}✗${NC} Service configuration files"
   echo -e "  ${RED}✗${NC} Print queue files and temporary data"
   echo -e "  ${RED}✗${NC} Environment configuration (.env files)"
@@ -92,59 +92,48 @@ confirm_uninstall() {
 stop_services() {
   print_section "Stopping Services"
 
-  # Stop directprint-agent
-  if systemctl is-active --quiet directprint-agent 2>/dev/null; then
-    print_step "Stopping directprint-agent service..."
-    sudo systemctl stop directprint-agent
-    print_success "Stopped directprint-agent"
-  else
-    print_info "directprint-agent service not running"
-  fi
-
-  # Stop directprint-qr
-  if systemctl is-active --quiet directprint-qr 2>/dev/null; then
-    print_step "Stopping directprint-qr service..."
-    sudo systemctl stop directprint-qr
-    print_success "Stopped directprint-qr"
-  else
-    print_info "directprint-qr service not running"
-  fi
+  local services=("LePrint-agent" "LePrint-qr" "directprint-agent" "directprint-qr")
+  for service in "${services[@]}"; do
+    if systemctl is-active --quiet "$service" 2>/dev/null; then
+      print_step "Stopping ${service} service..."
+      sudo systemctl stop "$service"
+      print_success "Stopped ${service}"
+    fi
+  done
 }
 
 # Disable services
 disable_services() {
   print_section "Disabling Services"
 
-  if systemctl is-enabled --quiet directprint-agent 2>/dev/null; then
-    print_step "Disabling directprint-agent..."
-    sudo systemctl disable directprint-agent
-    print_success "Disabled directprint-agent"
-  fi
-
-  if systemctl is-enabled --quiet directprint-qr 2>/dev/null; then
-    print_step "Disabling directprint-qr..."
-    sudo systemctl disable directprint-qr
-    print_success "Disabled directprint-qr"
-  fi
+  local services=("LePrint-agent" "LePrint-qr" "directprint-agent" "directprint-qr")
+  for service in "${services[@]}"; do
+    if systemctl is-enabled --quiet "$service" 2>/dev/null; then
+      print_step "Disabling ${service}..."
+      sudo systemctl disable "$service"
+      print_success "Disabled ${service}"
+    fi
+  done
 }
 
 # Remove service files
 remove_service_files() {
   print_section "Removing Service Files"
 
-  # Remove directprint-agent service
-  if [ -f "/etc/systemd/system/directprint-agent.service" ]; then
-    print_step "Removing directprint-agent.service..."
-    sudo rm /etc/systemd/system/directprint-agent.service
-    print_success "Removed /etc/systemd/system/directprint-agent.service"
-  fi
+  local service_files=(
+    "/etc/systemd/system/LePrint-agent.service"
+    "/etc/systemd/system/LePrint-qr.service"
+    "/etc/systemd/system/directprint-agent.service"
+    "/etc/systemd/system/directprint-qr.service"
+  )
 
-  # Remove directprint-qr service
-  if [ -f "/etc/systemd/system/directprint-qr.service" ]; then
-    print_step "Removing directprint-qr.service..."
-    sudo rm /etc/systemd/system/directprint-qr.service
-    print_success "Removed /etc/systemd/system/directprint-qr.service"
-  fi
+  for service_file in "${service_files[@]}"; do
+    if [ -f "$service_file" ]; then
+      print_step "Removing $(basename "$service_file")..."
+      sudo rm "$service_file"
+      print_success "Removed $service_file"
+    fi
+  done
 
   # Reload systemd
   print_step "Reloading systemd daemon..."
@@ -156,12 +145,12 @@ remove_service_files() {
 backup_config() {
   print_section "Backing Up Configuration"
 
-  BACKUP_DIR="$HOME/directprint-backup-$(date +%Y%m%d-%H%M%S)"
+  BACKUP_DIR="$HOME/leprint-backup-$(date +%Y%m%d-%H%M%S)"
 
   # Check for .env files in various locations
   local found_config=false
 
-  for dir in "$HOME/directprint-agent" "/opt/directprint" "$HOME/directprint"; do
+  for dir in "$HOME/LePrint-agent" "$HOME/directprint-agent" "/opt/LePrint" "/opt/directprint" "$HOME/directprint"; do
     if [ -f "$dir/.env" ]; then
       if [ "$found_config" = false ]; then
         mkdir -p "$BACKUP_DIR"
@@ -190,15 +179,21 @@ remove_directories() {
 
   # List of possible installation directories
   local dirs=(
+    "$HOME/LePrint-agent"
     "$HOME/directprint-agent"
     "$HOME/directprint"
+    "/opt/LePrint"
     "/opt/directprint"
   )
 
   for dir in "${dirs[@]}"; do
     if [ -d "$dir" ]; then
       print_step "Removing $dir..."
-      rm -rf "$dir"
+      if [[ "$dir" == /opt/* ]]; then
+        sudo rm -rf "$dir"
+      else
+        rm -rf "$dir"
+      fi
       print_success "Removed $dir"
     fi
   done
@@ -210,7 +205,9 @@ cleanup_temp_files() {
 
   # Remove print queue files
   local temp_dirs=(
+    "$HOME/LePrint-agent/print-queue"
     "$HOME/directprint-agent/print-queue"
+    "/tmp/leprint*"
     "/tmp/directprint*"
     "/tmp/print-queue*"
   )
@@ -253,21 +250,22 @@ check_orphaned_processes() {
   echo ""
   echo -e "${YELLOW}Checking for Running Processes${NC}"
 
-  # Check for any running node processes related to directprint
-  local processes=$(ps aux | grep -i "directprint\|pi-agent\|qr-server" | grep -v grep | grep -v uninstall)
+  # Check for any running node processes related to LePrint / pi-agent
+  local processes=$(ps aux | grep -i "leprint\|directprint\|pi-agent\|qr-server" | grep -v grep | grep -v uninstall)
 
   if [ -n "$processes" ]; then
-    print_warning "Found running DirectPrint processes:"
+    print_warning "Found running LePrint/DirectPrint processes:"
     echo "$processes"
     echo ""
     read -p "Kill these processes? (y/n): " -n 1 -r
     echo
 
     if [[ $REPLY =~ ^[Yy]$ ]]; then
+      pkill -f "leprint" || true
       pkill -f "directprint" || true
       pkill -f "pi-agent" || true
       pkill -f "qr-server" || true
-      print_success "Killed DirectPrint processes"
+      print_success "Killed related processes"
     fi
   else
     print_info "No orphaned processes found"
@@ -293,10 +291,10 @@ cleanup_old_dependencies() {
 show_completion() {
   print_section "Uninstallation Complete"
 
-  echo -e "${GREEN}✓${NC} DirectPrint has been completely removed!"
+  echo -e "${GREEN}✓${NC} LePrint Pi Agent has been removed!"
   echo ""
   echo -e "What was removed:"
-  echo -e "  ${RED}✗${NC} All DirectPrint code and files"
+  echo -e "  ${RED}✗${NC} All LePrint agent code and files"
   echo -e "  ${RED}✗${NC} Systemd services"
   echo -e "  ${RED}✗${NC} Temporary and cache files"
   echo ""
@@ -314,7 +312,7 @@ show_completion() {
     echo ""
   fi
 
-  print_warning "To reinstall DirectPrint, run: ./install-or-update-pi-agent.sh"
+  print_warning "To reinstall LePrint Pi Agent, run: ./setup.sh"
   echo ""
 
   echo -e "${RED}╔════════════════════════════════════════════════╗${NC}"
@@ -325,7 +323,7 @@ show_completion() {
 
 # Optional: Remove system packages
 inform_user() {
-  echo "DirectPrint used these system packages:"
+  echo "LePrint used these system packages:"
   echo ""
   echo "  • LibreOffice (document conversion)"
   echo "  • CUPS (printing system)"

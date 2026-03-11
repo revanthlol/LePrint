@@ -308,8 +308,8 @@ setup_pi_agent() {
         read -p "Backend URL -(leave blank for default) [https://justpri.duckdns.org]: " CLOUD_URL
         CLOUD_URL=${CLOUD_URL:-https://justpri.duckdns.org}
 
-        read -p "Frontend URL -(leave blank for default) [https://qr-wifi-printer.vercel.app]: " FRONTEND_URL
-        FRONTEND_URL=${FRONTEND_URL:-https://qr-wifi-printer.vercel.app}
+        read -p "Frontend URL -(leave blank for default) [https://leprint.in]: " FRONTEND_URL
+        FRONTEND_URL=${FRONTEND_URL:-https://leprint.in}
 
         # Ask for a manual Kiosk ID, default to 'kiosk_1' if they just hit enter
         read -p "Enter a unique Kiosk ID for printer detection (e.g. kiosk_1): " KIOSK_ID

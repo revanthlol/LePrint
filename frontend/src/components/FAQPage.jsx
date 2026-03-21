@@ -338,7 +338,6 @@ export function FAQPage() {
   const navigate = useNavigate();
   const [openItems, setOpenItems] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   // SEO Meta Tags
   useEffect(() => {
@@ -486,7 +485,7 @@ export function FAQPage() {
               Try different keywords or contact us directly
             </p>
             <button
-              onClick={() => setContactModalOpen(true)}
+              onClick={() => navigate('/contact')}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
             >
               <Mail className="w-4 h-4" />
@@ -504,7 +503,7 @@ export function FAQPage() {
         >
           <p className="text-sm text-muted-foreground mb-3">Still have questions?</p>
           <button
-            onClick={() => setContactModalOpen(true)}
+            onClick={() => navigate('/contact')}
             className="inline-flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 rounded-lg text-sm font-medium text-foreground transition-colors mb-4"
           >
             <Mail className="w-4 h-4" />
@@ -512,15 +511,12 @@ export function FAQPage() {
           </button>
           <p className="text-xs text-muted-foreground/60">
             Or email{' '}
-            <span className="text-muted-foreground underline underline-offset-2 cursor-pointer">
+            <a href="mailto:support@leprint.in" className="text-muted-foreground underline underline-offset-2">
               support@leprint.in
-            </span>
+            </a>
           </p>
         </motion.div>
       </div>
-
-      {/* Contact Modal */}
-      <ContactModal isOpen={contactModalOpen} onClose={() => setContactModalOpen(false)} />
 
       <Footer />
     </div>

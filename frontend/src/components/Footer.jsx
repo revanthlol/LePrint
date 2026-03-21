@@ -14,6 +14,7 @@ const footerSections = [
       { label: "Home", href: "/" },
       { label: "Landing", href: "/landing" },
       { label: "FAQ", href: "/faq" },
+      { label: "Contact Us", href: "/contact" },
     ],
   },
   {
@@ -22,13 +23,6 @@ const footerSections = [
       { label: "Privacy Policy", href: "/privacy-policy" },
       { label: "Terms & Conditions", href: "/terms" },
       { label: "Refund Policy", href: "/refund-policy" },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "Contact Us", href: "/contact" },
-      { label: "About LePrint", href: "/faq" },
     ],
   },
 ];
@@ -76,9 +70,9 @@ function AccordionSection({ title, links }) {
 export default function Footer() {
   return (
     <footer className="bg-[#0a0a0a] text-muted-foreground border-t border-border mt-auto">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* ── Desktop layout (md+): 4-column grid ── */}
-        <div className="hidden md:grid md:grid-cols-4 gap-8 mb-8">
+      <div className="max-w-6xl mx-auto px-6 py-6">
+        {/* ── Desktop layout (md+): 3-column grid ── */}
+        <div className="hidden md:grid md:grid-cols-3 gap-8 mb-6">
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -90,7 +84,7 @@ export default function Footer() {
             <p className="text-sm leading-relaxed text-muted-foreground/70">
               Scan. Upload. Print. — A self-service print kiosk for everyone.
             </p>
-            <p className="text-xs mt-4 text-muted-foreground/50">
+            <p className="text-xs mt-3 text-muted-foreground/50">
               {SUPPORT_EMAIL}
             </p>
           </div>
@@ -101,7 +95,7 @@ export default function Footer() {
               <h4 className="text-foreground text-sm font-medium mb-4 uppercase tracking-widest">
                 {section.title}
               </h4>
-              <ul className="space-y-2.5">
+              <ul className="space-y-2">
                 {section.links.map((link) => (
                   <li key={link.label}>
                     <Link
@@ -118,9 +112,9 @@ export default function Footer() {
         </div>
 
         {/* ── Mobile layout (<md): brand + accordions ── */}
-        <div className="md:hidden mb-6">
+        <div className="md:hidden mb-4">
           {/* Brand — always visible */}
-          <div className="mb-5">
+          <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <img src="/favicon.svg" alt="LePrint logo" className="h-6 w-6" />
               <span className="text-foreground font-semibold text-base tracking-tight">
@@ -143,7 +137,7 @@ export default function Footer() {
         </div>
 
         {/* Divider + bottom bar — both breakpoints */}
-        <div className="border-t border-border pt-5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-muted-foreground/50">
+        <div className="border-t border-border pt-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-muted-foreground/50">
           <span>© {YEAR} {BRAND}. All rights reserved.</span>
           <div className="flex gap-5">
             <Link to="/terms" className="hover:text-muted-foreground transition-colors">

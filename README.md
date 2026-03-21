@@ -40,7 +40,7 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 
 ### Print
 - 📄 **Multi-format support** — PDF, DOCX, TXT, PNG, JPG (auto-converted to PDF)
-- 💳 **Pay per page** — Razorpay integration with configurable pricing
+- 💳 **Pay per page** — PayU integration with configurable pricing
 - 🔄 **Real-time status** — Live job tracking via WebSocket
 - 🔒 **Row locking** — `FOR UPDATE SKIP LOCKED` prevents duplicate dispatch
 - 🔁 **Auto-retry** — Failed jobs retry up to 3 times
@@ -57,6 +57,12 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 - 📋 **Scan → Print pipeline** — Scan a document and print up to 20 copies
 - 💰 **₹5 per copy** — Automatic pricing based on copy count
 - 🔄 **Real-time progress** — Scanning and printing status updates via WebSocket
+
+### Landing Page & Public Pages
+- 🌐 **Landing page** — Modular, animated sections (Hero, How it Works, Services, Trust, Testimonials, Locations, CTA)
+- 📄 **Compliance pages** — Privacy Policy, Terms & Conditions, Refund Policy, Contact Us, FAQ
+- 🧭 **PublicNavbar** — Shared navigation with auth-aware CTA and scroll-hide behavior
+- 🦶 **Responsive Footer** — Accordion-based mobile layout with all links
 
 ### Admin
 - 📊 **Dashboard** — System metrics, revenue, job counts
@@ -117,8 +123,8 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 
 | Layer | Technologies |
 |-------|-------------|
-| **Frontend** | React 18, Vite, TailwindCSS, shadcn/ui, Firebase Auth, Socket.IO Client |
-| **Backend** | Node.js, Express, PostgreSQL, Socket.IO, Firebase Admin SDK, Multer, Razorpay |
+| **Frontend** | React 18, Vite, TailwindCSS, shadcn/ui, Framer Motion, Firebase Auth, Socket.IO Client |
+| **Backend** | Node.js, Express, PostgreSQL, Socket.IO, Firebase Admin SDK, Multer, PayU |
 | **Pi Agent** | Node.js, Socket.IO Client, CUPS, LibreOffice, pdf-lib, eSCL/AirScan (xml2js, axios) |
 | **Database** | PostgreSQL with views, triggers, constraints, JSONB fields |
 
@@ -147,11 +153,22 @@ LePrint/
 │       ├── App.jsx            # Router setup
 │       ├── firebase.js        # Firebase config
 │       └── components/
+│           ├── landing/       # Modular landing page sections
+│           │   ├── Hero.jsx, HowItWorks.jsx, ServicesPricing.jsx
+│           │   ├── TrustSecurity.jsx, UseCases.jsx, Testimonials.jsx
+│           │   ├── Locations.jsx, WhyLePrint.jsx, CtaBanner.jsx
+│           │   └── FadeInSection.jsx
 │           ├── Print/         # Upload, print, scan UI
 │           ├── Admin/         # Admin dashboard components
 │           ├── Dashboard/     # User dashboard
+│           ├── Landing.jsx    # Landing page orchestrator
 │           ├── Login.jsx      # Google OAuth login
-│           └── ui/            # Shared UI components
+│           ├── FeatureCards.jsx # Shared trust indicator cards
+│           ├── PublicNavbar.jsx # Shared public navigation
+│           ├── Footer.jsx     # Shared responsive footer
+│           ├── Contact.jsx, FAQPage.jsx  # Public pages
+│           ├── PrivacyPolicy.jsx, Terms.jsx, RefundPolicy.jsx
+│           └── ui/            # Shared UI primitives
 │
 ├── pi-agent/
 │   ├── index.js               # Main entry, config, init
@@ -164,6 +181,8 @@ LePrint/
 │       ├── logger.js          # Console logging
 │       └── errors.js          # Custom error types
 │
+├── docs/
+│   └── payu-integration.md    # PayU payment integration plan
 ├── TESTING.md                 # Full testing guide
 └── README.md                  # This file
 ```
@@ -371,13 +390,29 @@ See [TESTING.md](TESTING.md) for the complete testing guide covering:
 
 ## 💳 Payments
 
-Currently using mock payments. See [docs/RAZORPAY_INTEGRATION.md](docs/RAZORPAY_INTEGRATION.md) for the complete Razorpay integration guide covering:
-- Account setup and API keys
-- Backend order creation and signature verification
-- Frontend Razorpay Checkout integration
-- Webhook setup
-- Testing with test cards
-- Going live checklist
+Currently using mock payments. PayU integration is planned — see [docs/payu-integration.md](docs/payu-integration.md) for the complete technical plan covering:
+- Step-by-step payment flow design
+- Frontend and backend responsibilities
+- Hash generation and verification
+- Security considerations
+- Implementation roadmap
+
+---
+
+## 📌 Current Status
+
+### ✅ Completed
+- Full print/scan/xerox pipeline (frontend → backend → pi-agent → printer)
+- Landing page with 10 modular sections
+- Compliance pages (Privacy, Terms, Refund, Contact, FAQ)
+- Admin dashboard with metrics and kiosk management
+- Firebase Google OAuth authentication
+- Responsive UI with dark theme
+
+### 🔜 Pending
+- PayU payment gateway integration (plan ready, implementation pending)
+- Production deployment
+- Multi-kiosk management at scale
 
 ---
 

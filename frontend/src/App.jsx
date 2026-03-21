@@ -14,6 +14,7 @@ import PrivacyPolicy from "./components/PrivacyPolicy";
 import Terms from "./components/Terms";
 import RefundPolicy from "./components/RefundPolicy";
 import Contact from "./components/Contact";
+import Landing from "./components/Landing";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="/login" element={<Login />} />
 
           {/* Public routes - no auth required */}
+          <Route path="/landing" element={<Landing />} />
           <Route path="/faq" element={<FAQPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<Terms />} />

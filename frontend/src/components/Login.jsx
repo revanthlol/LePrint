@@ -2,9 +2,10 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
-import { Printer, Zap, Shield, Clock, AlertCircle } from 'lucide-react';
+import { Printer, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Footer from './Footer';
+import FeatureCards from './FeatureCards';
 
 // Animation variants for reusability
 const containerVariants = {
@@ -30,17 +31,6 @@ const itemVariants = {
     }
 };
 
-const featureCardVariants = {
-    hidden: { opacity: 0, scale: 0.8 },
-    visible: {
-        opacity: 1,
-        scale: 1,
-        transition: {
-            duration: 0.4,
-            ease: "easeOut"
-        }
-    }
-};
 
 export function Login() {
     const { signInWithGoogle, error: authError } = useAuth();
@@ -225,76 +215,7 @@ export function Login() {
                         </motion.p>
                     </motion.div>
 
-                    {/* Features Grid - Staggered animation */}
-                    <motion.div
-                        variants={{
-                            hidden: { opacity: 0 },
-                            visible: {
-                                opacity: 1,
-                                transition: {
-                                    staggerChildren: 0.1,
-                                    delayChildren: 0.5
-                                }
-                            }
-                        }}
-                        initial="hidden"
-                        animate="visible"
-                        className="grid grid-cols-3 gap-4"
-                    >
-                        {/* Feature Card 1 */}
-                        <motion.div
-                            variants={featureCardVariants}
-                            whileHover={{ scale: 1.05, y: -5 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="bg-card/60 backdrop-blur-md border border-border rounded-xl p-4 text-center hover:bg-card/80 transition-colors duration-200 cursor-pointer"
-                        >
-                            <motion.div
-                                animate={{ rotate: [0, 5, -5, 0] }}
-                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                                className="inline-flex items-center justify-center w-12 h-12 bg-muted rounded-lg mb-3"
-                            >
-                                <Zap className="w-6 h-6 text-foreground" />
-                            </motion.div>
-                            <p className="text-sm font-medium text-foreground">Instant</p>
-                            <p className="text-xs text-muted-foreground mt-1">Fast prints</p>
-                        </motion.div>
-
-                        {/* Feature Card 2 */}
-                        <motion.div
-                            variants={featureCardVariants}
-                            whileHover={{ scale: 1.05, y: -5 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="bg-card/60 backdrop-blur-md border border-border rounded-xl p-4 text-center hover:bg-card/80 transition-colors duration-200 cursor-pointer"
-                        >
-                            <motion.div
-                                animate={{ scale: [1, 1.1, 1] }}
-                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                                className="inline-flex items-center justify-center w-12 h-12 bg-purple-500/10 rounded-lg mb-3"
-                            >
-                                <Shield className="w-6 h-6 text-purple-400" />
-                            </motion.div>
-                            <p className="text-sm font-medium text-foreground">Secure</p>
-                            <p className="text-xs text-muted-foreground mt-1">Protected</p>
-                        </motion.div>
-
-                        {/* Feature Card 3 */}
-                        <motion.div
-                            variants={featureCardVariants}
-                            whileHover={{ scale: 1.05, y: -5 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="bg-card/60 backdrop-blur-md border border-border rounded-xl p-4 text-center hover:bg-card/80 transition-colors duration-200 cursor-pointer"
-                        >
-                            <motion.div
-                                animate={{ rotate: [0, 360] }}
-                                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                                className="inline-flex items-center justify-center w-12 h-12 bg-emerald-500/10 rounded-lg mb-3"
-                            >
-                                <Clock className="w-6 h-6 text-emerald-400" />
-                            </motion.div>
-                            <p className="text-sm font-medium text-foreground">24/7</p>
-                            <p className="text-xs text-muted-foreground mt-1">Always on</p>
-                        </motion.div>
-                    </motion.div>
+                    <FeatureCards />
                 </motion.div>
             </div>
             <Footer />

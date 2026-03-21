@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthProvider';
 import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Footer from '../Footer';
 
 export function DashboardLayout({ children, activeTab = 'print' }) {
     const { user, role, signOut } = useAuth();  // ← ADD role here
@@ -285,17 +286,18 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
             </AnimatePresence>
 
             {/* Main Content */}
-            <main className="lg:ml-64 min-h-screen">
+            <main className="lg:ml-64 min-h-screen flex flex-col">
                 <motion.div
                     key={activeTab}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
-                    className="p-6 lg:p-8 pt-20 lg:pt-8"
+                    className="p-6 lg:p-8 pt-20 lg:pt-8 flex-1"
                 >
                     {children}
                 </motion.div>
+                {activeTab !== 'print' && <Footer />}
             </main>
         </div>
     );

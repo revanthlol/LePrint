@@ -2,6 +2,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import Footer from './Footer';
+import PublicNavbar from './PublicNavbar';
 import { 
   ChevronDown, Printer, FileText, CreditCard, 
   Shield, HelpCircle, ArrowLeft, Search, X,
@@ -385,25 +387,10 @@ export function FAQPage() {
   const hasResults = filteredFaqs.length > 0;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
-      {/* Minimal top nav */}
-      <div className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-[#0a0a0a]/80 backdrop-blur-md">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </button>
-          <div className="flex items-center gap-2">
-            <Printer className="w-4 h-4 text-foreground" />
-            <span className="text-sm font-semibold text-foreground">LePrint</span>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
+      <PublicNavbar />
 
-      <div className="max-w-3xl mx-auto px-4 pt-24 pb-20">
+      <div className="flex-1 max-w-3xl mx-auto px-4 pt-20 pb-20 w-full">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -508,7 +495,7 @@ export function FAQPage() {
           </motion.div>
         )}
 
-        {/* Footer */}
+        {/* Still have questions CTA */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -529,15 +516,13 @@ export function FAQPage() {
               support@leprint.in
             </span>
           </p>
-          <p className="text-xs text-muted-foreground/40 mt-6">
-            © {new Date().getFullYear()} LePrint. All rights reserved.· 
-            <button onClick={() => navigate('/faq')} className="ml-1 hover:text-muted-foreground transition-colors">FAQ</button>
-          </p>
         </motion.div>
       </div>
 
       {/* Contact Modal */}
       <ContactModal isOpen={contactModalOpen} onClose={() => setContactModalOpen(false)} />
+
+      <Footer />
     </div>
   );
 }

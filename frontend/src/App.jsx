@@ -10,6 +10,10 @@ import { PrintInterface } from "./components/Print/PrintInterface";
 import { FAQPage } from "./components/FAQPage";
 import { AdminRoute } from "./components/Admin/AdminRoute";
 import { AdminDashboard } from "./components/Admin/Admindashboard";
+import PrivacyPolicy from "./components/PrivacyPolicy";
+import Terms from "./components/Terms";
+import RefundPolicy from "./components/RefundPolicy";
+import Contact from "./components/Contact";
 
 function App() {
   return (
@@ -18,8 +22,12 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
 
-          {/* Public FAQ route - no auth required */}
+          {/* Public routes - no auth required */}
           <Route path="/faq" element={<FAQPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/refund-policy" element={<RefundPolicy />} />
+          <Route path="/contact" element={<Contact />} />
 
           <Route
             path="/"

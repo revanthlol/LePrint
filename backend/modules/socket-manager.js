@@ -93,7 +93,7 @@ function initSocketServer(io) {
                         pages_printed
                     });
 
-                    // 2. Subtract pages from kiosk paper count
+                    // 2. Subtract pages from kiosk paper count (skip for mock kiosk)
                     if (pages_printed && pages_printed > 0) {
                         try {
                             // Find which kiosk printed this job
@@ -105,14 +105,20 @@ function initSocketServer(io) {
                             if (jobResult.rows.length > 0) {
                                 const kioskId = jobResult.rows[0].kiosk_id;
 
-                                // Decrement paper count (ensure it doesn't go below 0)
-                                await db.query(`
-                                    UPDATE kiosks 
-                                    SET current_paper_count = GREATEST(0, current_paper_count - $1)
-                                    WHERE id = $2
-                                `, [pages_printed, kioskId]);
+                                // Skip paper decrement for test kiosk
+                                const testKioskId = process.env.TEST_KIOSK_ID || null;
+                                if (testKioskId && kioskId === testKioskId) {
+                                    log.info(`[Paper] Skipping decrement for test kiosk ${kioskId}`);
+                                } else {
+                                    // Decrement paper count (ensure it doesn't go below 0)
+                                    await db.query(`
+                                        UPDATE kiosks 
+                                        SET current_paper_count = GREATEST(0, current_paper_count - $1)
+                                        WHERE id = $2
+                                    `, [pages_printed, kioskId]);
 
-                                log.info(`[Paper] Kiosk ${kioskId}: -${pages_printed} pages`);
+                                    log.info(`[Paper] Kiosk ${kioskId}: -${pages_printed} pages`);
+                                }
                             }
                         } catch (paperError) {
                             // Log error but don't fail the job completion process

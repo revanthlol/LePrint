@@ -53,6 +53,9 @@ if (!fs.existsSync(CONFIG.tempDir)) {
   fs.mkdirSync(CONFIG.tempDir);
 }
 
+const SIMULATE_PRINTER = process.env.SIMULATE_PRINTER === 'true';
+const SIMULATE_SCANNER = process.env.SIMULATE_SCANNER === 'true';
+
 console.log(`
 ╔════════════════════════════════════════╗
 ║   LePrint Agent V6 Starting...         ║
@@ -60,6 +63,8 @@ console.log(`
 ║   Kiosk ID: ${CONFIG.kioskId.padEnd(26)}║
 ║   Cloud: ${CONFIG.cloudServer.padEnd(30)}║
 ║   Printer IP: ${CONFIG.printerIP.padEnd(25)}║
+║   Printer Sim: ${(SIMULATE_PRINTER ? 'YES' : 'NO').padEnd(24)}║
+║   Scanner Sim: ${(SIMULATE_SCANNER ? 'YES' : 'NO').padEnd(24)}║
 ╚════════════════════════════════════════╝
 `);
 

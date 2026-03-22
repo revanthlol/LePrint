@@ -289,6 +289,123 @@ router.get('/jobs/:job_id/status', verifyToken, async (req, res) => {
 });
 
 
+// Mock kiosk configuration (read from env)
+const TEST_KIOSK_ID = process.env.TEST_KIOSK_ID || null;
+const MOCK_STEP_DELAY_MS = parseInt(process.env.MOCK_STEP_DELAY_MS) || 2000;
+const MOCK_COMPLETE_DELAY_MS = parseInt(process.env.MOCK_COMPLETE_DELAY_MS) || 5000;
+
+// Helper: safe mock step — wraps each setTimeout callback
+async function mockStep(jobId, stepName, startTime, fn) {
+    try {
+        const job = await db.getJob(jobId);
+        if (!job || job.status === 'COMPLETED' || job.status === 'FAILED' || job.status === 'CANCELLED') {
+            log.info(`[MOCK] ${jobId} | ${stepName} | SKIPPED (job ${job ? job.status : 'not found'})`);
+            return false;
+        }
+        await fn(job);
+        log.info(`[MOCK] ${jobId} | ${stepName} | ${Date.now() - startTime}ms elapsed`);
+        return true;
+    } catch (err) {
+        log.error(`[MOCK] ${jobId} | ${stepName} | ERROR: ${err.message}`);
+        return false;
+    }
+}
+
+// Mock simulation chains per job type
+function startMockSimulation(job, startTime) {
+    const jobId = job.id;
+    const jobType = job.job_type || 'print';
+
+    if (jobType === 'print') {
+        // Print: QUEUED → PRINTING → COMPLETED
+        setTimeout(async () => {
+            const ok = await mockStep(jobId, 'QUEUED', startTime, async () => {
+                await db.transitionJobState(jobId, 'QUEUED', { message: 'Mock kiosk acknowledged job' });
+            });
+            if (!ok) return;
+
+            setTimeout(async () => {
+                const ok2 = await mockStep(jobId, 'PRINTING', startTime, async () => {
+                    await db.transitionJobState(jobId, 'PRINTING', { message: 'Mock: printing started' });
+                });
+                if (!ok2) return;
+
+                setTimeout(async () => {
+                    await mockStep(jobId, 'COMPLETED', startTime, async (latestJob) => {
+                        await db.transitionJobState(jobId, 'COMPLETED', {
+                            message: 'Mock: print completed',
+                            pages_printed: latestJob.pages || 1
+                        });
+                    });
+                }, MOCK_COMPLETE_DELAY_MS - MOCK_STEP_DELAY_MS);
+
+            }, MOCK_STEP_DELAY_MS * 0.5);
+
+        }, MOCK_STEP_DELAY_MS * 0.5);
+
+    } else if (jobType === 'scan') {
+        // Scan: DISCOVERING_SCANNER → SCANNING → COMPLETED
+        setTimeout(async () => {
+            const ok = await mockStep(jobId, 'DISCOVERING_SCANNER', startTime, async () => {
+                await db.updateJob(jobId, { status: 'DISCOVERING_SCANNER', status_message: 'Mock: finding scanner', last_status_update: new Date() });
+            });
+            if (!ok) return;
+
+            setTimeout(async () => {
+                const ok2 = await mockStep(jobId, 'SCANNING', startTime, async () => {
+                    await db.updateJob(jobId, { status: 'SCANNING', status_message: 'Mock: scanning', last_status_update: new Date() });
+                });
+                if (!ok2) return;
+
+                setTimeout(async () => {
+                    await mockStep(jobId, 'COMPLETED', startTime, async () => {
+                        await db.transitionJobState(jobId, 'COMPLETED', { message: 'Mock: scan completed' });
+                    });
+                }, MOCK_COMPLETE_DELAY_MS - MOCK_STEP_DELAY_MS);
+
+            }, MOCK_STEP_DELAY_MS * 0.5);
+
+        }, MOCK_STEP_DELAY_MS * 0.5);
+
+    } else if (jobType === 'xerox') {
+        // Xerox: DISCOVERING_SCANNER → SCANNING → PRINTING → COMPLETED
+        setTimeout(async () => {
+            const ok = await mockStep(jobId, 'DISCOVERING_SCANNER', startTime, async () => {
+                await db.updateJob(jobId, { status: 'DISCOVERING_SCANNER', status_message: 'Mock: finding scanner', last_status_update: new Date() });
+            });
+            if (!ok) return;
+
+            setTimeout(async () => {
+                const ok2 = await mockStep(jobId, 'SCANNING', startTime, async () => {
+                    await db.updateJob(jobId, { status: 'SCANNING', status_message: 'Mock: scanning document', last_status_update: new Date() });
+                });
+                if (!ok2) return;
+
+                setTimeout(async () => {
+                    const ok3 = await mockStep(jobId, 'PRINTING', startTime, async () => {
+                        await db.transitionJobState(jobId, 'PRINTING', { message: 'Mock: printing copies' });
+                    });
+                    if (!ok3) return;
+
+                    setTimeout(async () => {
+                        await mockStep(jobId, 'COMPLETED', startTime, async (latestJob) => {
+                            const copies = latestJob.metadata?.copies || 1;
+                            await db.transitionJobState(jobId, 'COMPLETED', {
+                                message: 'Mock: xerox completed',
+                                pages_printed: copies
+                            });
+                        });
+                    }, MOCK_COMPLETE_DELAY_MS - MOCK_STEP_DELAY_MS * 1.5);
+
+                }, MOCK_STEP_DELAY_MS * 0.5);
+
+            }, MOCK_STEP_DELAY_MS * 0.5);
+
+        }, MOCK_STEP_DELAY_MS * 0.5);
+    }
+}
+
+
 // ===============================
 // Poll for Jobs (Pi Agent)
 // ===============================
@@ -301,6 +418,17 @@ router.get('/jobs/poll', async (req, res) => {
     }
 
     try {
+
+        // Auto-upsert mock kiosk on first poll
+        if (TEST_KIOSK_ID && kiosk_id === TEST_KIOSK_ID) {
+            await db.query(`
+                INSERT INTO kiosks (id, hostname, printer_name, status, last_seen, printer_status)
+                VALUES ($1, 'mock', 'mock_printer', 'online', NOW(), 'healthy')
+                ON CONFLICT (id) DO UPDATE SET
+                    status = 'online',
+                    last_seen = NOW()
+            `, [TEST_KIOSK_ID]);
+        }
 
         const result = await db.query(`
             UPDATE jobs
@@ -341,6 +469,12 @@ router.get('/jobs/poll', async (req, res) => {
                 metadata: job.metadata || null
             }]
         });
+
+        // Start mock simulation AFTER response is sent
+        if (TEST_KIOSK_ID && kiosk_id === TEST_KIOSK_ID) {
+            log.info(`[MOCK] ${job.id} | Starting mock simulation for ${job.job_type} job`);
+            startMockSimulation(job, Date.now());
+        }
 
     } catch (err) {
         log.error('[JOB] ERROR | route: /api/jobs/poll | reason: ' + err.message);

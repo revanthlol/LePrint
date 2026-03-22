@@ -47,7 +47,7 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 - 📥 **File streaming** — Download URLs instead of base64 encoding
 - 🗑️ **Auto-cleanup** — Print queue files cleaned up after 30 minutes
 - 💾 **Disk protection** — 500MB limit on print queue directory
-- 📑 **Multi-job** — Submit up to 5 jobs per session, track all via switchable tabs. Guests limited to 1 job
+- 📑 **Multi-job** — Tab bar appears from the first job onwards — tap + to queue additional jobs (max 5 per session, 1 for guests)
 - 📊 **Job summary screen** — On completion showing per-job outcomes, timings, and scan downloads
 
 ### Scan
@@ -320,6 +320,9 @@ All pi-agent logs include `[HH:MM:SS]` timestamps with color-coded levels (info,
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins | Vercel + localhost |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Path to Firebase service account JSON | `./config/firebase-service-account.json` |
 | `BACKEND_URL` | Public URL of backend (for scan download links) | — |
+| `TEST_KIOSK_ID` | Mock kiosk ID for UI testing | `kiosk_test` |
+| `MOCK_STEP_DELAY_MS` | Delay between mock status steps | `2000` |
+| `MOCK_COMPLETE_DELAY_MS` | Mock job completion delay | `5000` |
 
 ### Frontend (Vercel / `.env`)
 
@@ -344,6 +347,7 @@ All pi-agent logs include `[HH:MM:SS]` timestamps with color-coded levels (info,
 | `POLL_INTERVAL` | Job polling interval in ms | `5000` |
 | `DEBUG` | Enable verbose debug logging | `false` |
 | `SIMULATE_PRINTER` | Simulate printing without hardware | `false` |
+| `SIMULATE_SCANNER` | Simulate scanning without hardware | `false` |
 
 ---
 
@@ -486,6 +490,12 @@ All route files use `backend/modules/logger.js` for timestamped, structured logg
 |-------|--------|---------|
 | job | `[HH:MM:SS] ✓/⚠/✗ [XEROX/SCAN/PRINT] message (elapsed)` | `[14:32:10] ✓ [PRINT] Completed in 12s` |
 | socket | `[HH:MM:SS] [SOCKET] message` | `[14:32:00] [SOCKET] Connected to backend` |
+
+### 🧪 Testing
+
+**Mock kiosk (no hardware needed):** Use `kiosk_id=kiosk_test` on any live URL to test the full job flow without hardware. Completion time is configurable via `MOCK_COMPLETE_DELAY_MS` on the backend (default 5s). For instant testing, set `MOCK_STEP_DELAY_MS=500 MOCK_COMPLETE_DELAY_MS=1000`.
+
+**Pi-agent simulation:** Set `SIMULATE_PRINTER=true` and `SIMULATE_SCANNER=true` in `pi-agent/.env` to run locally without a printer or scanner. See [pi-agent/README.md](pi-agent/README.md) for details.
 
 ### 🔜 Pending
 - PayU payment gateway integration (plan ready, implementation pending)

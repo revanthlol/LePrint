@@ -115,8 +115,8 @@ export function PrintInterface() {
     isGuest,
   };
 
-  // Show tab bar when there are 2+ jobs
-  const showTabBar = jobs.length > 1;
+  // Show tab bar when there are 1+ jobs
+  const showTabBar = jobs.length >= 1;
 
   // Show all-jobs summary when all jobs are done AND we have >0 jobs
   const showSummary = allJobsDone && jobs.length > 0;

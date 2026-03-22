@@ -6,6 +6,13 @@ const fs = require('fs');
 const path = require('path');
 const { execSync, execFileSync } = require('child_process');
 
+const SIMULATE = process.env.SIMULATE_SCANNER === 'true';
+
+// Minimal valid PDF buffer for simulation
+const MOCK_PDF = Buffer.from(
+  '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\nxref\n0 4\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n0\n%%EOF'
+);
+
 // Map frontend color modes to SANE --mode values
 const SANE_MODE_MAP = {
   'RGB24': 'Color',
@@ -63,6 +70,12 @@ class Scanner {
    * Call this once at startup.
    */
   async init() {
+    // Simulation mode — skip all hardware probing
+    if (SIMULATE) {
+      this.logger.info('[SIM] Scanner simulation mode active — skipping hardware probe');
+      return;
+    }
+
     // 1. Check if scanimage exists
     try {
       execSync('which scanimage', { encoding: 'utf-8', timeout: 3000 });
@@ -355,6 +368,17 @@ class Scanner {
   // ==================== MAIN ENTRY POINT ====================
 
   async scan(options, outputDir) {
+    // Simulation mode — generate mock PDF
+    if (SIMULATE) {
+      this.logger.info('[SIM] Simulating scan...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const mockPath = path.join(outputDir, `scan_${Date.now()}.pdf`);
+      fs.writeFileSync(mockPath, MOCK_PDF);
+      const size = (MOCK_PDF.length / 1024).toFixed(1);
+      this.logger.info(`[SIM] Scan complete — mock.pdf created (${size}kb)`);
+      return mockPath;
+    }
+
     this.logger.info('🔍 Starting scan...');
 
     // SANE path (preferred — handles protocol correctly)

@@ -1,285 +1,47 @@
-# LePrint Pi Agent 🖨️
+# LePrint Pi-Agent
 
-The print agent that runs on your Raspberry Pi (or any laptop) to handle actual printing via CUPS.
+The Pi-Agent runs on Raspberry Pi (or any Linux device) connected to a printer. It polls the cloud backend for jobs, downloads files, converts them if needed, and sends to CUPS for printing. It also handles scan and xerox (photocopy) jobs via eSCL/SANE.
 
-## Prerequisites
-
-### Hardware
-
-- Raspberry Pi (any model) OR any laptop/desktop
-- USB printer connected
-- Network connection to reach cloud backend
-
-### Software
-
-- **Node.js 16+** (check: `node --version`)
-- **CUPS** (Common Unix Printing System)
-
-## Installation
-
-### 1. Install CUPS
-
-**Ubuntu/Debian/Raspberry Pi OS:**
+## Setup
 
 ```bash
-sudo apt update
-sudo apt install cups
-sudo systemctl start cups
-sudo systemctl enable cups
-```
-
-**macOS:**
-
-Already installed! Just make sure it's running:
-
-```bash
-sudo cupsctl WebInterface=yes
-```
-
-**Verify CUPS is working:**
-
-```bash
-lpstat -p # Should list your connected printers
-```
-
-### 2. Add your user to printer group
-
-```bash
-sudo usermod -aG lpadmin "$USER"
-# Log out and back in for changes to take effect
-```
-
-### 3. Install Agent Dependencies
-
-```bash
-cd pi-agent
+cp .env.example .env
+# Edit .env with your kiosk ID, cloud URL, and printer IP
 npm install
+node index.js
 ```
 
-### 4. Run Setup Wizard
+## Local Development & Testing
 
-```bash
-npm run setup
-```
+### Running without hardware (simulation mode)
 
-The wizard will:
+1. Copy `.env.example` to `.env` and configure:
+   ```
+   CLOUD_URL=https://justpri.duckdns.org
+   KIOSK_ID=kiosk_dev_yourname     # unique ID per developer
+   SIMULATE_PRINTER=true
+   SIMULATE_SCANNER=true
+   PRINTER_IP=192.168.1.1          # ignored in sim mode
+   ```
 
-- Detect connected printers
-- Let you choose auto-detect or manual selection
-- Generate a `.env` file
+2. Install and start:
+   ```bash
+   cd pi-agent && npm install && node index.js
+   ```
 
-## Configuration
+3. Go to `leprint.in?kiosk_id=kiosk_dev_yourname` to submit jobs.
+   Jobs will simulate print/scan with realistic delays.
 
-### Manual .env Setup
+### Quick UI testing (no pi-agent needed)
 
-If you skip the wizard, create `.env` manually:
+Use the mock kiosk built into the backend:
 
-```env
+1. Go to `leprint.in?kiosk_id=kiosk_test`
+2. Submit any job and complete payment
+3. Job auto-completes with real status transitions
+   - Default: ~5s total (controlled by `MOCK_COMPLETE_DELAY_MS` on backend)
+   - For instant testing: set `MOCK_STEP_DELAY_MS=500 MOCK_COMPLETE_DELAY_MS=1000`
 
-CLOUD_URL=http://your-cloud-server.com:3001
+### Multiple developers testing simultaneously
 
-PRINTER_NAME=auto
-
-```
-
-**PRINTER_NAME Options:**
-
--`auto` - Automatically detects default printer (recommended)
-
--`HP_LaserJet_1020` - Specific printer name from `lpstat -p`
-
--`Brother_HL_L2350DW` - Another example
-
-### Finding Your Printer Name
-
-```bash
-
-lpstat-p
-
-# Output example:
-
-# printer HP_LaserJet is idle.  enabled since Fri 14 Feb 2025
-
-# printer Brother_Printer is idle.  enabled since Fri 14 Feb 2025
-
-```
-
-## Running the Agent
-
-### Development (with auto-restart)
-
-```bash
-npm run dev
-```
-
-### Production
-
-```bash
-npm start
-```
-
-### Run on Boot (systemd service)
-
-Create `/etc/systemd/system/LePrint-agent.service`:
-
-```ini
-[Unit]
-Description=LePrint Agent
-After=network.target cups.service
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/LePrint-agent
-ExecStart=/usr/bin/node index.js
-Restart=always
-RestartSec=10
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-
-```bash
-sudo systemctl enable LePrint-agent
-sudo systemctl start LePrint-agent
-sudo systemctl status LePrint-agent
-```
-
-## Logs & Monitoring
-
-View logs in real-time:
-
-```bash
-# If running with systemd
-sudo journalctl -u LePrint-agent -f
-
-# If running manually, logs appear in console
-```
-
-Healthy agent output:
-
-```
-
-🖨️  LePrint Agent Starting...
-
-📡 Connecting to Cloud: http://your-server.com:3001
-
-✅ Connected to Cloud Hub!
-
-🎯 Auto-detected printer: HP_LaserJet
-
-🚀 Agent ready and listening for jobs!
-
-💚 Agent alive | Uptime: 45s
-
-```
-
-## Troubleshooting
-
-### Printer Not Detected
-
-```bash
-
-# Check if printer is connected
-
-lpstat-p
-
-
-# Check CUPS status
-
-sudosystemctlstatuscups
-
-
-# Test print manually
-
-echo"Test"|lp
-
-```
-
-### Permission Denied
-
-```bash
-
-# Add user to lpadmin group
-
-sudousermod-aGlpadmin $USER
-
-newgrplpadmin# Or log out/in
-
-```
-
-### Agent Can't Connect to Cloud
-
-- Check `CLOUD_URL` in `.env`
-- Verify cloud backend is running
-- Check firewall rules: `sudo ufw allow 3001`
-
-### Print Jobs Fail
-
-- Ensure printer is set as default: `lpoptions -d YourPrinterName`
-- Check printer queue: `lpq`
-- Clear stuck jobs: `cancel -a`
-
-## How It Works
-
-1. Agent connects to cloud backend via Socket.io
-2. Registers itself as available printer
-3. Cloud backend forwards print jobs from users
-4. Agent receives PDF buffer
-5. Saves to temp file
-6. Counts pages using pdf-lib
-7. Sends to CUPS via `lp` command
-8. Reports status back to cloud
-9. Cleans up temp files
-
-## File Structure
-
-```
-pi-agent/
-├── index.js           # Main agent logic
-├── setup.sh           # Install/update vs uninstall menu
-├── package.json       # Dependencies
-├── .env              # Configuration (created by setup)
-└── print-queue/      # Temp directory (auto-created)
-```
-
-## Security Notes
-
-- Agent should run on trusted local network
-- Don't expose CUPS web interface to internet
-- Use HTTPS for production cloud backend
-- Consider VPN for remote printer access
-
-## Performance
-
--**Memory Usage**: ~50MB idle
-
--**Startup Time**: 2-3 seconds
-
--**Print Latency**: ~1-2 seconds from cloud to CUPS
-
--**Tested With**: PDF files up to 50 pages
-
-## Next Steps
-
-After getting the agent running:
-
-1. Generate printer QR code (see main README)
-2. Test with frontend at `https://leprint.in`
-3. Monitor logs for any issues
-4. Set up auto-start on boot for production
-
-## Support
-
-Having issues? Check:
-
-1. Agent logs (console or journalctl)
-2. CUPS logs: `/var/log/cups/error_log`
-3. Backend logs on cloud server
-
----
-
-**Built for LePrint** | Works on Pi, Mac, Linux
+Use unique `KIOSK_ID`s per developer (e.g. `kiosk_dev_rev`, `kiosk_dev_abhay`) to avoid claiming each other's jobs from the queue.

@@ -1,5 +1,7 @@
 // frontend/src/components/GuestContext.jsx
-import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebase';
 
 function generateId() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -52,6 +54,18 @@ function writeStorage(data) {
 
 export function GuestProvider({ children }) {
     const [session, setSession] = useState(() => readStorage());
+
+    // FIX: Clear guest session when Firebase auth state returns a real user
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            if (firebaseUser) {
+                // Real user logged in — wipe guest state immediately
+                try { localStorage.removeItem(STORAGE_KEY); } catch {}
+                setSession(null);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
 
     const isGuest = !!session?.guestId;
     const guestId = session?.guestId || null;

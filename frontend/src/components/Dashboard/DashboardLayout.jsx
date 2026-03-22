@@ -9,10 +9,12 @@ import Footer from '../Footer';
 
 export function DashboardLayout({ children, activeTab = 'print' }) {
     const { user, role, signOut } = useAuth();
-    const { isGuest, endGuestSession, jobsToday } = useGuest();
+    const { isGuest: guestCtxIsGuest, endGuestSession, jobsToday } = useGuest();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
+    // Only treat as guest if GuestContext says guest AND there's no Firebase user
+    const isGuest = guestCtxIsGuest && !user;
     const jobsLeft = Math.max(0, 3 - jobsToday);
   
     const tabs = [

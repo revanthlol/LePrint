@@ -109,4 +109,13 @@
   .dark ::-webkit-scrollbar-thumb:hover {
     background: #404040;
   }
+
+  /* Hide scrollbar for tab bar */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }

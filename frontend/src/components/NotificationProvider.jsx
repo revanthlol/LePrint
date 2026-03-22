@@ -1,9 +1,9 @@
 // frontend/src/components/NotificationProvider.jsx
 // In-app toasts (sonner) + browser push notifications for job status updates
+// Supports multi-job: prefixed toasts, all-complete summary, single push on all-done
 
 import { createContext, useContext, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 
 const NotificationContext = createContext(null);
 
@@ -19,30 +19,51 @@ const STATUS_TOASTS = {
     FAILED:     { title: 'Job failed', desc: 'Tap for details', isError: true },
 };
 
-export function NotificationProvider({ children }) {
-    const lastNotifiedRef = useRef(null);
+const TYPE_PREFIX = { print: '[Print]', scan: '[Scan]', xerox: '[Xerox]' };
 
-    // Fire sonner toast on key status transitions
-    const notifyJobStatus = useCallback((status, jobId) => {
+export function NotificationProvider({ children }) {
+    const lastNotifiedRef = useRef({});
+
+    // Fire sonner toast on key status transitions — now with job type prefix
+    const notifyJobStatus = useCallback((status, jobId, jobType) => {
         const config = STATUS_TOASTS[status];
         if (!config) return;
 
-        // Deduplicate — don't fire same status twice in a row
+        // Deduplicate — don't fire same status twice for the same job
         const key = `${jobId}-${status}`;
-        if (lastNotifiedRef.current === key) return;
-        lastNotifiedRef.current = key;
+        if (lastNotifiedRef.current[key]) return;
+        lastNotifiedRef.current[key] = true;
+
+        const prefix = TYPE_PREFIX[jobType] || '';
+        const title = prefix ? `${prefix} ${config.title}` : config.title;
 
         if (config.isError) {
-            toast.error(config.title, { description: config.desc });
+            toast.error(title, { description: config.desc });
         } else if (status === 'COMPLETED') {
-            toast.success(config.title, { description: config.desc });
+            toast.success(title, { description: config.desc });
         } else {
-            toast(config.title, { description: config.desc });
+            toast(title, { description: config.desc });
         }
 
-        // Browser push if tab is not visible
+        // Browser push if tab is not visible (per-job — only for critical statuses)
+        // NOTE: Individual push notifications are intentionally suppressed.
+        // A single push fires on all-complete via notifyAllComplete().
+    }, []);
+
+    // Summary notification when ALL jobs complete
+    const notifyAllComplete = useCallback((total, succeeded, failed) => {
+        // Persistent in-app toast
+        toast.success(`All ${total} jobs complete — ${succeeded} succeeded, ${failed} failed`, {
+            duration: Infinity,
+            dismissible: true,
+        });
+
+        // Single browser push notification
         if (document.visibilityState !== 'visible') {
-            sendPushNotification(config.title, config.desc);
+            sendPushNotification(
+                'LePrint — All jobs complete',
+                `${succeeded} of ${total} jobs succeeded`
+            );
         }
     }, []);
 
@@ -98,6 +119,7 @@ export function NotificationProvider({ children }) {
     return (
         <NotificationContext.Provider value={{
             notifyJobStatus,
+            notifyAllComplete,
             shouldShowPushNudge,
             requestPushPermission,
             dismissPushNudge,
@@ -113,6 +135,7 @@ export function useNotifications() {
         // Return no-op functions if used outside provider
         return {
             notifyJobStatus: () => {},
+            notifyAllComplete: () => {},
             shouldShowPushNudge: () => false,
             requestPushPermission: () => {},
             dismissPushNudge: () => {},

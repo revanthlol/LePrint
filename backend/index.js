@@ -8,6 +8,7 @@ const multer = require('multer');
 
 const db = require('./db');
 const { initializeFirebase } = require('./auth-middleware');
+const log = require('./modules/logger');
 
 // Module Imports
 const jobRoutes = require('./modules/job-routes');
@@ -40,7 +41,7 @@ app.use(cors({
         if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
             callback(null, true);
         } else {
-            console.warn('CORS blocked:', origin);
+            log.warn('CORS blocked: ' + origin);
             callback(null, true);
         }
     },
@@ -96,41 +97,33 @@ async function startServer() {
         const dbConnected = await db.testConnection();
         
         if (!dbConnected) {
-            console.error('❌ Database connection failed. Please check your configuration.');
+            log.error('Database connection failed. Please check your configuration.');
             process.exit(1);
         }
         
         server.listen(PORT, '0.0.0.0', () => {
-            console.log(`
-╔═══════════════════════════════════════════╗
-║   DirectPrint Server V5 (Modular)         ║
-║   Database: PostgreSQL ✅                 ║
-║   Auth: Firebase ✅                       ║
-║   Model: Pull-Based ✅                    ║
-║   Port: ${PORT}                             ║
-╚═══════════════════════════════════════════╝
-            `);
+            log.info(`LePrint Server V5 started | Port: ${PORT} | DB: PostgreSQL | Auth: Firebase | Model: Pull-Based`);
         });
     } catch (error) {
-        console.error('Failed to start server:', error);
+        log.error('Failed to start server: ' + error.message);
         process.exit(1);
     }
 }
 
 // ==================== GRACEFUL SHUTDOWN ====================
 process.on('SIGINT', async () => {
-    console.log('\n👋 Shutting down server...');
+    log.info('Shutting down server...');
     try {
         await db.closePool();
-        console.log('✅ Database connections closed');
+        log.info('Database connections closed');
     } catch (error) {
-        console.error('Error closing database:', error);
+        log.error('Error closing database: ' + error.message);
     }
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-    console.log('\n🛑 Received SIGTERM...');
+    log.info('Received SIGTERM...');
     await db.closePool();
     process.exit(0);
 });

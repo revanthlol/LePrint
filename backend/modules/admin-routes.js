@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const log = require('./logger');
 
 // Database & Auth Imports
 const db = require('../db');
@@ -23,7 +24,7 @@ router.get('/status', async (req, res) => {
             jobs_completed: stats.completedJobs
         });
     } catch (error) {
-        console.error('[Status] Error:', error);
+        log.error('[ADMIN] ERROR | route: /api/status | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to get status' });
     }
 });
@@ -37,7 +38,7 @@ router.post('/connect', async (req, res) => {
             kiosks: stats.onlineKiosks
         });
     } catch (err) {
-        console.error('[CONNECT] failed:', err);
+        log.error('[ADMIN] ERROR | route: /api/connect | reason: ' + err.message);
         res.status(503).json({ error: 'Service unavailable' });
     }
 });
@@ -92,7 +93,7 @@ router.get('/admin/metrics', verifyToken, requireAdmin, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[Admin Metrics] Error:', error);
+        log.error('[ADMIN] ERROR | route: /api/admin/metrics | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to fetch metrics' });
     }
 });
@@ -163,7 +164,7 @@ router.get('/admin/kiosks', verifyToken, requireAdmin, async (req, res) => {
         res.json({ kiosks });
 
     } catch (error) {
-        console.error('[Admin Kiosks] Error:', error);
+        log.error('[ADMIN] ERROR | route: /api/admin/kiosks | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to fetch kiosk data' });
     }
 });
@@ -213,6 +214,8 @@ router.post('/admin/kiosks/:id/set-paper', verifyToken, requireAdmin, async (req
             { oldCount, newCount: paperCount }
         );
 
+        log.info(`[ADMIN] ${adminId} | SET_PAPER_COUNT | target: ${kioskId} (${oldCount} → ${paperCount})`);
+
         res.json({ 
             success: true, 
             kioskId, 
@@ -221,7 +224,7 @@ router.post('/admin/kiosks/:id/set-paper', verifyToken, requireAdmin, async (req
         });
 
     } catch (error) {
-        console.error('[Admin Set Paper] Error:', error);
+        log.error('[ADMIN] ERROR | route: /api/admin/kiosks/:id/set-paper | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to update paper count' });
     }
 });
@@ -251,9 +254,11 @@ router.patch('/admin/kiosks/:id', verifyToken, requireAdmin, async (req, res) =>
             { location_name }
         );
 
+        log.info(`[ADMIN] ${adminId} | UPDATE_KIOSK | target: ${kioskId}`);
+
         res.json({ success: true, kioskId });
     } catch (error) {
-        console.error('[Admin Update Kiosk] Error:', error);
+        log.error('[ADMIN] ERROR | route: /api/admin/kiosks/:id | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to update kiosk' });
     }
 });
@@ -275,7 +280,7 @@ router.get('/admin/jobs', verifyToken, requireAdmin, async (req, res) => {
         const jobs = await db.getJobs(filters);
         res.json({ jobs: jobs, total: jobs.length });
     } catch (error) {
-        console.error('[Admin Jobs] Error:', error);
+        log.error('[ADMIN] ERROR | route: /api/admin/jobs | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to get jobs' });
     }
 });
@@ -349,7 +354,7 @@ router.get('/admin/recent-jobs', verifyToken, requireAdmin, async (req, res) => 
         res.json({ jobs });
 
     } catch (error) {
-        console.error('[Admin Recent Jobs] Error:', error);
+        log.error('[ADMIN] ERROR | route: /api/admin/recent-jobs | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to fetch recent jobs' });
     }
 });

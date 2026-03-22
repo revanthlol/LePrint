@@ -5,6 +5,7 @@ const db = require('../db');
 const { verifyToken, ensureUserExists } = require('../auth-middleware');
 const { upload, generateJobId, generatePrintToken, countPDFPages, PRICE_PER_PAGE } = require('./utils');
 const socketManager = require('./socket-manager');
+const log = require('./logger');
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.get('/jobs/my-jobs', verifyToken, async (req, res) => {
         const jobs = await db.getUserJobs(req.user.uid, filters);
         res.json({ jobs });
     } catch (error) {
-        console.error('[My Jobs] Error:', error);
+        log.error('[JOB] ERROR | route: /api/jobs/my-jobs | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to fetch jobs' });
     }
 });
@@ -41,7 +42,7 @@ router.get('/users/stats', verifyToken, async (req, res) => {
             spentThisMonth: parseFloat(stats.spent_this_month || 0)
         });
     } catch (error) {
-        console.error('[User Stats] Error:', error);
+        log.error('[JOB] ERROR | route: /api/users/stats | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 });
@@ -64,7 +65,7 @@ router.get('/user/profile', verifyToken, async (req, res) => {
             name: user.name
         });
     } catch (error) {
-        console.error('[Profile] Error:', error);
+        log.error('[JOB] ERROR | route: /api/user/profile | reason: ' + error.message);
         res.json({ role: 'user' });
     }
 });
@@ -75,7 +76,7 @@ router.get('/user/profile', verifyToken, async (req, res) => {
 // ===============================
 router.post('/connect', async (req, res) => {
     const { kiosk_id } = req.body;
-    console.log('[API] Connect request for:', kiosk_id);
+    log.info('[JOB] Connect request for kiosk: ' + kiosk_id);
 
     try {
         const kiosk = await db.getKiosk(kiosk_id);
@@ -93,7 +94,7 @@ router.post('/connect', async (req, res) => {
         }
 
     } catch (error) {
-        console.error('[Connect] Error:', error);
+        log.error('[JOB] ERROR | route: /api/connect | reason: ' + error.message);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -178,6 +179,9 @@ router.post('/jobs/create', verifyToken, upload.single('file'), async (req, res)
             metadata
         });
 
+        const userId = req.user.isGuest ? 'guest:' + req.user.guestId : 'user:' + req.user.uid;
+        log.job(`${jobId} | PRINT | PENDING | ${userId}`);
+
         res.json({
             job_id: jobId,
             pages,
@@ -188,7 +192,7 @@ router.post('/jobs/create', verifyToken, upload.single('file'), async (req, res)
 
     } catch (error) {
 
-        console.error('Job creation error:', error);
+        log.error('[JOB] ERROR | route: /api/jobs/create | reason: ' + error.message);
 
         if (fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
@@ -235,10 +239,13 @@ router.post('/jobs/:job_id/verify-payment', verifyToken, async (req, res) => {
             token_timestamp: timestamp
         });
 
+        const payerId = req.user.isGuest ? 'guest:' + req.user.guestId : req.user.uid;
+        log.job(`${job_id} | payment verified | amount: ${job.total_cost} | by: ${payerId}`);
+
         res.json({ status: 'success', job_status: 'PAID' });
 
     } catch (error) {
-        console.error('[Payment] Error:', error);
+        log.error(`[JOB] ${job_id} | ERROR | route: /api/jobs/${job_id}/verify-payment | reason: ${error.message}`);
         res.status(500).json({ error: 'Payment verification failed' });
     }
 });
@@ -276,7 +283,7 @@ router.get('/jobs/:job_id/status', verifyToken, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[Job Status] Error:', error);
+        log.error(`[JOB] ${job_id} | ERROR | route: /api/jobs/${job_id}/status | reason: ${error.message}`);
         res.status(500).json({ error: 'Failed to get job status' });
     }
 });
@@ -321,6 +328,7 @@ router.get('/jobs/poll', async (req, res) => {
         }
 
         const job = result.rows[0];
+        log.job(`${job.id} | claimed by kiosk: ${kiosk_id}`);
 
         res.json({
             jobs: [{
@@ -335,7 +343,7 @@ router.get('/jobs/poll', async (req, res) => {
         });
 
     } catch (err) {
-        console.error('[Poll] Error:', err);
+        log.error('[JOB] ERROR | route: /api/jobs/poll | reason: ' + err.message);
         res.status(500).json({ error: 'Poll failed' });
     }
 
@@ -358,14 +366,14 @@ router.get('/jobs/:job_id/download', async (req, res) => {
         }
 
         if (!fs.existsSync(job.file_path)) {
-            console.error(`[Download] File missing for job ${job_id}: ${job.file_path}`);
+            log.error(`[JOB] ${job_id} | ERROR | route: /api/jobs/${job_id}/download | reason: File missing at ${job.file_path}`);
             return res.status(404).json({ error: 'File missing' });
         }
 
         res.download(job.file_path, job.filename);
 
     } catch (error) {
-        console.error('[Download] Error:', error);
+        log.error(`[JOB] ${job_id} | ERROR | route: /api/jobs/${job_id}/download | reason: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 });
@@ -420,6 +428,9 @@ router.post('/jobs/scan', verifyToken, async (req, res) => {
             metadata
         });
 
+        const scanUserId = req.user.isGuest ? 'guest:' + req.user.guestId : 'user:' + req.user.uid;
+        log.job(`${jobId} | SCAN | QUEUED | ${scanUserId}`);
+
         kioskSocket.emit('scan_job', {
             job_id: jobId,
             scan_options: scan_options || {}
@@ -431,6 +442,7 @@ router.post('/jobs/scan', verifyToken, async (req, res) => {
         });
 
     } catch (error) {
+        log.error('[JOB] ERROR | route: /api/jobs/scan | reason: ' + error.message);
         res.status(500).json({ error: error.message });
     }
 });
@@ -494,7 +506,7 @@ router.post('/jobs/xerox', verifyToken, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[Xerox] Error:', error);
+        log.error('[JOB] ERROR | route: /api/jobs/xerox | reason: ' + error.message);
         res.status(500).json({ error: 'Failed to create xerox job' });
     }
 });
@@ -523,12 +535,15 @@ router.post('/jobs/:job_id/scan-upload', upload.single('file'), async (req, res)
             file_size: req.file.size
         });
 
+        log.job(`${job_id} | scan uploaded | size: ${Math.round(req.file.size / 1024)}kb`);
+
         res.json({
             success: true,
             download_url: downloadURL
         });
 
     } catch (error) {
+        log.error(`[JOB] ${req.params.job_id} | ERROR | route: /api/jobs/${req.params.job_id}/scan-upload | reason: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 });

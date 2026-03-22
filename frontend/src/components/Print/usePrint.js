@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthProvider';
 import { useGuest } from '../GuestContext';
@@ -11,7 +11,8 @@ import {
 } from './printUtils';
 
 // Session storage key for active job recovery
-const SESSION_KEY = 'juspri_active_job';
+const SESSION_KEY = 'juspri_active_jobs';
+const MAX_JOBS = 5;
 
 function saveSession(data) {
     try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch {}
@@ -28,10 +29,33 @@ function clearSession() {
     try { sessionStorage.removeItem(SESSION_KEY); } catch {}
 }
 
+// ─── Job entry factory ──────────────────────────────────────
+function createJobEntry(overrides = {}) {
+    return {
+        jobId: null,
+        jobType: 'print',   // 'print' | 'scan' | 'xerox'
+        status: 'IDLE',
+        statusMessage: null,
+        filename: null,
+        pages: null,
+        createdAt: new Date(),
+        completedAt: null,
+        success: null,
+        downloadUrl: null,
+        // Internal state per job
+        pricing: null,
+        jobPhase: null,
+        scanResult: null,
+        serviceType: 'print',
+        file: null,
+        ...overrides
+    };
+}
+
 export function usePrint() {
     const { signOut, getAuthHeader, getGuestHeaders } = useAuth();
     const { isGuest, canCreateJob, isLastJob, incrementJobCount, guestId } = useGuest();
-    const { notifyJobStatus } = useNotifications();
+    const { notifyJobStatus, notifyAllComplete } = useNotifications();
 
     // Helper: build request headers (works for both auth and guest)
     const buildHeaders = useCallback(async () => {
@@ -48,24 +72,59 @@ export function usePrint() {
     // ==========================================
     // 1. State
     // ==========================================
-    const [status, setStatus] = useState('IDLE');
+
+    // Multi-job state
+    const [jobs, setJobs] = useState([]);
+    const [activeJobIndex, setActiveJobIndex] = useState(0);
+
+    // Shared pre-submission state (kiosk connection, scanner, etc.)
     const [config, setConfig] = useState(null);
-    const [file, setFile] = useState(null);
-    const [pricing, setPricing] = useState(null);
     const [logs, setLogs] = useState([]);
     const [cameraError, setCameraError] = useState(null);
     const [scannerActive, setScannerActive] = useState(true);
     const [printerStatusResult, setPrinterStatusResult] = useState(null);
 
-    // Scan & Xerox state
-    const [serviceType, setServiceType] = useState('print');
-    const [scanResult, setScanResult] = useState(null);
-    const [jobPhase, setJobPhase] = useState(null); // Backend status for progress display
+    // Pre-submission options (shared — applies to the job being configured)
     const [scanOptions, setScanOptions] = useState({
         resolution: 300,
         colorMode: 'RGB24'
     });
     const [xeroxCopies, setXeroxCopies] = useState(1);
+
+    // "View" status — controls which screen is shown
+    // When no job is active or being configured, this drives the UI
+    const [viewStatus, setViewStatus] = useState('IDLE');
+
+    // Derived: current active job (or null)
+    const activeJob = useMemo(() => jobs[activeJobIndex] || null, [jobs, activeJobIndex]);
+
+    // Derived: effective status for UI rendering
+    const status = useMemo(() => {
+        if (activeJob) {
+            // If the active job has a real in-flight status, show that
+            const jobStatus = activeJob.status;
+            if (['PRINTING', 'SCANNING', 'XEROXING', 'COMPLETED', 'SCAN_COMPLETE', 'ERROR', 'PAYMENT', 'CALCULATING'].includes(jobStatus)) {
+                return jobStatus;
+            }
+        }
+        return viewStatus;
+    }, [activeJob, viewStatus]);
+
+    // Derived: are all jobs done?
+    const allJobsDone = useMemo(() => {
+        if (jobs.length === 0) return false;
+        return jobs.every(j => j.status === 'COMPLETED' || j.status === 'SCAN_COMPLETE' || j.status === 'FAILED' || j.status === 'ERROR');
+    }, [jobs]);
+
+    // Derived: file & pricing from active job for backward compat
+    const file = activeJob?.file || null;
+    const pricing = activeJob?.pricing || null;
+    const scanResult = activeJob?.scanResult || null;
+    const jobPhase = activeJob?.jobPhase || null;
+    const serviceType = activeJob?.serviceType || viewStatus === 'SCAN_OPTIONS' ? 'scan' : viewStatus === 'XEROX_OPTIONS' ? 'xerox' : 'print';
+
+    // Track the active job's service type for views that need it
+    const activeServiceType = activeJob?.jobType || 'print';
 
     const addLog = useCallback((msg) => {
         setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 49)]);
@@ -75,14 +134,30 @@ export function usePrint() {
     const recoveryAttempted = useRef(false);
 
     // ==========================================
-    // 2. Core Helper Functions
-    // (Moved UP so they exist before they are called)
+    // 2. Job Array Helpers
+    // ==========================================
+
+    const updateJob = useCallback((jobId, updates) => {
+        setJobs(prev => prev.map(j =>
+            j.jobId === jobId ? { ...j, ...updates } : j
+        ));
+    }, []);
+
+    const addJob = useCallback((entry) => {
+        setJobs(prev => {
+            const newJobs = [...prev, createJobEntry(entry)];
+            return newJobs;
+        });
+    }, []);
+
+    // ==========================================
+    // 3. Core Helper Functions
     // ==========================================
 
     // Helper: Connect to printer (used by status check and manual connect)
     const connectPrinterAfterStatusCheck = useCallback(async (kioskId) => {
         try {
-            setStatus('CONNECTING');
+            setViewStatus('CONNECTING');
             addLog(`Connecting to kiosk ${kioskId}...`);
 
             const response = await axios.post(`${API_URL}/api/connect`, {
@@ -90,21 +165,20 @@ export function usePrint() {
             }, { timeout: 5000 });
 
             if (response.data.status === 'connected') {
-                setStatus('SERVICE_SELECT');
+                setViewStatus('SERVICE_SELECT');
                 addLog(`✓ Connected to "${response.data.kiosk_name || kioskId}"`);
                 addLog(`Printer: ${response.data.printer || 'Unknown'}`);
             }
         } catch (e) {
-            setStatus('ERROR');
+            setViewStatus('ERROR');
             addLog('✗ Kiosk offline or not found');
         }
     }, [API_URL, addLog]);
 
     // Helper: Check Kiosk Status
-    // MOVED UP: Must be defined before handleScan and useEffect
     const checkKioskStatus = useCallback(async (kioskId) => {
         try {
-            setStatus('CHECKING_STATUS');
+            setViewStatus('CHECKING_STATUS');
             addLog(`Checking kiosk status...`);
 
             const response = await axios.get(
@@ -124,85 +198,91 @@ export function usePrint() {
             addLog(`Printer: ${printerStatus}`);
 
             if (!result.kiosk_online) {
-                // Kiosk is completely offline → hard block
-                setStatus('SCANNED'); // Stay on connect screen with error
+                setViewStatus('SCANNED');
                 addLog('✗ Kiosk is offline');
                 return;
             }
 
             if (printerStatus === 'healthy') {
-                // All good → go straight to connect → connected
                 addLog('✓ Printer ready');
                 await connectPrinterAfterStatusCheck(kioskId);
                 return;
             }
 
             if (printerStatus === 'error') {
-                // Known printer error → hard block
-                setStatus('PRINTER_ERROR');
+                setViewStatus('PRINTER_ERROR');
                 addLog(`✗ Printer error: ${result.printer_status_detail || 'unknown'}`);
                 return;
             }
 
-            // status === 'unknown' → soft warning, let user decide
-            setStatus('PRINTER_WARNING');
+            setViewStatus('PRINTER_WARNING');
             addLog('⚠ Printer status unverified');
 
         } catch (err) {
-            // Network error reaching backend → treat as unknown, soft warning
             addLog('⚠ Could not reach status check, proceeding with warning');
             setPrinterStatusResult({ printer_status: 'unknown', kiosk_online: true });
-            setStatus('PRINTER_WARNING');
+            setViewStatus('PRINTER_WARNING');
         }
     }, [API_URL, addLog, connectPrinterAfterStatusCheck]);
 
     // ==========================================
-    // 3. Effects (Now safe to define)
+    // 4. Effects
     // ==========================================
 
-    // Save active job to sessionStorage for refresh recovery
+    // Save active jobs to sessionStorage for refresh recovery
     useEffect(() => {
-        const activeStatuses = ['PRINTING', 'SCANNING', 'XEROXING'];
-        if (activeStatuses.includes(status) && pricing?.job_id && config?.kiosk_id) {
+        const activeJobs = jobs.filter(j =>
+            ['PRINTING', 'SCANNING', 'XEROXING'].includes(j.status) && j.jobId
+        );
+        if (activeJobs.length > 0 && config?.kiosk_id) {
             saveSession({
-                job_id: pricing.job_id,
-                serviceType,
+                jobs: activeJobs.map(j => ({
+                    jobId: j.jobId,
+                    serviceType: j.serviceType,
+                    jobType: j.jobType,
+                    status: j.status,
+                    createdAt: j.createdAt,
+                    filename: j.filename,
+                    pages: j.pages,
+                })),
                 kiosk_id: config.kiosk_id,
-                status
+                activeJobIndex
             });
         }
-    }, [status, pricing?.job_id, serviceType, config?.kiosk_id]);
+    }, [jobs, config?.kiosk_id, activeJobIndex]);
 
-    // Recover active job from sessionStorage on mount
+    // Recover active jobs from sessionStorage on mount
     useEffect(() => {
         if (recoveryAttempted.current) return;
         recoveryAttempted.current = true;
 
         const saved = loadSession();
-        if (!saved?.job_id) return;
+        if (!saved?.jobs?.length) return;
 
-        // Restore state for polling
+        // Restore state
         setConfig({ kiosk_id: saved.kiosk_id });
-        setServiceType(saved.serviceType || 'print');
-        setPricing({ job_id: saved.job_id });
         setScannerActive(false);
 
-        if (saved.serviceType === 'scan') {
-            setStatus('SCANNING');
-        } else if (saved.serviceType === 'xerox') {
-            setStatus('XEROXING');
-        } else {
-            setStatus('PRINTING');
-        }
+        const recoveredJobs = saved.jobs.map(j => createJobEntry({
+            jobId: j.jobId,
+            jobType: j.jobType,
+            serviceType: j.serviceType,
+            status: j.status,
+            filename: j.filename,
+            pages: j.pages,
+            createdAt: new Date(j.createdAt),
+            pricing: { job_id: j.jobId },
+        }));
 
-        addLog('Reconnecting to active job...');
+        setJobs(recoveredJobs);
+        setActiveJobIndex(saved.activeJobIndex || 0);
+        addLog('Reconnecting to active job(s)...');
     }, [addLog]);
 
     // Auto-connect if kiosk_id is in the URL (skip if recovering active job)
     useEffect(() => {
-        // Don't auto-connect if we just recovered an active job
         const saved = loadSession();
-        if (saved?.job_id) return;
+        if (saved?.jobs?.length) return;
 
         const params = new URLSearchParams(window.location.search);
         const kioskIdFromUrl = params.get('kiosk_id');
@@ -215,72 +295,91 @@ export function usePrint() {
                 location: location,
                 floor: floor
             });
-            setStatus('SCANNED');
+            setViewStatus('SCANNED');
             setScannerActive(false);
 
             addLog(`Auto-scanned: ${kioskIdFromUrl}`);
             if (location) addLog(`Location: ${location}, Floor: ${floor || 'N/A'}`);
 
-            // This call was causing the error before. Now it works.
             checkKioskStatus(kioskIdFromUrl);
         }
     }, [addLog, checkKioskStatus]);
 
-    // Status polling for print/scan/xerox jobs
+    // Status polling for all in-flight jobs
     useEffect(() => {
-        const pollStatuses = ['PRINTING', 'SCANNING', 'XEROXING'];
-        if (!pricing?.job_id || !pollStatuses.includes(status)) return;
+        const pollableJobs = jobs.filter(j =>
+            ['PRINTING', 'SCANNING', 'XEROXING'].includes(j.status) && j.jobId
+        );
+
+        if (pollableJobs.length === 0) return;
 
         const pollInterval = setInterval(async () => {
-            try {
-                const headers = await buildHeaders();
-                const response = await axios.get(`${API_URL}/api/jobs/${pricing.job_id}/status`, {
-                    headers
-                });
-                const jobStatus = response.data.status;
+            for (const job of pollableJobs) {
+                try {
+                    const headers = await buildHeaders();
+                    const response = await axios.get(`${API_URL}/api/jobs/${job.jobId}/status`, {
+                        headers
+                    });
+                    const jobStatus = response.data.status;
 
-                // Track backend phase for progress display (xerox: SCANNING → PRINTING)
-                setJobPhase(prev => {
-                    // Notify on transitions only
-                    if (prev !== jobStatus) {
-                        notifyJobStatus(jobStatus, pricing.job_id);
+                    // Notify on transitions
+                    if (job.jobPhase !== jobStatus) {
+                        notifyJobStatus(jobStatus, job.jobId, job.jobType);
                     }
-                    return jobStatus;
-                });
 
-                if (jobStatus === 'COMPLETED') {
-                    clearSession();
-                    if (serviceType === 'scan') {
-                        // Fetch the download URL for scan result
-                        setScanResult({
-                            downloadUrl: `${API_URL}/api/jobs/${pricing.job_id}/download`
+                    if (jobStatus === 'COMPLETED') {
+                        const updates = {
+                            status: job.jobType === 'scan' ? 'SCAN_COMPLETE' : 'COMPLETED',
+                            jobPhase: jobStatus,
+                            completedAt: new Date(),
+                            success: true,
+                        };
+                        if (job.jobType === 'scan') {
+                            updates.scanResult = {
+                                downloadUrl: `${API_URL}/api/jobs/${job.jobId}/download`
+                            };
+                            updates.downloadUrl = `${API_URL}/api/jobs/${job.jobId}/download`;
+                        }
+                        updateJob(job.jobId, updates);
+                    } else if (jobStatus === 'FAILED' || jobStatus === 'CANCELLED') {
+                        updateJob(job.jobId, {
+                            status: 'ERROR',
+                            jobPhase: jobStatus,
+                            completedAt: new Date(),
+                            success: false,
                         });
-                        setStatus('SCAN_COMPLETE');
+                        addLog(`Job failed: ${response.data.error_message || 'Unknown error'}`);
                     } else {
-                        setStatus('COMPLETED');
+                        // Update phase for progress display
+                        updateJob(job.jobId, { jobPhase: jobStatus });
                     }
-                    clearInterval(pollInterval);
-                } else if (jobStatus === 'FAILED' || jobStatus === 'CANCELLED') {
-                    clearSession();
-                    setStatus('ERROR');
-                    clearInterval(pollInterval);
-                    addLog(`Job failed: ${response.data.error_message || 'Unknown error'}`);
+                } catch (e) {
+                    // Poll error — silent retry
                 }
-
-            } catch (e) {
-                // Poll error — silent retry
             }
         }, 3000);
 
         return () => clearInterval(pollInterval);
-    }, [pricing?.job_id, status, serviceType, API_URL, addLog, buildHeaders, notifyJobStatus]);
+    }, [jobs, API_URL, addLog, buildHeaders, notifyJobStatus, updateJob]);
+
+    // Clear session when all jobs complete
+    useEffect(() => {
+        if (allJobsDone && jobs.length > 0) {
+            clearSession();
+            // Fire summary notification
+            const succeeded = jobs.filter(j => j.success === true).length;
+            const failed = jobs.filter(j => j.success === false).length;
+            if (jobs.length > 1) {
+                notifyAllComplete(jobs.length, succeeded, failed);
+            }
+        }
+    }, [allJobsDone, jobs, notifyAllComplete]);
 
     // ==========================================
-    // 4. Handlers
+    // 5. Handlers
     // ==========================================
 
     const handleScan = useCallback((detectedCodes) => {
-        // ZXing sometimes sends undefined / empty arrays
         if (!Array.isArray(detectedCodes) || detectedCodes.length === 0) {
             return;
         }
@@ -288,21 +387,17 @@ export function usePrint() {
         const code = detectedCodes[0];
         const rawValue = code?.rawValue;
 
-        // Extra guard
         if (!rawValue || typeof rawValue !== 'string') {
             setScannerActive(true);
             return;
         }
 
-        // Stop scanner once we have *something*
         setScannerActive(false);
 
         try {
             let printerData = {};
 
-            // 1️⃣ URL QR (recommended)
             if (rawValue.startsWith('http://') || rawValue.startsWith('https://')) {
-
                 const url = new URL(rawValue);
                 const kioskId = url.searchParams.get('kiosk_id');
                 const location = url.searchParams.get('location');
@@ -325,7 +420,6 @@ export function usePrint() {
                     addLog(`📍 Location: ${location}${floor ? `, Floor ${floor}` : ''}`);
                 }
             }
-            // 2️⃣ JSON QR
             else if (rawValue.trim().startsWith('{')) {
                 const parsed = JSON.parse(rawValue);
                 printerData = {
@@ -334,7 +428,6 @@ export function usePrint() {
                 };
                 addLog(`✅ QR Decoded: Kiosk ${printerData.kiosk_id}`);
             }
-            // 3️⃣ Plain text QR
             else {
                 const value = rawValue.trim();
                 printerData = {
@@ -346,16 +439,14 @@ export function usePrint() {
             }
 
             setConfig(printerData);
-            setStatus('SCANNED');
-
-            // This call was also causing errors. Now it works.
+            setViewStatus('SCANNED');
             checkKioskStatus(printerData.kiosk_id);
 
         } catch (err) {
             addLog('Invalid QR format');
             setScannerActive(true);
         }
-    }, [addLog, setConfig, setStatus, checkKioskStatus]);
+    }, [addLog, setConfig, checkKioskStatus]);
 
     const handleScanError = useCallback((error) => {
         setCameraError(
@@ -364,7 +455,6 @@ export function usePrint() {
         setScannerActive(false);
     }, []);
 
-    // Manual connect button handler (if used in UI)
     const connectPrinter = useCallback(async () => {
         if (config?.kiosk_id) {
             await connectPrinterAfterStatusCheck(config.kiosk_id);
@@ -379,7 +469,7 @@ export function usePrint() {
     }, [config, connectPrinterAfterStatusCheck, addLog]);
 
     const rescanQR = useCallback(() => {
-        setStatus('IDLE');
+        setViewStatus('IDLE');
         setConfig(null);
         setPrinterStatusResult(null);
         setScannerActive(true);
@@ -389,15 +479,14 @@ export function usePrint() {
     // ---- Service Selection ----
 
     const selectService = useCallback((type) => {
-        setServiceType(type);
         if (type === 'print') {
-            setStatus('CONNECTED');
+            setViewStatus('CONNECTED');
             addLog('Selected: Print');
         } else if (type === 'scan') {
-            setStatus('SCAN_OPTIONS');
+            setViewStatus('SCAN_OPTIONS');
             addLog('Selected: Scan');
         } else if (type === 'xerox') {
-            setStatus('XEROX_OPTIONS');
+            setViewStatus('XEROX_OPTIONS');
             addLog('Selected: Xerox (Photocopy)');
         }
     }, [addLog]);
@@ -405,26 +494,22 @@ export function usePrint() {
     // ---- Scan Job ----
 
     const handleScanStart = useCallback(async () => {
-        // Guest job limit check
         if (isGuest && !canCreateJob) {
             addLog('Guest job limit reached (3/day). Sign in for unlimited access.');
-            setStatus('ERROR');
+            setViewStatus('ERROR');
             return;
         }
 
-        // Guest scan warning (one-time per device)
         if (isGuest) {
             try {
                 const warned = localStorage.getItem('leprint_guest_scan_warned');
                 if (!warned) {
-                    // The UI layer should show this as a modal — for now we log and set the flag
                     localStorage.setItem('leprint_guest_scan_warned', '1');
                     addLog('⚠ Guest scan: download link expires when you close this tab.');
                 }
             } catch {}
         }
 
-        setStatus('SCANNING');
         addLog('Creating scan job...');
 
         try {
@@ -438,11 +523,25 @@ export function usePrint() {
             });
 
             const { job_id } = response.data;
-            setPricing({ job_id, totalPrice: 5 });
+
+            // Create job entry
+            const newJob = createJobEntry({
+                jobId: job_id,
+                jobType: 'scan',
+                serviceType: 'scan',
+                status: 'SCANNING',
+                filename: `scan_${Date.now()}.pdf`,
+                createdAt: new Date(),
+                pricing: { job_id, totalPrice: 5 },
+            });
+
+            setJobs(prev => [...prev, newJob]);
+            setActiveJobIndex(prev => jobs.length); // point to new job
+            setViewStatus('SCANNING');
+
             addLog(`Scan job created: ${job_id}`);
             addLog('Scanning in progress...');
 
-            // Increment guest job count
             if (isGuest) incrementJobCount();
             if (isGuest && isLastJob) addLog('⚠ This is your last guest job today. Sign in for unlimited access.');
 
@@ -453,22 +552,20 @@ export function usePrint() {
                 return;
             }
 
-            setStatus('ERROR');
+            setViewStatus('ERROR');
             addLog(`Scan error: ${e.response?.data?.error || e.message}`);
         }
-    }, [config, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount]);
+    }, [config, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length]);
 
     // ---- Xerox Job ----
 
     const handleXeroxStart = useCallback(async () => {
-        // Guest job limit check
         if (isGuest && !canCreateJob) {
             addLog('Guest job limit reached (3/day). Sign in for unlimited access.');
-            setStatus('ERROR');
+            setViewStatus('ERROR');
             return;
         }
 
-        setStatus('XEROXING');
         addLog(`Creating xerox job (${xeroxCopies} copies)...`);
 
         try {
@@ -491,11 +588,25 @@ export function usePrint() {
                 { headers }
             );
 
-            setPricing({ job_id, totalPrice: total_cost });
+            // Create job entry
+            const newJob = createJobEntry({
+                jobId: job_id,
+                jobType: 'xerox',
+                serviceType: 'xerox',
+                status: 'XEROXING',
+                filename: `xerox_${Date.now()}.pdf`,
+                pages: xeroxCopies,
+                createdAt: new Date(),
+                pricing: { job_id, totalPrice: total_cost },
+            });
+
+            setJobs(prev => [...prev, newJob]);
+            setActiveJobIndex(prev => jobs.length);
+            setViewStatus('XEROXING');
+
             addLog(`Xerox job created & paid: ₹${total_cost}`);
             addLog('Scanning & printing in progress...');
 
-            // Increment guest job count
             if (isGuest) incrementJobCount();
             if (isGuest && isLastJob) addLog('⚠ This is your last guest job today. Sign in for unlimited access.');
 
@@ -506,17 +617,16 @@ export function usePrint() {
                 return;
             }
 
-            setStatus('ERROR');
+            setViewStatus('ERROR');
             addLog(`Xerox error: ${e.response?.data?.error || e.message}`);
         }
-    }, [config, xeroxCopies, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount]);
+    }, [config, xeroxCopies, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length]);
 
-    // ---- Existing Print Handlers ----
+    // ---- Print Handlers ----
 
     const handleFileSelect = useCallback(async (selectedFile) => {
         if (!selectedFile) return;
 
-        // Guest job limit check
         if (isGuest && !canCreateJob) {
             addLog('Guest job limit reached (3/day). Sign in for unlimited access.');
             return;
@@ -533,8 +643,7 @@ export function usePrint() {
             addLog(`File will be converted to PDF before printing`);
         }
 
-        setFile(selectedFile);
-        setStatus('CALCULATING');
+        setViewStatus('CALCULATING');
         addLog(`Creating job for ${selectedFile.name}...`);
 
         const fd = new FormData();
@@ -551,16 +660,31 @@ export function usePrint() {
             });
 
             const { job_id, pages, price_per_page, total_cost } = response.data;
-            setPricing({
-                job_id,
+
+            // Create job entry in PAYMENT state
+            const newJob = createJobEntry({
+                jobId: job_id,
+                jobType: 'print',
+                serviceType: 'print',
+                status: 'PAYMENT',
+                filename: selectedFile.name,
+                file: selectedFile,
                 pages,
-                pricePerPage: price_per_page,
-                totalPrice: total_cost
+                createdAt: new Date(),
+                pricing: {
+                    job_id,
+                    pages,
+                    pricePerPage: price_per_page,
+                    totalPrice: total_cost
+                },
             });
-            setStatus('PAYMENT');
+
+            setJobs(prev => [...prev, newJob]);
+            setActiveJobIndex(prev => jobs.length);
+            setViewStatus('PAYMENT');
+
             addLog(`Job created: ${pages} pages × ₹${price_per_page} = ₹${total_cost}`);
 
-            // Increment guest job count after successful creation
             if (isGuest) incrementJobCount();
             if (isGuest && isLastJob) addLog('⚠ This is your last guest job today. Sign in for unlimited access.');
 
@@ -571,20 +695,23 @@ export function usePrint() {
                 return;
             }
 
-            setStatus('ERROR');
+            setViewStatus('ERROR');
             addLog(`Error: ${e.response?.data?.error || e.message}`);
         }
-    }, [config, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount]);
+    }, [config, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length]);
 
     const handlePayment = useCallback(async () => {
-        setStatus('PRINTING');
+        if (!activeJob?.jobId) return;
+
+        updateJob(activeJob.jobId, { status: 'PRINTING' });
+        setViewStatus('PRINTING');
         addLog('Processing payment...');
 
         try {
             const headers = await buildHeaders();
 
             await axios.post(
-                `${API_URL}/api/jobs/${pricing.job_id}/verify-payment`,
+                `${API_URL}/api/jobs/${activeJob.jobId}/verify-payment`,
                 { payment_id: 'mock_payment_' + Date.now() },
                 { headers }
             );
@@ -597,51 +724,66 @@ export function usePrint() {
                 return;
             }
 
-            setStatus('ERROR');
+            updateJob(activeJob.jobId, { status: 'ERROR', success: false, completedAt: new Date() });
+            setViewStatus('ERROR');
             addLog(`Payment failed: ${e.response?.data?.error || e.message}`);
         }
-    }, [pricing, API_URL, addLog, buildHeaders, signOut, isGuest]);
+    }, [activeJob, API_URL, addLog, buildHeaders, signOut, isGuest, updateJob]);
 
     const resetFlow = useCallback(() => {
         clearSession();
-        setStatus('IDLE');
+        setJobs([]);
+        setActiveJobIndex(0);
+        setViewStatus('IDLE');
         setConfig(null);
-        setFile(null);
-        setPricing(null);
         setPrinterStatusResult(null);
         setScannerActive(true);
-        setServiceType('print');
-        setScanResult(null);
+        setScanOptions({ resolution: 300, colorMode: 'RGB24' });
         setXeroxCopies(1);
         addLog('Reset to scanner');
     }, [addLog]);
 
     const printAnotherOnSameKiosk = useCallback(() => {
         clearSession();
-        setStatus('SERVICE_SELECT');
-        setFile(null);
-        setPricing(null);
-        setServiceType('print');
-        setScanResult(null);
+        setViewStatus('SERVICE_SELECT');
+        setScanOptions({ resolution: 300, colorMode: 'RGB24' });
         setXeroxCopies(1);
         addLog('Ready for next job');
     }, [addLog]);
 
     const backToServiceSelect = useCallback(() => {
         clearSession();
-        setStatus('SERVICE_SELECT');
-        setFile(null);
-        setPricing(null);
-        setScanResult(null);
+        setViewStatus('SERVICE_SELECT');
+        setScanOptions({ resolution: 300, colorMode: 'RGB24' });
         setXeroxCopies(1);
         addLog('Back to service selection');
     }, [addLog]);
 
+    // ---- Multi-job: Add another job ----
+    const addAnotherJob = useCallback(() => {
+        // Don't exceed max
+        if (jobs.length >= MAX_JOBS) return;
+        // Guests capped at 1
+        if (isGuest) return;
+
+        setViewStatus('SERVICE_SELECT');
+        setScanOptions({ resolution: 300, colorMode: 'RGB24' });
+        setXeroxCopies(1);
+        addLog('Adding another job...');
+    }, [jobs.length, isGuest, addLog]);
+
     // ==========================================
-    // 5. Return
+    // 6. Return
     // ==========================================
     return {
-        // State
+        // Multi-job state
+        jobs,
+        activeJobIndex,
+        setActiveJobIndex,
+        activeJob,
+        allJobsDone,
+
+        // Backward-compatible single-job state
         status,
         config,
         file,
@@ -650,7 +792,7 @@ export function usePrint() {
         cameraError,
         scannerActive,
         printerStatusResult,
-        serviceType,
+        serviceType: activeServiceType,
         scanResult,
         scanOptions,
         xeroxCopies,
@@ -671,14 +813,15 @@ export function usePrint() {
         handleScanStart,
         handleXeroxStart,
         backToServiceSelect,
+        addAnotherJob,
 
-        // Setters
-        setStatus,
-        setFile,
-        setPricing,
+        // Setters (backward compat)
+        setStatus: setViewStatus,
+        setFile: () => {}, // no-op — file is per-job now
+        setPricing: () => {}, // no-op — pricing is per-job now
         setScannerActive,
         setCameraError,
         setScanOptions,
-        setXeroxCopies
+        setXeroxCopies,
     };
 }

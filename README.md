@@ -47,6 +47,8 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 - 📥 **File streaming** — Download URLs instead of base64 encoding
 - 🗑️ **Auto-cleanup** — Print queue files cleaned up after 30 minutes
 - 💾 **Disk protection** — 500MB limit on print queue directory
+- 📑 **Multi-job** — Submit up to 5 jobs per session, track all via switchable tabs. Guests limited to 1 job
+- 📊 **Job summary screen** — On completion showing per-job outcomes, timings, and scan downloads
 
 ### Scan
 - 🔍 **eSCL scanning** — Works with any AirScan/eSCL-compatible printer
@@ -135,6 +137,8 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 **Scan:** User selects Scan → Chooses options (DPI, color) → Backend creates scan job → Pi Agent polls & scans via eSCL → Uploads PDF to backend → User gets download link
 
 **Xerox:** User selects Xerox → Sets copies & options → Backend creates xerox job → Pi Agent polls, scans via eSCL, prints N copies via CUPS → Status updates via WebSocket
+
+> **Note:** Multi-job state is managed entirely frontend-side — backend and pi-agent are unchanged. Each job entry in the `jobs[]` array has its own status polling loop and notification scope.
 
 ### Resilience Features
 
@@ -383,6 +387,10 @@ All pi-agent logs include `[HH:MM:SS]` timestamps with color-coded levels (info,
 | `POST` | `/api/jobs/scan` | Create a scan job |
 | `POST` | `/api/jobs/xerox` | Create a xerox (photocopy) job |
 | `GET` | `/api/jobs/:id/download` | Download job file |
+| `GET` | `/api/jobs/:id/status` | Poll job status |
+| `GET` | `/api/jobs/my-jobs` | User's job history |
+| `GET` | `/api/users/stats` | User stats (pages, spend) |
+| `GET` | `/api/user/profile` | User profile + role |
 
 ### Pi Agent Endpoints
 
@@ -458,6 +466,26 @@ Currently using mock payments. PayU integration is planned — see [docs/payu-in
 - Ordered state transitions (backward transition rejection)
 - Idempotent completion handlers (duplicate event protection)
 - Timestamped structured logging across pi-agent and backend
+
+---
+
+## 📝 Logging
+
+### Backend
+All route files use `backend/modules/logger.js` for timestamped, structured logging.
+
+| Prefix | Format | Example |
+|--------|--------|---------|
+| `[JOB]` | `[HH:MM:SS] [JOB] job_id \| TYPE \| STATUS \| context` | `[14:32:01] [JOB] abc123 \| PRINT \| PENDING \| user:uid` |
+| `[ADMIN]` | `[HH:MM:SS] [ADMIN] uid \| ACTION \| target: X` | `[14:32:05] [ADMIN] uid \| SET_PAPER_COUNT \| target: kiosk_001` |
+
+### Pi-Agent
+7-level colored logger with `[HH:MM:SS]` timestamps, levels: info, success, warn, error, debug, job, socket.
+
+| Level | Format | Example |
+|-------|--------|---------|
+| job | `[HH:MM:SS] ✓/⚠/✗ [XEROX/SCAN/PRINT] message (elapsed)` | `[14:32:10] ✓ [PRINT] Completed in 12s` |
+| socket | `[HH:MM:SS] [SOCKET] message` | `[14:32:00] [SOCKET] Connected to backend` |
 
 ### 🔜 Pending
 - PayU payment gateway integration (plan ready, implementation pending)

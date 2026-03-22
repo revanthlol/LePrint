@@ -761,11 +761,16 @@ export function usePrint() {
 
     // ---- Multi-job: Add another job ----
     const addAnotherJob = useCallback(() => {
+        console.log('[DEBUG] addAnotherJob called, isGuest:', isGuest, 'jobs:', jobs.length);
         // Don't exceed max
         if (jobs.length >= MAX_JOBS) return;
         // Guests capped at 1
-        if (isGuest) return;
+        if (isGuest === true) return;
 
+        // Create new job entry and switch to it
+        const newJob = createJobEntry({ status: 'IDLE' });
+        setJobs(prev => [...prev, newJob]);
+        setActiveJobIndex(jobs.length); // point to the new entry (0-based)
         setViewStatus('SERVICE_SELECT');
         setScanOptions({ resolution: 300, colorMode: 'RGB24' });
         setXeroxCopies(1);

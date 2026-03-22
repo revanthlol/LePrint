@@ -127,6 +127,10 @@ function startScheduledTasks() {
 
                 if (kiosk.status === 'online' && now - lastSeen > 60000) {
 
+                    // Skip test kiosk — it never sends heartbeats
+                    const testKioskId = process.env.TEST_KIOSK_ID || null;
+                    if (testKioskId && kiosk.id === testKioskId) continue;
+
                     await db.updateKioskStatus(kiosk.id, 'offline');
                     kioskSockets.delete(kiosk.id);
 

@@ -272,8 +272,15 @@ function initSocketServer(io) {
 
             log.socket(`Disconnected: ${socket.id} (alive ${(aliveMs / 1000).toFixed(1)}s)`);
             try {
+                const testKioskId = process.env.TEST_KIOSK_ID || null;
                 for (const [kioskId, sock] of kioskSockets.entries()) {
                     if (sock.id === socket.id) {
+                        // Skip marking test kiosk offline on disconnect
+                        if (testKioskId && kioskId === testKioskId) {
+                            log.socket(`Test kiosk ${kioskId} disconnect ignored`);
+                            kioskSockets.delete(kioskId);
+                            break;
+                        }
                         await db.updateKioskStatus(kioskId, 'offline');
                         kioskSockets.delete(kioskId);
                         lastPrinterStatus.delete(kioskId);

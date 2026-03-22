@@ -30,6 +30,27 @@ router.get('/status', async (req, res) => {
     try {
         const db = req.app.get('db');
 
+        // Test kiosk — always online, no DB lookup needed
+        const testKioskId = process.env.TEST_KIOSK_ID || null;
+        if (testKioskId && kiosk_id === testKioskId) {
+            // Upsert so it exists for poll calls
+            await db.query(`
+                INSERT INTO kiosks (id, hostname, printer_name, status, last_seen, printer_status)
+                VALUES ($1, 'mock', 'mock_printer', 'online', NOW(), 'healthy')
+                ON CONFLICT (id) DO UPDATE SET status = 'online', last_seen = NOW()
+            `, [testKioskId]);
+
+            return res.json({
+                kiosk_id,
+                kiosk_online: true,
+                printer_name: 'Mock Printer',
+                printer_status: 'ready',
+                printer_status_detail: null,
+                current_paper_count: 999,
+                message: 'Mock kiosk — always online.'
+            });
+        }
+
         // Fetch kiosk record from DB
         const result = await db.query(
             `SELECT 

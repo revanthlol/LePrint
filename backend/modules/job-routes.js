@@ -244,6 +244,18 @@ router.post('/jobs/:job_id/verify-payment', verifyToken, async (req, res) => {
 
         res.json({ status: 'success', job_status: 'PAID' });
 
+        // Trigger mock simulation immediately for test kiosk
+        if (TEST_KIOSK_ID && job.kiosk_id === TEST_KIOSK_ID) {
+            log.info(`[MOCK] ${job_id} | simulation triggered from payment verify`);
+            // Re-fetch job to get updated PAID status
+            const paidJob = await db.getJob(job_id);
+            if (paidJob) {
+                // Mark as SENT_TO_PI (same as poll would do)
+                await db.updateJob(job_id, { status: 'SENT_TO_PI', queued_at: new Date(), last_status_update: new Date() });
+                startMockSimulation(paidJob, Date.now());
+            }
+        }
+
     } catch (error) {
         log.error(`[JOB] ${job_id} | ERROR | route: /api/jobs/${job_id}/verify-payment | reason: ${error.message}`);
         res.status(500).json({ error: 'Payment verification failed' });

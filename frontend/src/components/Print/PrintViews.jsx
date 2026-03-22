@@ -1,12 +1,12 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 import {
   Loader2, QrCode, AlertCircle, Zap, FileUp,
   IndianRupee, CheckCircle, Printer,
-  ScanLine, Copy, Download, Minus, Plus, ArrowLeft
+  ScanLine, Copy, Download, Minus, Plus, ArrowLeft, ExternalLink
 } from 'lucide-react';
 import { getFileIcon, getFileExt } from './printUtils';
 import { AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import ZXingScanner from './ZXingScanner'
 
@@ -464,29 +464,158 @@ export function PaymentView({ pricing, handlePayment, setStatus, setFile, setPri
   );
 }
 
-export function PrintingView({ jobPhase }) {
-  const subtitle = jobPhase === 'QUEUED' ? 'Queued for printing'
-    : jobPhase === 'PRINTING' ? 'Printing your document'
-    : 'Sending to printer';
+// ─── Fun facts data ─────────────────────────────────────────
+const FUN_FACTS = [
+    "The first laser printer was built by Xerox in 1969",
+    "A standard inkjet nozzle is thinner than a human hair",
+    "CUPS (used to run this kiosk) is open-source software from Apple",
+    "The average office printer handles ~10,000 pages before needing maintenance",
+    "PDF was invented by Adobe in 1993 — originally called 'Camelot'",
+    "A4 paper dimensions come from a German DIN standard set in 1922",
+    "The word 'printer' comes from the Latin 'premere' — to press",
+    "A single cartridge of toner can print around 2,500 pages",
+];
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6 text-center py-8"
-    >
-      <div className="relative">
-        <Loader2 className="animate-spin h-16 w-16 mx-auto text-white"/>
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="h-20 w-20 bg-white/10 rounded-full blur-xl"></div>
+// ─── Step definitions for each service type ─────────────────
+const STEP_MAP = {
+    print: [
+        { id: 'PAID',       label: 'Paid' },
+        { id: 'SENT_TO_PI', label: 'Sent to Kiosk' },
+        { id: 'QUEUED',     label: 'Queued' },
+        { id: 'PRINTING',   label: 'Printing' },
+        { id: 'COMPLETED',  label: 'Done' },
+    ],
+    scan: [
+        { id: 'QUEUED',               label: 'Queued' },
+        { id: 'DISCOVERING_SCANNER',   label: 'Discovering' },
+        { id: 'SCANNING',             label: 'Scanning' },
+        { id: 'PROCESSING',           label: 'Processing' },
+        { id: 'COMPLETED',            label: 'Done' },
+    ],
+    xerox: [
+        { id: 'PAID',       label: 'Paid' },
+        { id: 'SENT_TO_PI', label: 'Sent to Kiosk' },
+        { id: 'SCANNING',   label: 'Scanning' },
+        { id: 'PRINTING',   label: 'Printing' },
+        { id: 'COMPLETED',  label: 'Done' },
+    ],
+};
+
+function getActiveStepIndex(steps, jobPhase) {
+    if (!jobPhase) return 0;
+    const idx = steps.findIndex(s => s.id === jobPhase);
+    return idx >= 0 ? idx : 0;
+}
+
+function FunFactsTicker() {
+    const [factIdx, setFactIdx] = useState(0);
+    const [paused, setPaused] = useState(false);
+    const intervalRef = useRef(null);
+
+    useEffect(() => {
+        if (paused) return;
+        intervalRef.current = setInterval(() => {
+            setFactIdx(prev => (prev + 1) % FUN_FACTS.length);
+        }, 6000);
+        return () => clearInterval(intervalRef.current);
+    }, [paused]);
+
+    return (
+        <div
+            className="mt-6 bg-white/5 border border-border rounded-xl p-4 min-h-[60px] flex items-center cursor-default"
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+        >
+            <AnimatePresence mode="wait">
+                <motion.p
+                    key={factIdx}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-xs text-muted-foreground italic text-center w-full"
+                >
+                    💡 {FUN_FACTS[factIdx]}
+                </motion.p>
+            </AnimatePresence>
         </div>
-      </div>
-      <div>
-        <p className="text-xl font-semibold mb-2 text-foreground">Printing...</p>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
-      </div>
-    </motion.div>
-  );
+    );
+}
+
+// ─── Unified Job Progress View ──────────────────────────────
+export function JobProgressView({ serviceType, jobPhase, resetFlow, backToServiceSelect }) {
+    const type = serviceType || 'print';
+    const steps = STEP_MAP[type] || STEP_MAP.print;
+    const activeIdx = getActiveStepIndex(steps, jobPhase);
+
+    const titles = {
+        print: 'Printing...',
+        scan: 'Scanning...',
+        xerox: 'Xeroxing...',
+    };
+
+    const currentStep = steps[activeIdx];
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6 py-6"
+        >
+            {/* Title */}
+            <div className="text-center">
+                <p className="text-xl font-semibold text-foreground mb-1">{titles[type]}</p>
+                <p className="text-sm text-muted-foreground">{currentStep?.label || 'Processing'}</p>
+            </div>
+
+            {/* Step indicator */}
+            <div className="flex items-center justify-center gap-0 px-2">
+                {steps.map((step, i) => {
+                    const isCompleted = i < activeIdx;
+                    const isActive = i === activeIdx;
+                    const isFuture = i > activeIdx;
+
+                    return (
+                        <React.Fragment key={step.id}>
+                            {/* Connector line */}
+                            {i > 0 && (
+                                <div className={`h-px flex-1 max-w-[32px] transition-colors duration-300 ${
+                                    isCompleted || isActive ? 'bg-white/50' : 'bg-white/10'
+                                }`} />
+                            )}
+
+                            {/* Step dot + label */}
+                            <div className="flex flex-col items-center gap-1.5 min-w-0">
+                                <div className={`relative w-3 h-3 rounded-full transition-all duration-300 ${
+                                    isCompleted ? 'bg-white' :
+                                    isActive ? 'bg-white' :
+                                    'bg-white/15'
+                                }`}>
+                                    {isActive && (
+                                        <motion.div
+                                            animate={{ scale: [1, 1.8, 1], opacity: [0.6, 0, 0.6] }}
+                                            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                                            className="absolute inset-0 rounded-full bg-white"
+                                        />
+                                    )}
+                                </div>
+                                <span className={`text-[10px] leading-tight text-center whitespace-nowrap transition-colors ${
+                                    isCompleted ? 'text-white/70' :
+                                    isActive ? 'text-white font-medium' :
+                                    'text-white/25'
+                                }`}>
+                                    {step.label}
+                                </span>
+                            </div>
+                        </React.Fragment>
+                    );
+                })}
+            </div>
+
+            {/* Fun facts */}
+            <FunFactsTicker />
+        </motion.div>
+    );
 }
 
 export function CompletedView({ serviceType, printAnotherOnSameKiosk, resetFlow }) {
@@ -680,30 +809,10 @@ export function ScanOptionsView({ scanOptions, setScanOptions, handleScanStart, 
 }
 
 
-// ─── VIEW: Scanning in progress ─────────────────────────────
-export function ScanningView({ jobPhase }) {
-    const subtitle = jobPhase === 'PROCESSING' ? 'Processing scanned document'
-        : jobPhase === 'DISCOVERING_SCANNER' ? 'Detecting scanner'
-        : 'Scanning your document';
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6 text-center py-8"
-        >
-            <div className="relative">
-                <Loader2 className="animate-spin h-16 w-16 mx-auto text-white" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="h-20 w-20 bg-white/10 rounded-full blur-xl"></div>
-                </div>
-            </div>
-            <div>
-                <p className="text-xl font-semibold mb-2 text-foreground">Scanning...</p>
-                <p className="text-sm text-muted-foreground">{subtitle}</p>
-            </div>
-        </motion.div>
-    );
+// ScanningView and XeroxingView are now handled by JobProgressView
+// Kept as aliases for backward compatibility if directly imported
+export function ScanningView({ jobPhase, ...rest }) {
+    return <JobProgressView serviceType="scan" jobPhase={jobPhase} {...rest} />;
 }
 
 
@@ -854,49 +963,13 @@ export function XeroxOptionsView({ xeroxCopies, setXeroxCopies, scanOptions, set
 }
 
 
-// ─── VIEW: Xeroxing in progress ─────────────────────────────
-export function XeroxingView({ jobPhase }) {
-    const isPrinting = jobPhase === 'PRINTING' || jobPhase === 'QUEUED';
-    const title = isPrinting ? 'Printing...' : 'Scanning...';
-    const subtitle = isPrinting
-        ? 'Printing your copies'
-        : 'Scanning your document';
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6 text-center py-8"
-        >
-            <div className="relative">
-                <Loader2 className="animate-spin h-16 w-16 mx-auto text-white" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="h-20 w-20 bg-white/10 rounded-full blur-xl"></div>
-                </div>
-            </div>
-            <div>
-                <p className="text-xl font-semibold mb-2 text-foreground">{title}</p>
-                <p className="text-sm text-muted-foreground">{subtitle}</p>
-            </div>
-
-            {/* Progress steps */}
-            <div className="flex items-center justify-center gap-3">
-                <div className={`flex items-center gap-1.5 text-xs ${!isPrinting ? 'text-white font-medium' : 'text-muted-foreground'}`}>
-                    <div className={`w-2 h-2 rounded-full ${!isPrinting ? 'bg-white animate-pulse' : 'bg-white/30'}`} />
-                    Scan
-                </div>
-                <div className="w-6 h-px bg-border" />
-                <div className={`flex items-center gap-1.5 text-xs ${isPrinting ? 'text-white font-medium' : 'text-muted-foreground'}`}>
-                    <div className={`w-2 h-2 rounded-full ${isPrinting ? 'bg-white animate-pulse' : 'bg-white/30'}`} />
-                    Print
-                </div>
-            </div>
-        </motion.div>
-    );
+// ─── VIEW: Xeroxing in progress (alias for JobProgressView) ─
+export function XeroxingView({ jobPhase, ...rest }) {
+    return <JobProgressView serviceType="xerox" jobPhase={jobPhase} {...rest} />;
 }
 
 
-// ─── VIEW: Generic Job Error (scan/xerox failures) ──────────
+// ─── VIEW: Generic Job Error (with refund button) ──────────
 export function JobErrorView({ serviceType, logs, backToServiceSelect, resetFlow }) {
     // Extract the latest error from logs
     const errorLog = logs.find(l => l.includes('Job failed:') || l.includes('error'));
@@ -904,8 +977,12 @@ export function JobErrorView({ serviceType, logs, backToServiceSelect, resetFlow
         ? errorLog.replace(/^\[.*?\]\s*/, '')
         : 'Something went wrong. Please try again.';
 
-    const title = serviceType === 'scan' ? 'Scan Failed' : 'Xerox Failed';
-    const icon = serviceType === 'scan' ? ScanLine : Copy;
+    const title = serviceType === 'scan' ? 'Scan Failed'
+        : serviceType === 'xerox' ? 'Xerox Failed'
+        : 'Print Failed';
+    const icon = serviceType === 'scan' ? ScanLine
+        : serviceType === 'xerox' ? Copy
+        : Printer;
     const Icon = icon;
 
     return (
@@ -933,7 +1010,7 @@ export function JobErrorView({ serviceType, logs, backToServiceSelect, resetFlow
                 <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
                     <p className="text-sm text-red-400/80">
-                        The scanner could not be reached. Make sure the printer/scanner is powered on and connected to the network.
+                        If you've already been charged, you can request a refund below.
                     </p>
                 </div>
             </div>
@@ -946,6 +1023,19 @@ export function JobErrorView({ serviceType, logs, backToServiceSelect, resetFlow
                     <RefreshCw className="mr-2 w-4 h-4" />
                     Try Again
                 </Button>
+
+                <a
+                    href={`/contact?subject=${encodeURIComponent('Refund Request')}`}
+                    className="block"
+                >
+                    <Button
+                        variant="outline"
+                        className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    >
+                        <ExternalLink className="mr-2 w-4 h-4" />
+                        Request Refund
+                    </Button>
+                </a>
 
                 <Button
                     variant="ghost"

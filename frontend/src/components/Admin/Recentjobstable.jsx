@@ -100,7 +100,16 @@ export function RecentJobsTable({ jobs, loading }) {
 
                   {/* User */}
                   <div className="text-muted-foreground">
-                    {job.userEmail}
+                    {job.isGuest ? (
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="secondary" className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/20">Guest</Badge>
+                        {job.guestId && (
+                          <span className="text-[10px] text-muted-foreground/50 font-mono">{job.guestId.slice(0, 8)}</span>
+                        )}
+                      </div>
+                    ) : (
+                      job.userEmail
+                    )}
                   </div>
 
                   {/* Kiosk */}

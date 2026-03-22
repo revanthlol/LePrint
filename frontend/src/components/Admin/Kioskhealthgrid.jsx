@@ -24,6 +24,8 @@ import axios from 'axios';
 export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
   const [editingKiosk, setEditingKiosk] = useState(null);
   const [newPaperCount, setNewPaperCount] = useState('');
+  const [editingLocation, setEditingLocation] = useState(null);
+  const [newLocationName, setNewLocationName] = useState('');
   const [updating, setUpdating] = useState(false);
 
   const handleSetPaper = async () => {
@@ -144,7 +146,22 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                     <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
                       {/* Kiosk Name */}
                       <div>
-                        <p className="text-sm font-medium text-foreground">{kiosk.hostname || kiosk.id}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium text-foreground">
+                            {kiosk.locationName || kiosk.hostname || kiosk.id}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingLocation(kiosk);
+                              setNewLocationName(kiosk.locationName || '');
+                            }}
+                            className="h-5 w-5 p-0 opacity-50 hover:opacity-100"
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                        </div>
                         <p className="text-xs text-muted-foreground font-mono">{kiosk.id}</p>
                       </div>
 
@@ -238,6 +255,68 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
             </Button>
             <Button
               onClick={handleSetPaper}
+              disabled={updating}
+            >
+              {updating ? 'Updating...' : 'Update'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Location Name Dialog */}
+      <Dialog open={!!editingLocation} onOpenChange={(open) => !open && setEditingLocation(null)}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Set Location Name</DialogTitle>
+            <DialogDescription>
+              Set a display name for <span className="font-medium text-foreground">{editingLocation?.hostname || editingLocation?.id}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm text-muted-foreground mb-2 block">
+              Location Name
+            </label>
+            <Input
+              type="text"
+              value={newLocationName}
+              onChange={(e) => setNewLocationName(e.target.value)}
+              placeholder="e.g. Library 2nd Floor"
+              className="bg-muted/10"
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              This will appear as the kiosk display name
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setEditingLocation(null)}
+              disabled={updating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!editingLocation) return;
+                setUpdating(true);
+                try {
+                  const authHeader = await getAuthHeader();
+                  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+                  await axios.patch(
+                    `${API_URL}/api/admin/kiosks/${editingLocation.id}`,
+                    { location_name: newLocationName.trim() || null },
+                    { headers: { 'Authorization': authHeader } }
+                  );
+                  setEditingLocation(null);
+                  setNewLocationName('');
+                  onRefresh();
+                } catch (error) {
+                  console.error('Failed to update location:', error);
+                  alert(error.response?.data?.message || 'Failed to update location name');
+                } finally {
+                  setUpdating(false);
+                }
+              }}
               disabled={updating}
             >
               {updating ? 'Updating...' : 'Update'}

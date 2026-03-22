@@ -13,7 +13,7 @@ import {
   ConnectView,
   FileUploadView,
   PaymentView,
-  PrintingView,
+  JobProgressView,
   CompletedView,
   StatusCheckView,
   PrinterErrorView,
@@ -99,7 +99,7 @@ export function PrintInterface() {
           {status === 'PAYMENT' && <PaymentView {...viewProps} />}
 
           {/* VIEW: Printing progress */}
-          {status === 'PRINTING' && <PrintingView {...viewProps} />}
+          {status === 'PRINTING' && <JobProgressView serviceType={viewProps.serviceType || 'print'} jobPhase={viewProps.jobPhase} resetFlow={viewProps.resetFlow} backToServiceSelect={viewProps.backToServiceSelect} />}
 
           {/* VIEW: Completed / success */}
           {status === 'COMPLETED' && <CompletedView {...viewProps} />}

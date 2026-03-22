@@ -116,6 +116,7 @@ router.get('/admin/kiosks', verifyToken, requireAdmin, async (req, res) => {
                 k.current_paper_count,
                 k.last_seen,
                 k.uptime,
+                k.location_name,
                 -- Today's stats for this kiosk
                 COUNT(j.id) FILTER (WHERE j.created_at >= CURRENT_DATE) as jobs_today,
                 COALESCE(
@@ -136,14 +137,15 @@ router.get('/admin/kiosks', verifyToken, requireAdmin, async (req, res) => {
             LEFT JOIN jobs j ON k.id = j.kiosk_id
             GROUP BY k.id, k.hostname, k.printer_name, k.status, 
                      k.printer_status, k.printer_status_detail,
-                     k.current_paper_count, k.last_seen, k.uptime
+                     k.current_paper_count, k.last_seen, k.uptime, k.location_name
             ORDER BY k.id
         `);
 
         const kiosks = result.rows.map(k => ({
             id: k.id,
-            name: k.hostname, // Mapped to 'name' to match previous API expectation if needed
+            name: k.hostname,
             hostname: k.hostname,
+            locationName: k.location_name || null,
             printerName: k.printer_name,
             status: k.status,
             printerStatus: k.printer_status,
@@ -224,6 +226,38 @@ router.post('/admin/kiosks/:id/set-paper', verifyToken, requireAdmin, async (req
     }
 });
 
+/**
+ * PATCH /admin/kiosks/:id
+ * Update kiosk settings (e.g., location_name)
+ */
+router.patch('/admin/kiosks/:id', verifyToken, requireAdmin, async (req, res) => {
+    try {
+        const { id: kioskId } = req.params;
+        const { location_name } = req.body;
+
+        if (location_name !== undefined) {
+            await db.query(
+                'UPDATE kiosks SET location_name = $1, updated_at = NOW() WHERE id = $2',
+                [location_name || null, kioskId]
+            );
+        }
+
+        const adminId = req.user ? req.user.uid : 'system';
+        await logAdminAction(
+            adminId,
+            'UPDATE_KIOSK',
+            'kiosk',
+            kioskId,
+            { location_name }
+        );
+
+        res.json({ success: true, kioskId });
+    } catch (error) {
+        console.error('[Admin Update Kiosk] Error:', error);
+        res.status(500).json({ error: 'Failed to update kiosk' });
+    }
+});
+
 // ==================== JOB MANAGEMENT ====================
 
 /**
@@ -266,7 +300,11 @@ router.get('/admin/recent-jobs', verifyToken, requireAdmin, async (req, res) => 
                 j.print_completed_at,
                 j.error_message,
                 j.kiosk_id,
+                j.user_id,
+                j.job_type,
+                j.metadata,
                 k.hostname as kiosk_name,
+                k.location_name as kiosk_location,
                 u.email as user_email,
                 u.name as user_name
             FROM jobs j
@@ -276,21 +314,37 @@ router.get('/admin/recent-jobs', verifyToken, requireAdmin, async (req, res) => 
             LIMIT $1
         `, [limit]);
 
-        const jobs = result.rows.map(j => ({
-            id: j.id,
-            filename: j.filename,
-            pages: j.pages,
-            totalCost: parseFloat(j.total_cost),
-            status: j.status,
-            paymentStatus: j.payment_status,
-            createdAt: j.created_at,
-            completedAt: j.print_completed_at,
-            errorMessage: j.error_message,
-            kioskId: j.kiosk_id,
-            kioskName: j.kiosk_name,
-            userEmail: j.user_email ? maskEmail(j.user_email) : 'Unknown',
-            userName: j.user_name
-        }));
+        const jobs = result.rows.map(j => {
+            // Determine user display info
+            let userEmail, isGuestJob = false, guestId = null;
+            if (j.user_id === null || j.user_id === undefined) {
+                const meta = j.metadata || {};
+                isGuestJob = !!meta.guest;
+                guestId = meta.guestId || null;
+                userEmail = 'Guest';
+            } else {
+                userEmail = j.user_email ? maskEmail(j.user_email) : 'Unknown';
+            }
+
+            return {
+                id: j.id,
+                filename: j.filename,
+                pages: j.pages,
+                totalCost: parseFloat(j.total_cost),
+                status: j.status,
+                paymentStatus: j.payment_status,
+                createdAt: j.created_at,
+                completedAt: j.print_completed_at,
+                errorMessage: j.error_message,
+                kioskId: j.kiosk_id,
+                kioskName: j.kiosk_location || j.kiosk_name,
+                jobType: j.job_type || 'print',
+                userEmail,
+                userName: j.user_name,
+                isGuest: isGuestJob,
+                guestId,
+            };
+        });
 
         res.json({ jobs });
 

@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS kiosks (
     current_paper_count INTEGER DEFAULT 500,
     price_per_page DECIMAL(10,2) DEFAULT 3.00,
 
+    -- Display
+    location_name TEXT,
+
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthProvider';
 import { useGuest } from '../GuestContext';
+import { useNotifications } from '../NotificationProvider';
 import {
     API_URL,
     ALLOWED_FILE_TYPES,
@@ -30,6 +31,7 @@ function clearSession() {
 export function usePrint() {
     const { signOut, getAuthHeader, getGuestHeaders } = useAuth();
     const { isGuest, canCreateJob, isLastJob, incrementJobCount, guestId } = useGuest();
+    const { notifyJobStatus } = useNotifications();
 
     // Helper: build request headers (works for both auth and guest)
     const buildHeaders = useCallback(async () => {
@@ -238,7 +240,13 @@ export function usePrint() {
                 const jobStatus = response.data.status;
 
                 // Track backend phase for progress display (xerox: SCANNING → PRINTING)
-                setJobPhase(jobStatus);
+                setJobPhase(prev => {
+                    // Notify on transitions only
+                    if (prev !== jobStatus) {
+                        notifyJobStatus(jobStatus, pricing.job_id);
+                    }
+                    return jobStatus;
+                });
 
                 if (jobStatus === 'COMPLETED') {
                     clearSession();
@@ -265,7 +273,7 @@ export function usePrint() {
         }, 3000);
 
         return () => clearInterval(pollInterval);
-    }, [pricing?.job_id, status, serviceType, API_URL, addLog, buildHeaders]);
+    }, [pricing?.job_id, status, serviceType, API_URL, addLog, buildHeaders, notifyJobStatus]);
 
     // ==========================================
     // 4. Handlers

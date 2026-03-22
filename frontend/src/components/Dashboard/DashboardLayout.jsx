@@ -1,18 +1,19 @@
 // frontend/src/components/Dashboard/DashboardLayout.jsx
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthProvider';
 import { useGuest } from '../GuestContext';
-import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield, LogIn, Info } from 'lucide-react';
+import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield, LogIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Footer from '../Footer';
 
 export function DashboardLayout({ children, activeTab = 'print' }) {
     const { user, role, signOut } = useAuth();
-    const { isGuest, endGuestSession } = useGuest();
+    const { isGuest, endGuestSession, jobsToday } = useGuest();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [guestBannerDismissed, setGuestBannerDismissed] = useState(false);
+
+    const jobsLeft = Math.max(0, 3 - jobsToday);
   
     const tabs = [
       { id: 'print', label: 'Print', icon: Printer, path: '/' },
@@ -43,19 +44,6 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
 
     return (
         <div className="min-h-screen bg-[#0a0a0a]">
-            {/* Guest Banner */}
-            {isGuest && !guestBannerDismissed && (
-                <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500/10 border-b border-amber-500/20 px-4 py-2">
-                    <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-xs text-amber-300">
-                            <Info className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span>You're using LePrint as a guest. Job history won't be saved.</span>
-                            <Link to="/login" className="underline underline-offset-2 font-medium hover:text-amber-200 ml-1">Sign in →</Link>
-                        </div>
-                        <button onClick={() => setGuestBannerDismissed(true)} className="text-amber-300/60 hover:text-amber-300 text-xs">✕</button>
-                    </div>
-                </div>
-            )}
             {/* Mobile Header */}
             <div className="lg:hidden fixed top-0 left-0 right-0 bg-card/95 backdrop-blur-md border-b border-border z-50 px-4 py-3">
                 <div className="flex items-center justify-between">
@@ -207,6 +195,25 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                         </motion.button>
                     </nav>
 
+                    {/* Guest Session Card */}
+                    {isGuest && (
+                        <div className="mx-4 mb-3 p-3 bg-muted/10 border border-border rounded-lg">
+                            <div className="flex items-center gap-2 mb-1.5">
+                                <User className="w-4 h-4 text-amber-400" />
+                                <span className="text-sm font-medium text-foreground">Guest Session</span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mb-3">
+                                {jobsLeft} job{jobsLeft !== 1 ? 's' : ''} left today · History unavailable
+                            </p>
+                            <button
+                                onClick={() => navigate('/login')}
+                                className="w-full text-xs py-2 px-3 border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all"
+                            >
+                                Sign in for full access →
+                            </button>
+                        </div>
+                    )}
+
                     {/* Logout / Sign-in */}
                     <div className="p-4 border-t border-border">
                         {isGuest ? (
@@ -260,7 +267,11 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                                 {/* User Info */}
                                 <div className="p-4 border-b border-border mt-16">
                                     <div className="flex items-center gap-3">
-                                        {user?.photoURL ? (
+                                        {isGuest ? (
+                                            <div className="w-10 h-10 bg-amber-500/10 rounded-full flex items-center justify-center">
+                                                <User className="w-5 h-5 text-amber-400" />
+                                            </div>
+                                        ) : user?.photoURL ? (
                                             <img
                                                 src={user.photoURL}
                                                 alt={user.displayName}
@@ -273,10 +284,10 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                                         )}
                                         <div className="flex-1 min-w-0">
                                             <p className="font-medium text-foreground truncate text-sm">
-                                                {user?.displayName || 'User'}
+                                                {isGuest ? 'Guest' : (user?.displayName || 'User')}
                                             </p>
                                             <p className="text-xs text-muted-foreground truncate">
-                                                {user?.email}
+                                                {isGuest ? 'No account' : user?.email}
                                             </p>
                                         </div>
                                     </div>
@@ -317,15 +328,44 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                                     </button>
                                 </nav>
 
+                                {/* Guest Session Card - Mobile */}
+                                {isGuest && (
+                                    <div className="mx-4 mb-3 p-3 bg-muted/10 border border-border rounded-lg">
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <User className="w-4 h-4 text-amber-400" />
+                                            <span className="text-sm font-medium text-foreground">Guest Session</span>
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground mb-3">
+                                            {jobsLeft} job{jobsLeft !== 1 ? 's' : ''} left today · History unavailable
+                                        </p>
+                                        <button
+                                            onClick={() => { navigate('/login'); setSidebarOpen(false); }}
+                                            className="w-full text-xs py-2 px-3 border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all"
+                                        >
+                                            Sign in for full access →
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* Logout */}
                                 <div className="p-4 border-t border-border">
-                                    <button
-                                        onClick={handleSignOut}
-                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
-                                    >
-                                        <LogOut className="w-5 h-5" />
-                                        <span className="font-medium">Logout</span>
-                                    </button>
+                                    {isGuest ? (
+                                        <button
+                                            onClick={() => { navigate('/login'); setSidebarOpen(false); }}
+                                            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
+                                        >
+                                            <LogIn className="w-5 h-5" />
+                                            <span className="font-medium">Sign In</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={handleSignOut}
+                                            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
+                                        >
+                                            <LogOut className="w-5 h-5" />
+                                            <span className="font-medium">Logout</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </motion.aside>

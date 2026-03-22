@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "./components/AuthProvider";
 import { GuestProvider } from "./components/GuestContext";
+import { NotificationProvider } from "./components/NotificationProvider";
+import { Toaster } from 'sonner';
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardLayout } from "./components/Dashboard/DashboardLayout";
 import { Login } from "./components/Login";
@@ -22,6 +24,18 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <GuestProvider>
+          <NotificationProvider>
+            <Toaster
+              theme="dark"
+              position="bottom-right"
+              toastOptions={{
+                style: {
+                  background: '#1a1a1a',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff',
+                },
+              }}
+            />
           <Routes>
             <Route path="/login" element={<Login />} />
 
@@ -71,6 +85,7 @@ function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </NotificationProvider>
         </GuestProvider>
       </AuthProvider>
     </BrowserRouter>

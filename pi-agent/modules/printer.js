@@ -103,11 +103,70 @@ async function checkPrinterStatus(printerName, logger) {
   });
 }
 
+// ==================== CUPS JOB STATUS POLLING ====================
+/**
+ * Poll CUPS for job completion using lpstat.
+ * Returns { success: true/false, error?: string }
+ * Logs progress every 10s (not every poll) to reduce noise.
+ */
+function pollCupsJobStatus(cupsJobId, logger) {
+  return new Promise((resolve) => {
+    const POLL_INTERVAL = 2000; // 2 seconds
+    const LOG_INTERVAL = 10000; // Log every 10 seconds
+    const MAX_WAIT = 120000;    // 120 seconds
+    const startTime = Date.now();
+    let lastLogTime = 0;
+
+    const checkStatus = () => {
+      exec(`lpstat -o ${cupsJobId} 2>&1`, { timeout: 5000 }, (error, stdout) => {
+        if (error) {
+          // lpstat not available or errored — fall back to success
+          logger.warn(`[CUPS] lpstat polling failed: ${error.message}, assuming print succeeded`);
+          return resolve({ success: true });
+        }
+
+        const output = (stdout || '').trim().toLowerCase();
+        const elapsed = Date.now() - startTime;
+
+        // Empty output means job is no longer in queue — completed
+        if (!output || !output.includes(cupsJobId.toLowerCase())) {
+          logger.job(`[CUPS] ${cupsJobId} done — ${(elapsed / 1000).toFixed(1)}s total`);
+          return resolve({ success: true });
+        }
+
+        // Check for failure states
+        if (output.includes('aborted') || output.includes('stopped') || output.includes('error')) {
+          logger.error(`[CUPS] ${cupsJobId} failed: ${output}`);
+          return resolve({ success: false, error: `CUPS job failed: ${output}` });
+        }
+
+        // Timeout check
+        if (elapsed >= MAX_WAIT) {
+          logger.warn(`[CUPS] ${cupsJobId} timed out after ${MAX_WAIT / 1000}s`);
+          return resolve({ success: false, error: 'Print job timed out waiting for CUPS confirmation' });
+        }
+
+        // Log progress every 10s (not every 2s poll)
+        if (elapsed - lastLogTime >= LOG_INTERVAL) {
+          logger.job(`[CUPS] ${cupsJobId} still processing... (${(elapsed / 1000).toFixed(0)}s elapsed)`);
+          lastLogTime = elapsed;
+        }
+
+        // Still printing, poll again
+        setTimeout(checkStatus, POLL_INTERVAL);
+      });
+    };
+
+    // Start polling
+    checkStatus();
+  });
+}
+
 // ==================== PRINT EXECUTION ====================
 async function printDocument(printerName, filePath, pages, logger) {
   if (SIMULATE) {
     const fileName = filePath.split('/').pop();
-    logger.info(`\n🖨️  [SIM] Simulating Print Job`);
+    logger.info(`🖨️  [SIM] Simulating Print Job`);
     logger.info(`   File: ${fileName}`);
     logger.info(`   Pages: ${pages}`);
     logger.info(`   Printer: VIRTUAL_PRINTER`);
@@ -116,25 +175,50 @@ async function printDocument(printerName, filePath, pages, logger) {
     const delay = 2000 + Math.random() * 1000;
     await new Promise(resolve => setTimeout(resolve, delay));
 
-    logger.success(`[SIM] ✓ Print simulation complete (${(delay / 1000).toFixed(1)}s)`);
-    return { success: true, pages };
+    logger.success(`[SIM] Print simulation complete (${(delay / 1000).toFixed(1)}s)`);
+    return { success: true, pages, cupsJobId: 'SIM-001' };
   }
 
   return new Promise((resolve, reject) => {
-    logger.info(`\n🖨️  Printing Job`);
-    logger.info(`   File: ${filePath.split('/').pop()}`);
-    logger.info(`   Pages: ${pages}`);
+    logger.info(`🖨️  Sending to CUPS — file: ${filePath.split('/').pop()}, pages: ${pages}`);
 
     const cmd = `lp -d ${printerName} "${filePath}"`;
 
-    exec(cmd, (error, stdout, stderr) => {
+    exec(cmd, async (error, stdout, stderr) => {
       if (error) {
         logger.error(`Print failed: ${stderr || error.message}`);
         reject(new PrinterError(`Print command failed: ${stderr || error.message}`, printerName));
-      } else {
-        logger.success('Print job sent to CUPS');
-        logger.info(stdout.trim());
-        resolve({ success: true, pages });
+        return;
+      }
+
+      logger.success('Print job accepted by CUPS');
+
+      // Parse CUPS job ID from lp output
+      // Format: "request id is PRINTER_NAME-NUMBER (N file(s))"
+      const jobIdMatch = (stdout || '').match(/request id is (\S+)/);
+      const cupsJobId = jobIdMatch ? jobIdMatch[1] : null;
+
+      if (!cupsJobId) {
+        // Could not parse job ID — fall back to fire-and-forget
+        logger.warn('[CUPS] WARNING: Could not get job ID, falling back to fire-and-forget');
+        resolve({ success: true, pages, cupsJobId: null });
+        return;
+      }
+
+      logger.job(`[CUPS] ${cupsJobId} submitted, polling for completion...`);
+
+      // Poll CUPS for real completion
+      try {
+        const cupsResult = await pollCupsJobStatus(cupsJobId, logger);
+        if (cupsResult.success) {
+          resolve({ success: true, pages, cupsJobId });
+        } else {
+          reject(new PrinterError(cupsResult.error || 'CUPS job failed', printerName));
+        }
+      } catch (pollError) {
+        // Polling itself errored — fall back to success with warning
+        logger.warn(`[CUPS] Polling error: ${pollError.message}, assuming print succeeded`);
+        resolve({ success: true, pages, cupsJobId });
       }
     });
   });

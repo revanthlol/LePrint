@@ -1,8 +1,18 @@
 // backend/modules/socket-manager.js
 const db = require('../db');
+const log = require('./logger');
 
 // In-memory tracking
 const kioskSockets = new Map();
+const kioskConnectedAt = new Map(); // Track connection time per socket
+const lastPrinterStatus = new Map(); // Track last printer status per kiosk
+
+// State ordering for preventing backward transitions
+const STATE_ORDER = {
+    PENDING: 0, PAID: 1, SENT_TO_PI: 2, QUEUED: 3,
+    DISCOVERING_SCANNER: 4, SCANNING: 5, PROCESSING: 6,
+    PRINTING: 7, COMPLETED: 8, FAILED: 9
+};
 
 function emitToKiosk(kioskId, eventName, payload) {
     const socket = kioskSockets.get(kioskId);
@@ -13,7 +23,8 @@ function emitToKiosk(kioskId, eventName, payload) {
 
 function initSocketServer(io) {
     io.on('connection', (socket) => {
-        console.log('[Socket] New connection:', socket.id);
+        kioskConnectedAt.set(socket.id, Date.now());
+        log.socket(`New connection: ${socket.id}`);
         
         // ===== REGISTER: Initializes kiosk and printer_status =====
         socket.on('register', async (data) => {
@@ -33,27 +44,31 @@ function initSocketServer(io) {
                 );
 
                 kioskSockets.set(kiosk_id, socket);
-                console.log(`[Kiosk] ${kiosk_id} registered (${hostname})`);
+                log.socket(`Kiosk registered — id: ${kiosk_id}, hostname: ${hostname}, printer: ${printer_name}, socket: ${socket.id}`);
             } catch (error) {
-                console.error('[Kiosk] Registration error:', error);
+                log.error(`[SOCKET] Registration error for ${kiosk_id}: ${error.message}`);
             }
         });
         
         socket.on('job_received', async (data) => {
             try {
+                const currentJob = await db.getJob(data.job_id);
+                const oldStatus = currentJob?.status || 'unknown';
                 await db.transitionJobState(data.job_id, 'QUEUED', { message: 'Pi agent acknowledged job' });
-                console.log(`[Job] ${data.job_id} received by Pi`);
+                log.job(`${data.job_id} | ${currentJob?.job_type || 'print'} | ${oldStatus} → QUEUED | Pi agent acknowledged`);
             } catch (error) {
-                console.error('[Job] job_received error:', error);
+                log.error(`[JOB] job_received error: ${error.message}`);
             }
         });
         
         socket.on('print_started', async (data) => {
             try {
+                const currentJob = await db.getJob(data.job_id);
+                const oldStatus = currentJob?.status || 'unknown';
                 await db.transitionJobState(data.job_id, 'PRINTING', { message: 'Printing started' });
-                console.log(`[Job] ${data.job_id} printing started`);
+                log.job(`${data.job_id} | ${currentJob?.job_type || 'print'} | ${oldStatus} → PRINTING | Printing started`);
             } catch (error) {
-                console.error('[Job] print_started error:', error);
+                log.error(`[JOB] print_started error: ${error.message}`);
             }
         });
         
@@ -61,6 +76,16 @@ function initSocketServer(io) {
         socket.on('print_complete', async (data) => {
             const { job_id, success, pages_printed, error } = data;
             try {
+                // Idempotency guard: skip if already completed or failed
+                const currentJob = await db.getJob(job_id);
+                if (currentJob && (currentJob.status === 'COMPLETED' || currentJob.status === 'FAILED')) {
+                    log.socket(`Duplicate event received: print_complete for ${job_id} — ignored (already ${currentJob.status})`);
+                    return;
+                }
+
+                const oldStatus = currentJob?.status || 'unknown';
+                const jobType = currentJob?.job_type || 'print';
+
                 if (success) {
                     // 1. Update job status to COMPLETED
                     await db.transitionJobState(job_id, 'COMPLETED', {
@@ -87,15 +112,15 @@ function initSocketServer(io) {
                                     WHERE id = $2
                                 `, [pages_printed, kioskId]);
 
-                                console.log(`[Paper Tracking] Kiosk ${kioskId}: -${pages_printed} pages`);
+                                log.info(`[Paper] Kiosk ${kioskId}: -${pages_printed} pages`);
                             }
                         } catch (paperError) {
                             // Log error but don't fail the job completion process
-                            console.error('[Paper Tracking] Error:', paperError);
+                            log.error(`[Paper] Tracking error: ${paperError.message}`);
                         }
                     }
 
-                    console.log(`[Job] ${job_id} completed successfully`);
+                    log.job(`${job_id} | ${jobType} | ${oldStatus} → COMPLETED | ${pages_printed || 0} pages printed`);
                 } else {
                     // Handle Failure with retry logic + exponential backoff
                     const jobData = await db.getJob(job_id);
@@ -117,17 +142,17 @@ function initSocketServer(io) {
                             error_message: `Retry ${retryCount + 1}/2: ${error}`,
                             metadata: updatedMetadata
                         });
-                        console.log(`[Job] ${job_id} failed, requeued (retry ${retryCount + 1}/2, backoff ${backoffSeconds}s)`);
+                        log.job(`${job_id} | ${jobType} | ${oldStatus} → PAID (retry ${retryCount + 1}/2, backoff ${backoffSeconds}s) | ${error}`);
                     } else {
                         await db.transitionJobState(job_id, 'FAILED', {
                             message: 'Print failed after 3 attempts',
                             error_message: error
                         });
-                        console.log(`[Job] ${job_id} permanently failed after 3 attempts`);
+                        log.job(`${job_id} | ${jobType} | ${oldStatus} → FAILED (3 attempts exhausted) | ${error}`);
                     }
                 }
-            } catch (error) {
-                console.error('[Job] print_complete error:', error);
+            } catch (err) {
+                log.error(`[JOB] print_complete error: ${err.message}`);
             }
         });
         
@@ -135,20 +160,30 @@ function initSocketServer(io) {
         socket.on('scan_complete', async (data) => {
             const { job_id, success, error } = data;
             try {
+                // Idempotency guard: skip if already completed or failed
+                const currentJob = await db.getJob(job_id);
+                if (currentJob && (currentJob.status === 'COMPLETED' || currentJob.status === 'FAILED')) {
+                    log.socket(`Duplicate event received: scan_complete for ${job_id} — ignored (already ${currentJob.status})`);
+                    return;
+                }
+
+                const oldStatus = currentJob?.status || 'unknown';
+                const jobType = currentJob?.job_type || 'scan';
+
                 if (success) {
                     await db.transitionJobState(job_id, 'COMPLETED', {
                         message: 'Scan completed'
                     });
-                    console.log(`[Job] ${job_id} scan completed`);
+                    log.job(`${job_id} | ${jobType} | ${oldStatus} → COMPLETED | Scan finished`);
                 } else {
                     await db.transitionJobState(job_id, 'FAILED', {
                         message: 'Scan failed',
                         error_message: error
                     });
-                    console.log(`[Job] ${job_id} scan failed: ${error}`);
+                    log.job(`${job_id} | ${jobType} | ${oldStatus} → FAILED | ${error}`);
                 }
             } catch (err) {
-                console.error('[Job] scan_complete error:', err);
+                log.error(`[JOB] scan_complete error: ${err.message}`);
             }
         });
 
@@ -156,6 +191,20 @@ function initSocketServer(io) {
         socket.on('job_state_change', async (data) => {
             const { job_id, status: newStatus, status_message } = data;
             try {
+                // Ordered state transition guard
+                const currentJob = await db.getJob(job_id);
+                if (currentJob && newStatus !== 'FAILED') {
+                    const currentOrder = STATE_ORDER[currentJob.status];
+                    const newOrder = STATE_ORDER[newStatus];
+                    if (currentOrder !== undefined && newOrder !== undefined && newOrder <= currentOrder) {
+                        log.warn(`[JOB] Skipping backward transition — ${job_id}: ${currentJob.status} → ${newStatus}`);
+                        return;
+                    }
+                }
+
+                const oldStatus = currentJob?.status || 'unknown';
+                const jobType = currentJob?.job_type || 'unknown';
+
                 const updateFields = {
                     status: newStatus,
                     status_message: status_message || null,
@@ -168,9 +217,9 @@ function initSocketServer(io) {
                 }
 
                 await db.updateJob(job_id, updateFields);
-                console.log(`[Job] ${job_id} state → ${newStatus}: ${status_message || ''}`);
+                log.job(`${job_id} | ${jobType} | ${oldStatus} → ${newStatus} | ${status_message || ''}`);
             } catch (err) {
-                console.error('[Job] job_state_change error:', err);
+                log.error(`[JOB] job_state_change error: ${err.message}`);
             }
         });
 
@@ -196,24 +245,38 @@ function initSocketServer(io) {
                         data.kiosk_id
                     ]
                 );
+
+                // Only log if printer status changed
+                if (data.kiosk_id && data.printer_ipp_status) {
+                    const lastStatus = lastPrinterStatus.get(data.kiosk_id);
+                    if (lastStatus !== data.printer_ipp_status) {
+                        log.info(`[Heartbeat] Kiosk ${data.kiosk_id} printer: ${lastStatus || 'unknown'} → ${data.printer_ipp_status}`);
+                        lastPrinterStatus.set(data.kiosk_id, data.printer_ipp_status);
+                    }
+                }
             } catch (error) {
-                console.error('[Heartbeat] Error:', error);
+                log.error(`[Heartbeat] Error: ${error.message}`);
             }
         });
         
         socket.on('disconnect', async () => {
-            console.log('[Socket] Disconnected:', socket.id);
+            const connectedAt = kioskConnectedAt.get(socket.id);
+            const aliveMs = connectedAt ? Date.now() - connectedAt : 0;
+            kioskConnectedAt.delete(socket.id);
+
+            log.socket(`Disconnected: ${socket.id} (alive ${(aliveMs / 1000).toFixed(1)}s)`);
             try {
                 for (const [kioskId, sock] of kioskSockets.entries()) {
                     if (sock.id === socket.id) {
                         await db.updateKioskStatus(kioskId, 'offline');
                         kioskSockets.delete(kioskId);
-                        console.log(`[Kiosk] ${kioskId} went offline`);
+                        lastPrinterStatus.delete(kioskId);
+                        log.socket(`Kiosk ${kioskId} went offline`);
                         break;
                     }
                 }
             } catch (error) {
-                console.error('[Disconnect] Error:', error);
+                log.error(`[Disconnect] Error: ${error.message}`);
             }
         });
     });
@@ -229,25 +292,3 @@ module.exports = {
     emitToKiosk,
     getKioskSocket
 };
-
-/*
---------------------------------------------------------------------------------
-FALLBACK NOTE:
-If your ../db module does NOT expose `query(...)`, and you prefer to keep using
-helper functions (like db.upsertKiosk and db.updateKioskHeartbeat), here are two
-options:
-
-1) For register: keep your existing db.upsertKiosk call but ensure it accepts a
-   `printer_status` field and writes it to the DB (or call a new db.upsertKioskWithPrinterStatus).
-
-2) For heartbeat: either add a new helper in db, e.g.:
-     async updateKioskHeartbeatExtended(kioskId, uptime, socketId, printerStatus, printerDetail) { ... }
-   or call the existing db.updateKioskHeartbeat with the extended info by modifying
-   the db helper to accept extra params and perform the SQL update shown above.
-
-You will also need to add DB columns if they don't exist:
-  ALTER TABLE kiosks ADD COLUMN printer_status text DEFAULT 'unknown';
-  ALTER TABLE kiosks ADD COLUMN printer_status_detail text;
-  ALTER TABLE kiosks ADD COLUMN last_status_check timestamp;
---------------------------------------------------------------------------------
-*/

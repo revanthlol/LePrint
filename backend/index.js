@@ -58,7 +58,9 @@ const io = new Server(server, {
         origin: allowedOrigins,
         methods: ["GET", "POST"],
         credentials: true
-    } 
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000
 });
 
 initSocketServer(io);

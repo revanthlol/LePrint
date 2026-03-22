@@ -130,11 +130,19 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 
 ### Data Flow
 
-**Print:** User uploads file → Backend creates job → User pays → Pi Agent polls & claims job (row-locked) → Downloads file → Converts to PDF → Prints via CUPS → Status updates via WebSocket
+**Print:** User uploads file → Backend creates job → User pays → Pi Agent polls & claims job (row-locked) → Downloads file → Converts to PDF → Prints via CUPS → Polls `lpstat` for real completion → Status updates via WebSocket
 
 **Scan:** User selects Scan → Chooses options (DPI, color) → Backend creates scan job → Pi Agent polls & scans via eSCL → Uploads PDF to backend → User gets download link
 
 **Xerox:** User selects Xerox → Sets copies & options → Backend creates xerox job → Pi Agent polls, scans via eSCL, prints N copies via CUPS → Status updates via WebSocket
+
+### Resilience Features
+
+- **safeEmit:** If the socket disconnects mid-job, events are queued in memory and replayed in order on reconnect (prevents dropped status updates during long xerox scans)
+- **Fast heartbeat:** During active jobs, the agent sends a lightweight keepalive every 8s to prevent the backend from timing out the connection
+- **CUPS polling:** `printDocument()` parses the CUPS job ID and polls `lpstat` every 2s (logs every 10s) until the print physically completes or times out at 120s
+- **Ordered state transitions:** Backend rejects backward state changes (e.g. `PRINTING` → `SCANNING`) using a `STATE_ORDER` map — only forward transitions and `FAILED` are allowed
+- **Idempotent completion:** Duplicate `print_complete` / `scan_complete` events (from reconnect replay) are detected and safely ignored
 
 ---
 
@@ -164,6 +172,7 @@ LePrint/
 │       ├── admin-routes.js    # Admin dashboard API
 │       ├── kiosk-routes.js    # Public kiosk status endpoint
 │       ├── socket-manager.js  # WebSocket event handling
+│       ├── logger.js          # Timestamped logging helper
 │       ├── tasks.js           # Scheduled cleanup tasks
 │       └── utils.js           # File upload, PDF utils
 │
@@ -196,12 +205,12 @@ LePrint/
 ├── pi-agent/
 │   ├── index.js               # Main entry, config, init
 │   └── modules/
-│       ├── socket-client.js   # WebSocket connection + scan handler
+│       ├── socket-client.js   # WebSocket connection + safeEmit + scan handler
 │       ├── job-handler.js     # Job polling, processing, printing
 │       ├── scanner.js         # eSCL scanner module
-│       ├── printer.js         # CUPS printing + status checks
+│       ├── printer.js         # CUPS printing + lpstat polling + status checks
 │       ├── utils.js           # File conversion (DOCX→PDF, IMG→PDF)
-│       ├── logger.js          # Console logging
+│       ├── logger.js          # Timestamped logging with 7 levels
 │       └── errors.js          # Custom error types
 │
 ├── docs/
@@ -278,13 +287,17 @@ sudo apt install cups libreoffice-writer imagemagick
 
 # Configure
 cp .env.example .env
-# Edit .env with your settings
+# Edit .env with your settings (set DEBUG=true for verbose logs)
 
 # Start
 node index.js
 
 # Or install as systemd service for auto-start
+# View live logs: journalctl -u leprint-agent -f
+# Last 50 lines: journalctl -u leprint-agent -n 50
 ```
+
+All pi-agent logs include `[HH:MM:SS]` timestamps with color-coded levels (info, success, warn, error, debug, job, socket).
 
 ---
 
@@ -325,6 +338,8 @@ node index.js
 | `KIOSK_ID` | Unique kiosk identifier | `kiosk_{hostname}` |
 | `PRINTER_NAME` | CUPS printer name | `auto` (auto-detect) |
 | `POLL_INTERVAL` | Job polling interval in ms | `5000` |
+| `DEBUG` | Enable verbose debug logging | `false` |
+| `SIMULATE_PRINTER` | Simulate printing without hardware | `false` |
 
 ---
 
@@ -438,6 +453,11 @@ Currently using mock payments. PayU integration is planned — see [docs/payu-in
 - In-app toast notifications (sonner) + browser push notifications
 - Guest job visibility in admin dashboard
 - Responsive UI with dark theme
+- Socket resilience (safeEmit event queuing + replay, fast heartbeat during jobs)
+- CUPS job polling for real print completion tracking
+- Ordered state transitions (backward transition rejection)
+- Idempotent completion handlers (duplicate event protection)
+- Timestamped structured logging across pi-agent and backend
 
 ### 🔜 Pending
 - PayU payment gateway integration (plan ready, implementation pending)
@@ -463,6 +483,7 @@ psql -U printuser -d printkiosk -h localhost
 curl https://your-backend.com/api/kiosk/status?kiosk_id=test
 
 # Check pi-agent logs for WebSocket errors
+journalctl -u leprint-agent -n 50 | grep SOCKET
 ```
 
 ### Printer not found
@@ -483,6 +504,37 @@ curl http://PRINTER_IP/eSCL/ScannerCapabilities
 curl -k https://PRINTER_IP/eSCL/ScannerCapabilities
 
 # Verify printer and Pi are on the same network
+```
+
+### Xerox scans but doesn't print
+```bash
+# Check pi-agent logs for safeEmit queue events during scan phase
+journalctl -u leprint-agent -n 100 | grep "Event queued"
+
+# Verify backend pingTimeout is set to 60000 in backend/index.js
+grep pingTimeout backend/index.js
+
+# Check CUPS job ID parsing
+journalctl -u leprint-agent -n 100 | grep "CUPS WARNING"
+```
+
+### Print marked complete but nothing printed
+```bash
+# Check for CUPS timeout (printer accepted job but never completed in 120s)
+journalctl -u leprint-agent -n 100 | grep "CUPS.*timed out"
+
+# View stuck CUPS jobs
+lpstat -o
+
+# Clear CUPS queue and retry
+cancel -a
+```
+
+### Events arriving out of order in logs
+This is handled automatically — the `STATE_ORDER` guard rejects backward transitions.
+If still seeing out-of-order events, check for duplicate pi-agent instances:
+```bash
+ps aux | grep "node index.js"
 ```
 
 ### Image conversion fails
@@ -510,8 +562,10 @@ ALLOWED_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173
 **Job statuses:**
 - Print: `PENDING` → `PAID` → `QUEUED` → `SENT_TO_PI` → `PRINTING` → `COMPLETED`
 - Scan: `QUEUED` → `DISCOVERING_SCANNER` → `SCANNING` → `PROCESSING` → `COMPLETED`
-- Xerox: `PENDING` → `PAID` → `SENT_TO_PI` → `SCANNING` → `PRINTING` → `COMPLETED`
+- Xerox: `PENDING` → `PAID` → `SENT_TO_PI` → `DISCOVERING_SCANNER` → `SCANNING` → `PRINTING` → `COMPLETED`
 - Error: `FAILED`, `EXPIRED`, `CANCELLED`
+
+> **Note:** Backward state transitions (e.g. `PRINTING` → `SCANNING`) are rejected by the `STATE_ORDER` guard in `socket-manager.js`. Transitions to `FAILED` are always allowed regardless of current state. Duplicate `print_complete` / `scan_complete` events are idempotently ignored.
 
 **Migration (if upgrading):**
 ```sql

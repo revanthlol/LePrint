@@ -4,9 +4,28 @@
 const io = require('socket.io-client');
 const printer = require('./printer');
 
+// ==================== SAFE EMIT ====================
+/**
+ * Emit an event safely. If socket is connected, emit immediately.
+ * If disconnected, queue the event for replay on reconnect.
+ * Signature matches: safeEmit(socket, state, eventName, payload)
+ */
+function safeEmit(socket, state, eventName, payload) {
+  if (socket.connected) {
+    socket.emit(eventName, payload);
+    return true;
+  }
+  state.pendingEvents.push({ eventName, payload, timestamp: Date.now() });
+  // Log the queued event with job context if available
+  const jobId = payload?.job_id || 'unknown';
+  const logger = require('./logger');
+  logger.socket(`Event queued (socket down): ${eventName} for job ${jobId}`);
+  return false;
+}
+
 // ==================== SOCKET INITIALIZATION ====================
 function initSocket(cloudServer, logger) {
-  logger.info('📡 Connecting to cloud...');
+  logger.socket('📡 Connecting to cloud...');
 
   const socket = io(cloudServer, {
     reconnection: true,
@@ -21,7 +40,8 @@ function initSocket(cloudServer, logger) {
 function setupEventHandlers(socket, kioskId, hostname, state, logger) {
   
   socket.on('connect', async () => {
-    logger.success('Connected to Cloud Hub!');
+    state.socketConnectedAt = Date.now();
+    logger.socket('Connected to Cloud Hub!');
 
     try {
       state.printerName = await printer.detectPrinter(process.env.PRINTER_NAME || 'auto', logger);
@@ -35,15 +55,32 @@ function setupEventHandlers(socket, kioskId, hostname, state, logger) {
       printer_name: state.printerName || 'unknown'
     });
 
-    logger.success('Registered with cloud');
+    logger.socket(`Registered with cloud — kiosk: ${kioskId}, printer: ${state.printerName || 'unknown'}`);
+
+    // Flush queued events that were stored while disconnected
+    if (state.pendingEvents && state.pendingEvents.length > 0) {
+      const count = state.pendingEvents.length;
+      logger.socket(`Replaying ${count} queued events...`);
+      for (const queued of state.pendingEvents) {
+        socket.emit(queued.eventName, queued.payload);
+        const jobId = queued.payload?.job_id || 'unknown';
+        logger.socket(`→ Replayed: ${queued.eventName} for job ${jobId}`);
+      }
+      state.pendingEvents = [];
+    }
   });
 
   socket.on('disconnect', () => {
-    logger.warn('Disconnected from Cloud. Reconnecting...');
+    const connectedDuration = state.socketConnectedAt
+      ? `${((Date.now() - state.socketConnectedAt) / 1000).toFixed(1)}s`
+      : 'unknown';
+    const queuedCount = state.pendingEvents ? state.pendingEvents.length : 0;
+    logger.socket(`Disconnected after ${connectedDuration} — ${queuedCount} events queued`);
+    state.socketConnectedAt = null;
   });
 
   socket.on('reconnect', (attemptNumber) => {
-    logger.success(`Reconnected after ${attemptNumber} attempts`);
+    logger.socket(`🔁 Reconnected after ${attemptNumber} attempts`);
   });
 
   socket.on('ping', () => {
@@ -65,7 +102,7 @@ function setupEventHandlers(socket, kioskId, hostname, state, logger) {
   // ==================== SCAN JOB HANDLER ====================
   socket.on('scan_job', async (data) => {
     try {
-      logger.info(`📄 Received scan job: ${data.job_id}`);
+      logger.job(`📄 Received scan job: ${data.job_id}`);
 
       // Delegate to job-handler which uses the already-initialized scanner
       const jobHandler = require('./job-handler');
@@ -77,8 +114,8 @@ function setupEventHandlers(socket, kioskId, hostname, state, logger) {
 
       await jobHandler.processScanJob(data.job_id, state._cloudServer, state, socket, logger);
     } catch (error) {
-      logger.error(`❌ Scan failed: ${error.message}`);
-      socket.emit('job_state_change', {
+      logger.error(`Scan failed: ${error.message}`);
+      safeEmit(socket, state, 'job_state_change', {
         job_id: data.job_id,
         status: 'FAILED',
         status_message: `Scan failed: ${error.message}`
@@ -91,6 +128,7 @@ function setupEventHandlers(socket, kioskId, hostname, state, logger) {
 function startHeartbeat(socket, kioskId, heartbeatInterval, state, logger) {
   let lastPrinterStatus = 'unknown';
 
+  // Normal heartbeat — full payload at configured interval
   const heartbeatId = setInterval(async () => {
     if (!socket.connected) return;
 
@@ -118,6 +156,29 @@ function startHeartbeat(socket, kioskId, heartbeatInterval, state, logger) {
       last_poll: state.lastPollTime
     });
   }, heartbeatInterval);
+
+  // Fast heartbeat — minimal keepalive during active jobs (every 8s)
+  let fastHeartbeatId = null;
+
+  const fastHeartbeatCheck = setInterval(() => {
+    if (state.currentJob && !fastHeartbeatId) {
+      // Start fast heartbeat when a job becomes active
+      fastHeartbeatId = setInterval(() => {
+        if (!state.currentJob) {
+          // Job finished, stop fast heartbeat
+          clearInterval(fastHeartbeatId);
+          fastHeartbeatId = null;
+          return;
+        }
+        if (!socket.connected) return;
+        socket.emit('heartbeat', {
+          kiosk_id: kioskId,
+          current_job: state.currentJob,
+          status: 'job_active'
+        });
+      }, 8000);
+    }
+  }, 2000);
 
   return heartbeatId;
 }
@@ -158,5 +219,6 @@ module.exports = {
   setupEventHandlers,
   startHeartbeat,
   startStatusLog,
-  startDailyReset
+  startDailyReset,
+  safeEmit
 };

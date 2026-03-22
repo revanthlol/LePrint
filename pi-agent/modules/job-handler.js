@@ -9,6 +9,7 @@ const { JobError } = require("./errors");
 const utils = require("./utils");
 const printer = require("./printer");
 const Scanner = require("./scanner");
+const { safeEmit } = require("./socket-client");
 
 let scanner = null;
 
@@ -17,7 +18,7 @@ let scanner = null;
 async function initScanner(printerIP, logger) {
   scanner = new Scanner(printerIP, logger);
   await scanner.init();
-  logger.info("✓ Scanner initialized");
+  logger.success("Scanner initialized");
 }
 
 function ensureTempDir() {
@@ -25,6 +26,12 @@ function ensureTempDir() {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+}
+
+// ==================== HELPERS ====================
+
+function elapsedSince(startTime) {
+  return `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
 }
 
 // ==================== JOB POLLING ====================
@@ -104,11 +111,10 @@ async function processJob(jobId, state, socket, logger) {
 
   const tempDir = "./print-queue";
   state.currentJob = jobId;
+  const jobStartTime = Date.now();
 
   try {
-    logger.info(`\n[Poll] New print job: ${jobId}`);
-    logger.info(`   File: ${job.filename}`);
-    logger.info(`   Pages: ${job.pages}`);
+    logger.job(`[PRINT] ${jobId} started — file: ${job.filename}, pages: ${job.pages}`);
 
     // Disk protection: check queue size before downloading
     const queueSizeMB = getDirectorySizeMB(tempDir);
@@ -141,15 +147,12 @@ async function processJob(jobId, state, socket, logger) {
     });
 
     const fileSize = fs.statSync(originalPath).size;
-    logger.info(`   ✓ File downloaded (${(fileSize / 1024).toFixed(1)} KB)`);
+    logger.job(`[PRINT] ${jobId} downloaded — ${(fileSize / 1024).toFixed(1)}KB, ${elapsedSince(jobStartTime)} elapsed`);
 
-    if (socket.connected) {
-      socket.emit("job_received", { job_id: jobId });
-    }
+    safeEmit(socket, state, "job_received", { job_id: jobId });
 
     const fileType = utils.getFileType(job.filename);
-
-    logger.info(`   File type: ${fileType}`);
+    logger.debug(`File type: ${fileType}`);
 
     let finalPdfPath = originalPath;
 
@@ -165,9 +168,8 @@ async function processJob(jobId, state, socket, logger) {
       throw new JobError(`Unsupported file type: ${fileType}`, jobId);
     }
 
-    if (socket.connected) {
-      socket.emit("print_started", { job_id: jobId });
-    }
+    logger.job(`[PRINT] ${jobId} starting print phase — ${elapsedSince(jobStartTime)} since job start`);
+    safeEmit(socket, state, "print_started", { job_id: jobId });
 
     const printResult = await printer.printDocument(
       state.printerName,
@@ -176,15 +178,13 @@ async function processJob(jobId, state, socket, logger) {
       logger,
     );
 
-    if (socket.connected) {
-      socket.emit("print_complete", {
-        job_id: jobId,
-        success: true,
-        pages_printed: printResult.pages,
-      });
-    }
+    safeEmit(socket, state, "print_complete", {
+      job_id: jobId,
+      success: true,
+      pages_printed: printResult.pages,
+    });
 
-    logger.success(`✓ Job ${jobId} completed`);
+    logger.job(`[PRINT] ${jobId} COMPLETED — total time: ${elapsedSince(jobStartTime)}`);
 
     setTimeout(() => {
       try {
@@ -194,21 +194,19 @@ async function processJob(jobId, state, socket, logger) {
           fs.unlinkSync(originalPath);
         }
 
-        logger.info("🗑 Temp files cleaned");
+        logger.debug("Temp files cleaned");
       } catch (err) {
         logger.warn(`Cleanup error: ${err.message}`);
       }
     }, 5000);
   } catch (error) {
-    logger.error(`Print error: ${error.message}`);
+    logger.error(`[JOB] ${jobId} FAILED after ${elapsedSince(jobStartTime)} — reason: ${error.message}`);
 
-    if (socket.connected) {
-      socket.emit("print_complete", {
-        job_id: jobId,
-        success: false,
-        error: error.message,
-      });
-    }
+    safeEmit(socket, state, "print_complete", {
+      job_id: jobId,
+      success: false,
+      error: error.message,
+    });
   } finally {
     state.currentJob = null;
     state.pendingJobs.delete(jobId);
@@ -216,7 +214,7 @@ async function processJob(jobId, state, socket, logger) {
     if (state.pendingJobs.size > 0) {
       const nextJobId = state.pendingJobs.keys().next().value;
       const nextJob = state.pendingJobs.get(nextJobId);
-      logger.info(`→ Next job: ${nextJobId}`);
+      logger.job(`→ Next job: ${nextJobId}`);
 
       if (nextJob && nextJob.job_type === "scan") {
         await processScanJob(nextJobId, state._cloudServer, state, socket, logger);
@@ -239,11 +237,12 @@ async function processScanJob(jobId, cloudServer, state, socket, logger) {
   ensureTempDir();
 
   state.currentJob = jobId;
+  const jobStartTime = Date.now();
 
   try {
-    logger.info(`📄 Scan job received: ${jobId}`);
+    logger.job(`[SCAN] ${jobId} started — resolution: ${job.scan_options?.resolution || 300}dpi`);
 
-    socket.emit("job_state_change", {
+    safeEmit(socket, state, "job_state_change", {
       job_id: jobId,
       status: "DISCOVERING_SCANNER",
       status_message: "Detecting scanner",
@@ -255,7 +254,7 @@ async function processScanJob(jobId, cloudServer, state, socket, logger) {
       format: job.scan_options?.format || "application/pdf",
     };
 
-    socket.emit("job_state_change", {
+    safeEmit(socket, state, "job_state_change", {
       job_id: jobId,
       status: "SCANNING",
       status_message: "Scanning document",
@@ -263,7 +262,10 @@ async function processScanJob(jobId, cloudServer, state, socket, logger) {
 
     const scanOutputPath = await scanner.scan(scanOptions, "./print-queue");
 
-    socket.emit("job_state_change", {
+    const scanFileSize = fs.existsSync(scanOutputPath) ? fs.statSync(scanOutputPath).size : 0;
+    logger.job(`[SCAN] ${jobId} scan complete — ${elapsedSince(jobStartTime)} elapsed, file: ${(scanFileSize / 1024).toFixed(1)}KB`);
+
+    safeEmit(socket, state, "job_state_change", {
       job_id: jobId,
       status: "PROCESSING",
       status_message: "Processing scan",
@@ -279,18 +281,18 @@ async function processScanJob(jobId, cloudServer, state, socket, logger) {
       headers: form.getHeaders(),
     });
 
-    socket.emit("scan_complete", {
+    safeEmit(socket, state, "scan_complete", {
       job_id: jobId,
       success: true,
     });
 
-    logger.info(`✓ Scan uploaded`);
+    logger.job(`[SCAN] ${jobId} COMPLETED — total time: ${elapsedSince(jobStartTime)}`);
 
     fs.unlinkSync(scanOutputPath);
   } catch (error) {
-    logger.error(`Scan failed: ${error.message}`);
+    logger.error(`[JOB] ${jobId} FAILED after ${elapsedSince(jobStartTime)} — reason: ${error.message}`);
 
-    socket.emit("scan_complete", {
+    safeEmit(socket, state, "scan_complete", {
       job_id: jobId,
       success: false,
       error: error.message,
@@ -311,15 +313,16 @@ async function processXeroxJob(jobId, cloudServer, state, socket, logger) {
   ensureTempDir();
 
   state.currentJob = jobId;
+  const jobStartTime = Date.now();
 
   try {
     const metadata = job.metadata || {};
     const copies = metadata.copies || 1;
     const scanOpts = metadata.scan_options || {};
 
-    logger.info(`📋 Xerox job received: ${jobId} (${copies} copies)`);
+    logger.job(`[XEROX] ${jobId} started — copies: ${copies}, scanner: ${state.printerIP}`);
 
-    socket.emit("job_state_change", {
+    safeEmit(socket, state, "job_state_change", {
       job_id: jobId,
       status: "DISCOVERING_SCANNER",
       status_message: "Detecting scanner",
@@ -331,7 +334,7 @@ async function processXeroxJob(jobId, cloudServer, state, socket, logger) {
       format: "application/pdf",
     };
 
-    socket.emit("job_state_change", {
+    safeEmit(socket, state, "job_state_change", {
       job_id: jobId,
       status: "SCANNING",
       status_message: "Scanning document for xerox",
@@ -339,9 +342,12 @@ async function processXeroxJob(jobId, cloudServer, state, socket, logger) {
 
     const scanOutputPath = await scanner.scan(scanOptions, "./print-queue");
 
-    logger.info(`✓ Scan complete, printing ${copies} copies...`);
+    const scanFileSize = fs.existsSync(scanOutputPath) ? fs.statSync(scanOutputPath).size : 0;
+    logger.job(`[XEROX] ${jobId} scan complete — ${elapsedSince(jobStartTime)} elapsed, file: ${(scanFileSize / 1024).toFixed(1)}KB`);
 
-    socket.emit("job_state_change", {
+    logger.job(`[XEROX] ${jobId} starting print phase — ${elapsedSince(jobStartTime)} since job start`);
+
+    safeEmit(socket, state, "job_state_change", {
       job_id: jobId,
       status: "PRINTING",
       status_message: `Printing ${copies} copy${copies > 1 ? "ies" : ""}`,
@@ -354,26 +360,26 @@ async function processXeroxJob(jobId, cloudServer, state, socket, logger) {
       logger,
     );
 
-    socket.emit("print_complete", {
+    safeEmit(socket, state, "print_complete", {
       job_id: jobId,
       success: true,
       pages_printed: printResult.pages * copies,
     });
 
-    logger.info(`✓ Xerox job ${jobId} completed`);
+    logger.job(`[XEROX] ${jobId} COMPLETED — total time: ${elapsedSince(jobStartTime)}`);
 
     setTimeout(() => {
       try {
         if (fs.existsSync(scanOutputPath)) fs.unlinkSync(scanOutputPath);
-        logger.info("🗑 Xerox temp files cleaned");
+        logger.debug("Xerox temp files cleaned");
       } catch (err) {
         logger.warn(`Cleanup error: ${err.message}`);
       }
     }, 5000);
   } catch (error) {
-    logger.error(`Xerox error: ${error.message}`);
+    logger.error(`[JOB] ${jobId} FAILED after ${elapsedSince(jobStartTime)} — reason: ${error.message}`);
 
-    socket.emit("print_complete", {
+    safeEmit(socket, state, "print_complete", {
       job_id: jobId,
       success: false,
       error: error.message,

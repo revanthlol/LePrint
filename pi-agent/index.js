@@ -43,7 +43,9 @@ const STATE = {
   jobsFetchedToday: 0,
   conversionsToday: 0,
   lastPollTime: null,
-  _cloudServer: CONFIG.cloudServer
+  _cloudServer: CONFIG.cloudServer,
+  pendingEvents: [],
+  socketConnectedAt: null
 };
 
 // ==================== SETUP ====================

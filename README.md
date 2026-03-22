@@ -58,6 +58,31 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 - 💰 **₹5 per copy** — Automatic pricing based on copy count
 - 🔄 **Real-time progress** — Scanning and printing status updates via WebSocket
 
+### Job Status UI
+- 📊 **Step indicators** — Horizontal progress bar showing exact job phase (e.g. Paid → Sent → Queued → Printing → Done)
+- 💡 **Fun facts ticker** — Auto-cycling print/tech trivia displayed during job processing (hover to pause)
+- ❌ **Error states** — Clear error UI with "Request Refund" button linking to Contact page
+
+### Guest Mode
+- 👤 **Continue as Guest** — No account required, UUID-based identity via `localStorage`
+- 🎯 **3 jobs/day limit** — Per-device daily cap with counter reset at midnight
+- 🪪 **Sidebar card** — Compact guest session info in sidebar (jobs remaining, sign-in CTA)
+- 🔄 **Auto-cleanup** — Guest session automatically cleared when user signs in via Google OAuth
+- 🛡️ **Backend support** — `X-Guest-ID` header for guest job creation, metadata-based access control
+
+### Notifications
+- 🔔 **In-app toasts** — Sonner-powered dark-themed toasts on job status transitions (queued, printing, done, failed)
+- 📱 **Browser push** — Native `Notification` API alerts when tab is backgrounded
+- 🚫 **Deduplication** — Same status never notified twice in a row
+- 🔕 **Soft permission** — Permission stored in `localStorage`, nudge shown only once
+
+### Authentication
+- 🔐 **Firebase Auth** — Google OAuth login
+- 🔑 **JWT verification** — All API endpoints authenticated
+- 🔁 **Smart redirect** — Logged-in users redirected from `/login`; `?redirect=` param preserved by `ProtectedRoute`
+- 👥 **Role-based access** — user, admin, superadmin roles
+- 🛡️ **User isolation** — Users only see their own jobs
+
 ### Landing Page & Public Pages
 - 🌐 **Landing page** — Modular, animated sections (Hero, How it Works, Services, Trust, Testimonials, Locations, CTA)
 - 📄 **Compliance pages** — Privacy Policy, Terms & Conditions, Refund Policy, Contact Us, FAQ
@@ -66,15 +91,9 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 
 ### Admin
 - 📊 **Dashboard** — System metrics, revenue, job counts
-- 🖨️ **Kiosk health** — Real-time printer status, paper counts
-- 📋 **Job management** — View and filter all jobs
+- 🖨️ **Kiosk health** — Real-time printer status, paper counts, editable location names
+- 📋 **Job management** — View and filter all jobs; guest jobs shown with amber badge
 - 📝 **Audit logging** — Admin action tracking
-
-### Security
-- 🔐 **Firebase Auth** — Google OAuth login
-- 🔑 **JWT verification** — All API endpoints authenticated
-- 👥 **Role-based access** — user, admin, superadmin roles
-- 🛡️ **User isolation** — Users only see their own jobs
 
 ---
 
@@ -150,7 +169,7 @@ LePrint/
 │
 ├── frontend/
 │   └── src/
-│       ├── App.jsx            # Router setup
+│       ├── App.jsx            # Router setup + Toaster + providers
 │       ├── firebase.js        # Firebase config
 │       └── components/
 │           ├── landing/       # Modular landing page sections
@@ -158,14 +177,18 @@ LePrint/
 │           │   ├── TrustSecurity.jsx, UseCases.jsx, Testimonials.jsx
 │           │   ├── Locations.jsx, WhyLePrint.jsx, CtaBanner.jsx
 │           │   └── FadeInSection.jsx
-│           ├── Print/         # Upload, print, scan UI
+│           ├── Print/         # Upload, print, scan, job progress UI
 │           ├── Admin/         # Admin dashboard components
-│           ├── Dashboard/     # User dashboard
+│           ├── Dashboard/     # User dashboard + sidebar guest card
 │           ├── Landing.jsx    # Landing page orchestrator
-│           ├── Login.jsx      # Google OAuth login
-│           ├── FeatureCards.jsx # Shared trust indicator cards
-│           ├── PublicNavbar.jsx # Shared public navigation
-│           ├── Footer.jsx     # Shared responsive footer
+│           ├── Login.jsx      # Google OAuth login + smart redirect
+│           ├── AuthProvider.jsx    # Firebase auth context + guest header support
+│           ├── GuestContext.jsx    # Guest session (UUID, job limits, auto-cleanup)
+│           ├── ProtectedRoute.jsx  # Auth guard + ?redirect= + guest passthrough
+│           ├── NotificationProvider.jsx  # Sonner toasts + browser push
+│           ├── FeatureCards.jsx    # Shared trust indicator cards
+│           ├── PublicNavbar.jsx    # Shared public navigation
+│           ├── Footer.jsx         # Shared responsive footer
 │           ├── Contact.jsx, FAQPage.jsx  # Public pages
 │           ├── PrivacyPolicy.jsx, Terms.jsx, RefundPolicy.jsx
 │           └── ui/            # Shared UI primitives
@@ -310,18 +333,20 @@ node index.js
 ### For Users
 
 1. **Scan** the QR code displayed at the kiosk
-2. **Login** with your Google account
+2. **Login** with your Google account — or **Continue as Guest** (3 jobs/day limit)
 3. **Choose** a service: Print, Scan, or Xerox
-4. **Print:** Upload a document → Review pricing → Pay → Collect printout
+4. **Print:** Upload a document → Review pricing → Pay → Track progress via step indicators → Collect printout
 5. **Scan:** Choose DPI & color → Start scan → Download scanned PDF
 6. **Xerox:** Set copies & color → Pay → Collect photocopies
+7. **Notifications:** In-app toasts appear on status changes; browser push alerts when the tab is backgrounded
 
 ### For Admins
 
 1. Login with an admin account (set via `UPDATE users SET role = 'admin' WHERE email = '...'`)
 2. Navigate to `/admin` in the frontend
 3. Monitor kiosk health, job history, and system metrics
-4. Manage paper counts per kiosk
+4. Manage paper counts and **location names** per kiosk
+5. Guest jobs appear with an amber "Guest" badge and truncated guest ID
 
 ---
 
@@ -357,10 +382,11 @@ node index.js
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/admin/metrics` | System-wide statistics |
-| `GET` | `/api/admin/kiosks` | All kiosks with status |
+| `GET` | `/api/admin/kiosks` | All kiosks with status + location names |
 | `GET` | `/api/admin/jobs` | Filterable job list |
-| `GET` | `/api/admin/recent-jobs` | Recent jobs with user info |
+| `GET` | `/api/admin/recent-jobs` | Recent jobs with user/guest info |
 | `POST` | `/api/admin/kiosks/:id/set-paper` | Update paper count |
+| `PATCH` | `/api/admin/kiosks/:id` | Update kiosk settings (location name) |
 
 ### WebSocket Events
 
@@ -405,8 +431,12 @@ Currently using mock payments. PayU integration is planned — see [docs/payu-in
 - Full print/scan/xerox pipeline (frontend → backend → pi-agent → printer)
 - Landing page with 10 modular sections
 - Compliance pages (Privacy, Terms, Refund, Contact, FAQ)
-- Admin dashboard with metrics and kiosk management
-- Firebase Google OAuth authentication
+- Admin dashboard with metrics, kiosk management, and location names
+- Firebase Google OAuth authentication with smart redirect
+- Guest mode (3 jobs/day, localStorage-based, auto-cleanup on login)
+- Job status UI with step indicators and fun facts ticker
+- In-app toast notifications (sonner) + browser push notifications
+- Guest job visibility in admin dashboard
 - Responsive UI with dark theme
 
 ### 🔜 Pending
@@ -471,7 +501,7 @@ ALLOWED_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173
 
 ## 📊 Database Schema
 
-**4 tables:** `users`, `kiosks`, `jobs`, `admin_actions`
+**4 tables:** `users`, `kiosks` (with `location_name`), `jobs` (with JSONB `metadata` for guest info), `admin_actions`
 
 **4 views:** `active_jobs`, `kiosk_stats`, `daily_kiosk_stats`, `system_metrics`
 
@@ -482,3 +512,8 @@ ALLOWED_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173
 - Scan: `QUEUED` → `DISCOVERING_SCANNER` → `SCANNING` → `PROCESSING` → `COMPLETED`
 - Xerox: `PENDING` → `PAID` → `SENT_TO_PI` → `SCANNING` → `PRINTING` → `COMPLETED`
 - Error: `FAILED`, `EXPIRED`, `CANCELLED`
+
+**Migration (if upgrading):**
+```sql
+ALTER TABLE kiosks ADD COLUMN IF NOT EXISTS location_name TEXT;
+```

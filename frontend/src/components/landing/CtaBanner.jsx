@@ -15,7 +15,7 @@ export default function CtaBanner() {
           No downloads, no drivers — just your phone and a kiosk.
         </p>
         <Link
-          to="/login"
+          to="/"
           className="inline-flex items-center gap-2 px-8 py-4 bg-foreground text-background font-semibold rounded-xl hover:bg-foreground/90 transition-colors text-sm"
         >
           Start Printing Now

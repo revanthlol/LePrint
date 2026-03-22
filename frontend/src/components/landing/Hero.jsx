@@ -27,7 +27,7 @@ export default function Hero() {
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <Link
-              to="/login"
+              to="/"
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-colors"
             >
               Start Printing

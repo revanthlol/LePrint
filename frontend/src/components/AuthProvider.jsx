@@ -148,6 +148,7 @@ export function AuthProvider({ children }) {
     };
 
     // Get fresh auth header for API calls
+    // Returns Bearer token for Firebase users, null for guests
     const getAuthHeader = async () => {
         if (!token) return null;
         
@@ -165,17 +166,30 @@ export function AuthProvider({ children }) {
         return `Bearer ${token}`;
     };
 
+    // Get guest headers for API calls when not authenticated
+    const getGuestHeaders = () => {
+        try {
+            const raw = localStorage.getItem('leprint_guest');
+            if (raw) {
+                const data = JSON.parse(raw);
+                if (data?.guestId) return { 'X-Guest-ID': data.guestId };
+            }
+        } catch {}
+        return null;
+    };
+
     const value = {
         user,
-        role, // <--- ADDED: Exposed in context
+        role,
         token,
         loading,
         error,
         signInWithGoogle,
         signOut,
         getAuthHeader,
+        getGuestHeaders,
         isAuthenticated: !!user,
-        isAdmin: role === 'admin' // Helper boolean for convenience
+        isAdmin: role === 'admin'
     };
 
     return (

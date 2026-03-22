@@ -117,7 +117,10 @@ router.post('/jobs/create', verifyToken, upload.single('file'), async (req, res)
 
     try {
 
-        await ensureUserExists(db, req.user);
+        // Only ensure user exists for non-guest users
+        if (!req.user.isGuest) {
+            await ensureUserExists(db, req.user);
+        }
 
         const ext = path.extname(req.file.originalname).toLowerCase();
         let pages = 1;
@@ -154,9 +157,14 @@ router.post('/jobs/create', verifyToken, upload.single('file'), async (req, res)
         const totalCost = pages * pricePerPage;
         const jobId = generateJobId();
 
+        // Guest: null user_id, store guestId in metadata
+        const metadata = req.user.isGuest
+            ? { guest: true, guestId: req.user.guestId }
+            : {};
+
         await db.createJob({
             id: jobId,
-            user_id: req.user.uid,
+            user_id: req.user.isGuest ? null : req.user.uid,
             kiosk_id,
             filename: req.file.originalname,
             file_path: req.file.path,
@@ -166,7 +174,8 @@ router.post('/jobs/create', verifyToken, upload.single('file'), async (req, res)
             total_cost: totalCost,
             status: 'PENDING',
             payment_status: 'pending',
-            job_type: 'print'
+            job_type: 'print',
+            metadata
         });
 
         res.json({
@@ -205,7 +214,13 @@ router.post('/jobs/:job_id/verify-payment', verifyToken, async (req, res) => {
             return res.status(404).json({ error: 'Job not found' });
         }
 
-        if (job.user_id !== req.user.uid) {
+        // Access check: user_id match OR guest match via metadata
+        if (req.user.isGuest) {
+            const meta = job.metadata || {};
+            if (meta.guestId !== req.user.guestId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        } else if (job.user_id !== req.user.uid) {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
@@ -242,7 +257,13 @@ router.get('/jobs/:job_id/status', verifyToken, async (req, res) => {
             return res.status(404).json({ error: 'Job not found' });
         }
 
-        if (job.user_id !== req.user.uid) {
+        // Access check: user_id match OR guest match via metadata
+        if (req.user.isGuest) {
+            const meta = job.metadata || {};
+            if (meta.guestId !== req.user.guestId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        } else if (job.user_id !== req.user.uid) {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
@@ -374,13 +395,18 @@ router.post('/jobs/scan', verifyToken, async (req, res) => {
             return res.status(503).json({ error: 'Kiosk is not connected. Please try again.' });
         }
 
-        await ensureUserExists(db, req.user);
+        if (!req.user.isGuest) {
+            await ensureUserExists(db, req.user);
+        }
 
         const jobId = generateJobId();
+        const metadata = req.user.isGuest
+            ? { guest: true, guestId: req.user.guestId }
+            : {};
 
         await db.createJob({
             id: jobId,
-            user_id: req.user.uid,
+            user_id: req.user.isGuest ? null : req.user.uid,
             kiosk_id,
             job_type: 'scan',
             filename: `scan_${Date.now()}.pdf`,
@@ -390,7 +416,8 @@ router.post('/jobs/scan', verifyToken, async (req, res) => {
             price_per_page: 0,
             total_cost: 5,
             status: 'QUEUED',
-            scan_options: scan_options || {}
+            scan_options: scan_options || {},
+            metadata
         });
 
         kioskSocket.emit('scan_job', {
@@ -430,15 +457,21 @@ router.post('/jobs/xerox', verifyToken, async (req, res) => {
 
         const numCopies = Math.max(1, Math.min(parseInt(copies) || 1, 20));
 
-        await ensureUserExists(db, req.user);
+        if (!req.user.isGuest) {
+            await ensureUserExists(db, req.user);
+        }
 
         const XEROX_PRICE_PER_COPY = 5;
         const totalCost = numCopies * XEROX_PRICE_PER_COPY;
         const jobId = generateJobId();
 
+        const metadata = req.user.isGuest
+            ? { copies: numCopies, scan_options: scan_options || {}, guest: true, guestId: req.user.guestId }
+            : { copies: numCopies, scan_options: scan_options || {} };
+
         await db.createJob({
             id: jobId,
-            user_id: req.user.uid,
+            user_id: req.user.isGuest ? null : req.user.uid,
             kiosk_id,
             job_type: 'xerox',
             filename: `xerox_${Date.now()}.pdf`,
@@ -449,7 +482,7 @@ router.post('/jobs/xerox', verifyToken, async (req, res) => {
             total_cost: totalCost,
             status: 'PENDING',
             payment_status: 'pending',
-            metadata: { copies: numCopies, scan_options: scan_options || {} }
+            metadata
         });
 
         res.json({

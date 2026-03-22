@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "./components/AuthProvider";
+import { GuestProvider } from "./components/GuestContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardLayout } from "./components/Dashboard/DashboardLayout";
 import { Login } from "./components/Login";
@@ -20,55 +21,57 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+        <GuestProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
-          {/* Public routes - no auth required */}
-          <Route path="/landing" element={<Landing />} />
-          <Route path="/faq" element={<FAQPage />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/refund-policy" element={<RefundPolicy />} />
-          <Route path="/contact" element={<Contact />} />
+            {/* Public routes - no auth required */}
+            <Route path="/landing" element={<Landing />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/contact" element={<Contact />} />
 
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout activeTab="print">
-                  <PrintInterface />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/history"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout activeTab="history">
-                  <History />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Admin route */}
-          <Route
-            path="/admin"
-            element={
-              <AdminRoute>
+            <Route
+              path="/"
+              element={
                 <ProtectedRoute>
-                  <DashboardLayout activeTab="admin">
-                    <AdminDashboard />
+                  <DashboardLayout activeTab="print">
+                    <PrintInterface />
                   </DashboardLayout>
                 </ProtectedRoute>
-              </AdminRoute>
-            }
-          />
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout activeTab="history">
+                    <History />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Admin route */}
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <ProtectedRoute>
+                    <DashboardLayout activeTab="admin">
+                      <AdminDashboard />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                </AdminRoute>
+              }
+            />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </GuestProvider>
       </AuthProvider>
     </BrowserRouter>
   );

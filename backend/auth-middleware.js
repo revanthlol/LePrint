@@ -35,7 +35,20 @@ async function verifyToken(req, res, next) {
     try {
         // Get token from Authorization header
         const authHeader = req.headers.authorization;
+        const guestId = req.headers['x-guest-id'];
         
+        // Guest mode: allow access with X-Guest-ID header (no JWT required)
+        if (!authHeader && guestId) {
+            req.user = {
+                uid: null,
+                guestId: guestId,
+                isGuest: true,
+                email: null,
+                name: 'Guest'
+            };
+            return next();
+        }
+
         if (!authHeader) {
             return res.status(401).json({ 
                 error: 'No authorization header',
@@ -70,7 +83,8 @@ async function verifyToken(req, res, next) {
             email: decodedToken.email,
             name: decodedToken.name || decodedToken.email.split('@')[0],
             email_verified: decodedToken.email_verified,
-            picture: decodedToken.picture || null
+            picture: decodedToken.picture || null,
+            isGuest: false
         };
         
         // Continue to next middleware/route handler

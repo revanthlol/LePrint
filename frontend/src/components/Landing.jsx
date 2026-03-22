@@ -25,7 +25,7 @@ function MidCta() {
           Got a file ready?
         </p>
         <Link
-          to="/login"
+          to="/"
           className="inline-flex items-center gap-2 px-6 py-3 border border-border text-foreground font-semibold text-sm rounded-xl hover:bg-card transition-colors"
         >
           Upload Your File

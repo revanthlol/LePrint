@@ -1,19 +1,23 @@
 // frontend/src/components/Dashboard/DashboardLayout.jsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthProvider';
-import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield } from 'lucide-react';
+import { useGuest } from '../GuestContext';
+import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield, LogIn, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Footer from '../Footer';
 
 export function DashboardLayout({ children, activeTab = 'print' }) {
-    const { user, role, signOut } = useAuth();  // ← ADD role here
+    const { user, role, signOut } = useAuth();
+    const { isGuest, endGuestSession } = useGuest();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [guestBannerDismissed, setGuestBannerDismissed] = useState(false);
   
     const tabs = [
       { id: 'print', label: 'Print', icon: Printer, path: '/' },
-      { id: 'history', label: 'History', icon: History, path: '/history' },
+      // Hide history for guests
+      ...(!isGuest ? [{ id: 'history', label: 'History', icon: History, path: '/history' }] : []),
       // Only show admin tab if user is admin
       ...(role === 'admin' || role === 'superadmin' ? [{
         id: 'admin', 
@@ -29,12 +33,29 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
     };
 
     const handleSignOut = async () => {
-        await signOut();
+        if (isGuest) {
+            endGuestSession();
+        } else {
+            await signOut();
+        }
         navigate('/login');
     };
 
     return (
         <div className="min-h-screen bg-[#0a0a0a]">
+            {/* Guest Banner */}
+            {isGuest && !guestBannerDismissed && (
+                <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500/10 border-b border-amber-500/20 px-4 py-2">
+                    <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs text-amber-300">
+                            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>You're using LePrint as a guest. Job history won't be saved.</span>
+                            <Link to="/login" className="underline underline-offset-2 font-medium hover:text-amber-200 ml-1">Sign in →</Link>
+                        </div>
+                        <button onClick={() => setGuestBannerDismissed(true)} className="text-amber-300/60 hover:text-amber-300 text-xs">✕</button>
+                    </div>
+                </div>
+            )}
             {/* Mobile Header */}
             <div className="lg:hidden fixed top-0 left-0 right-0 bg-card/95 backdrop-blur-md border-b border-border z-50 px-4 py-3">
                 <div className="flex items-center justify-between">
@@ -73,14 +94,25 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                             <span className="font-bold text-foreground">LePrint</span>
                         </div>
                     </div>
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={handleSignOut}
-                        className="p-2 hover:bg-accent rounded-lg transition-colors"
-                    >
-                        <LogOut className="w-5 h-5 text-muted-foreground" />
-                    </motion.button>
+                    {isGuest ? (
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => navigate('/login')}
+                            className="p-2 hover:bg-accent rounded-lg transition-colors"
+                        >
+                            <LogIn className="w-5 h-5 text-muted-foreground" />
+                        </motion.button>
+                    ) : (
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleSignOut}
+                            className="p-2 hover:bg-accent rounded-lg transition-colors"
+                        >
+                            <LogOut className="w-5 h-5 text-muted-foreground" />
+                        </motion.button>
+                    )}
                 </div>
             </div>
 
@@ -109,7 +141,11 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                     {/* User Info */}
                     <div className="p-4 border-b border-border">
                         <div className="flex items-center gap-3">
-                            {user?.photoURL ? (
+                            {isGuest ? (
+                                <div className="w-10 h-10 bg-amber-500/10 rounded-full flex items-center justify-center">
+                                    <User className="w-5 h-5 text-amber-400" />
+                                </div>
+                            ) : user?.photoURL ? (
                                 <motion.img
                                     whileHover={{ scale: 1.05 }}
                                     src={user.photoURL}
@@ -123,10 +159,10 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                             )}
                             <div className="flex-1 min-w-0">
                                 <p className="font-medium text-foreground truncate text-sm">
-                                    {user?.displayName || 'User'}
+                                    {isGuest ? 'Guest' : (user?.displayName || 'User')}
                                 </p>
                                 <p className="text-xs text-muted-foreground truncate">
-                                    {user?.email}
+                                    {isGuest ? 'No account' : user?.email}
                                 </p>
                             </div>
                         </div>
@@ -171,17 +207,29 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                         </motion.button>
                     </nav>
 
-                    {/* Logout */}
+                    {/* Logout / Sign-in */}
                     <div className="p-4 border-t border-border">
-                        <motion.button
-                            whileHover={{ scale: 1.02, x: 4 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={handleSignOut}
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
-                        >
-                            <LogOut className="w-5 h-5" />
-                            <span className="font-medium">Logout</span>
-                        </motion.button>
+                        {isGuest ? (
+                            <motion.button
+                                whileHover={{ scale: 1.02, x: 4 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => navigate('/login')}
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
+                            >
+                                <LogIn className="w-5 h-5" />
+                                <span className="font-medium">Sign In</span>
+                            </motion.button>
+                        ) : (
+                            <motion.button
+                                whileHover={{ scale: 1.02, x: 4 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={handleSignOut}
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
+                            >
+                                <LogOut className="w-5 h-5" />
+                                <span className="font-medium">Logout</span>
+                            </motion.button>
+                        )}
                     </div>
                 </div>
             </aside>

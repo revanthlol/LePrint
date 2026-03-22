@@ -1,8 +1,9 @@
 // frontend/src/components/Login.jsx
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
-import { Printer, AlertCircle } from 'lucide-react';
+import { useGuest } from './GuestContext';
+import { Printer, AlertCircle, UserX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Footer from './Footer';
 import FeatureCards from './FeatureCards';
@@ -33,14 +34,21 @@ const itemVariants = {
 
 
 export function Login() {
-    const { signInWithGoogle, error: authError } = useAuth();
+    const { signInWithGoogle, isAuthenticated, loading: authLoading, error: authError } = useAuth();
+    const { startGuestSession } = useGuest();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
-    const location = useLocation();
+    const [searchParams] = useSearchParams();
 
-    // Preserve query params when redirecting
-    const from = (location.state?.from?.pathname || '') + (location.state?.from?.search || '') || '/';
+    const redirectTo = searchParams.get('redirect') || '/';
+
+    // Smart redirect: if already logged in, redirect away
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) {
+            navigate(redirectTo, { replace: true });
+        }
+    }, [authLoading, isAuthenticated, redirectTo, navigate]);
 
     const handleGoogleSignIn = async () => {
         try {
@@ -48,7 +56,7 @@ export function Login() {
             setError(null);
             
             await signInWithGoogle();
-            navigate(from, { replace: true });
+            navigate(redirectTo, { replace: true });
         } catch (err) {
             console.error('Login failed:', err);
             setError(err.message || 'Failed to sign in with Google');
@@ -56,6 +64,23 @@ export function Login() {
             setLoading(false);
         }
     };
+
+    const handleGuestContinue = () => {
+        startGuestSession();
+        navigate(redirectTo, { replace: true });
+    };
+
+    // Show nothing while auth state is loading (avoid flash)
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+                <svg className="animate-spin h-10 w-10 text-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
@@ -204,12 +229,33 @@ export function Login() {
                             </AnimatePresence>
                         </motion.button>
 
+                        {/* Divider */}
+                        <div className="flex items-center gap-3 my-5">
+                            <div className="flex-1 h-px bg-border" />
+                            <span className="text-xs text-muted-foreground/50 uppercase tracking-wider">or</span>
+                            <div className="flex-1 h-px bg-border" />
+                        </div>
+
+                        {/* Continue as Guest */}
+                        <motion.button
+                            onClick={handleGuestContinue}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 bg-transparent border border-border rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all duration-200"
+                        >
+                            <UserX className="w-4 h-4" />
+                            Continue as Guest
+                        </motion.button>
+                        <p className="mt-3 text-center text-[11px] text-muted-foreground/40">
+                            No account needed. Up to 3 jobs/day. History not saved.
+                        </p>
+
                         {/* Privacy note */}
                         <motion.p
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.6 }}
-                            className="mt-6 text-center text-xs text-muted-foreground"
+                            className="mt-5 text-center text-xs text-muted-foreground"
                         >
                             Secure authentication via Google OAuth
                         </motion.p>

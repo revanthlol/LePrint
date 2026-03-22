@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthProvider';
+import { useGuest } from '../GuestContext';
 import {
     API_URL,
     ALLOWED_FILE_TYPES,
@@ -27,7 +28,20 @@ function clearSession() {
 }
 
 export function usePrint() {
-    const { signOut, getAuthHeader } = useAuth();
+    const { signOut, getAuthHeader, getGuestHeaders } = useAuth();
+    const { isGuest, canCreateJob, isLastJob, incrementJobCount, guestId } = useGuest();
+
+    // Helper: build request headers (works for both auth and guest)
+    const buildHeaders = useCallback(async () => {
+        const authHeader = await getAuthHeader();
+        if (authHeader) return { 'Authorization': authHeader };
+
+        // Guest fallback
+        const guestHeaders = getGuestHeaders();
+        if (guestHeaders) return guestHeaders;
+
+        return {};
+    }, [getAuthHeader, getGuestHeaders]);
 
     // ==========================================
     // 1. State
@@ -217,9 +231,9 @@ export function usePrint() {
 
         const pollInterval = setInterval(async () => {
             try {
-                const authHeader = await getAuthHeader();
+                const headers = await buildHeaders();
                 const response = await axios.get(`${API_URL}/api/jobs/${pricing.job_id}/status`, {
-                    headers: { 'Authorization': authHeader }
+                    headers
                 });
                 const jobStatus = response.data.status;
 
@@ -251,7 +265,7 @@ export function usePrint() {
         }, 3000);
 
         return () => clearInterval(pollInterval);
-    }, [pricing?.job_id, status, serviceType, API_URL, addLog, getAuthHeader]);
+    }, [pricing?.job_id, status, serviceType, API_URL, addLog, buildHeaders]);
 
     // ==========================================
     // 4. Handlers
@@ -383,16 +397,35 @@ export function usePrint() {
     // ---- Scan Job ----
 
     const handleScanStart = useCallback(async () => {
+        // Guest job limit check
+        if (isGuest && !canCreateJob) {
+            addLog('Guest job limit reached (3/day). Sign in for unlimited access.');
+            setStatus('ERROR');
+            return;
+        }
+
+        // Guest scan warning (one-time per device)
+        if (isGuest) {
+            try {
+                const warned = localStorage.getItem('leprint_guest_scan_warned');
+                if (!warned) {
+                    // The UI layer should show this as a modal — for now we log and set the flag
+                    localStorage.setItem('leprint_guest_scan_warned', '1');
+                    addLog('⚠ Guest scan: download link expires when you close this tab.');
+                }
+            } catch {}
+        }
+
         setStatus('SCANNING');
         addLog('Creating scan job...');
 
         try {
-            const authHeader = await getAuthHeader();
+            const headers = await buildHeaders();
             const response = await axios.post(`${API_URL}/api/jobs/scan`, {
                 kiosk_id: config.kiosk_id,
                 scan_options: scanOptions
             }, {
-                headers: { 'Authorization': authHeader },
+                headers,
                 timeout: 10000
             });
 
@@ -401,32 +434,43 @@ export function usePrint() {
             addLog(`Scan job created: ${job_id}`);
             addLog('Scanning in progress...');
 
+            // Increment guest job count
+            if (isGuest) incrementJobCount();
+            if (isGuest && isLastJob) addLog('⚠ This is your last guest job today. Sign in for unlimited access.');
+
         } catch (e) {
             if (e.response?.status === 401) {
                 addLog('Session expired. Please log in again.');
-                await signOut();
+                if (!isGuest) await signOut();
                 return;
             }
 
             setStatus('ERROR');
             addLog(`Scan error: ${e.response?.data?.error || e.message}`);
         }
-    }, [config, scanOptions, API_URL, addLog, getAuthHeader, signOut]);
+    }, [config, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount]);
 
     // ---- Xerox Job ----
 
     const handleXeroxStart = useCallback(async () => {
+        // Guest job limit check
+        if (isGuest && !canCreateJob) {
+            addLog('Guest job limit reached (3/day). Sign in for unlimited access.');
+            setStatus('ERROR');
+            return;
+        }
+
         setStatus('XEROXING');
         addLog(`Creating xerox job (${xeroxCopies} copies)...`);
 
         try {
-            const authHeader = await getAuthHeader();
+            const headers = await buildHeaders();
             const response = await axios.post(`${API_URL}/api/jobs/xerox`, {
                 kiosk_id: config.kiosk_id,
                 copies: xeroxCopies,
                 scan_options: scanOptions
             }, {
-                headers: { 'Authorization': authHeader },
+                headers,
                 timeout: 10000
             });
 
@@ -436,29 +480,39 @@ export function usePrint() {
             await axios.post(
                 `${API_URL}/api/jobs/${job_id}/verify-payment`,
                 { payment_id: 'mock_payment_' + Date.now() },
-                { headers: { 'Authorization': authHeader } }
+                { headers }
             );
 
             setPricing({ job_id, totalPrice: total_cost });
             addLog(`Xerox job created & paid: ₹${total_cost}`);
             addLog('Scanning & printing in progress...');
 
+            // Increment guest job count
+            if (isGuest) incrementJobCount();
+            if (isGuest && isLastJob) addLog('⚠ This is your last guest job today. Sign in for unlimited access.');
+
         } catch (e) {
             if (e.response?.status === 401) {
                 addLog('Session expired. Please log in again.');
-                await signOut();
+                if (!isGuest) await signOut();
                 return;
             }
 
             setStatus('ERROR');
             addLog(`Xerox error: ${e.response?.data?.error || e.message}`);
         }
-    }, [config, xeroxCopies, scanOptions, API_URL, addLog, getAuthHeader, signOut]);
+    }, [config, xeroxCopies, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount]);
 
     // ---- Existing Print Handlers ----
 
     const handleFileSelect = useCallback(async (selectedFile) => {
         if (!selectedFile) return;
+
+        // Guest job limit check
+        if (isGuest && !canCreateJob) {
+            addLog('Guest job limit reached (3/day). Sign in for unlimited access.');
+            return;
+        }
 
         const fileExt = getFileExt(selectedFile.name);
 
@@ -481,13 +535,11 @@ export function usePrint() {
         fd.append('job_type', 'print');
 
         try {
-            const authHeader = await getAuthHeader();
+            const headers = await buildHeaders();
 
             const response = await axios.post(`${API_URL}/api/jobs/create`, fd, {
                 timeout: 15000,
-                headers: {
-                    'Authorization': authHeader
-                }
+                headers
             });
 
             const { job_id, pages, price_per_page, total_cost } = response.data;
@@ -500,43 +552,47 @@ export function usePrint() {
             setStatus('PAYMENT');
             addLog(`Job created: ${pages} pages × ₹${price_per_page} = ₹${total_cost}`);
 
+            // Increment guest job count after successful creation
+            if (isGuest) incrementJobCount();
+            if (isGuest && isLastJob) addLog('⚠ This is your last guest job today. Sign in for unlimited access.');
+
         } catch (e) {
             if (e.response?.status === 401) {
                 addLog('Session expired. Please log in again.');
-                await signOut();
+                if (!isGuest) await signOut();
                 return;
             }
 
             setStatus('ERROR');
             addLog(`Error: ${e.response?.data?.error || e.message}`);
         }
-    }, [config, API_URL, addLog, getAuthHeader, signOut]);
+    }, [config, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount]);
 
     const handlePayment = useCallback(async () => {
         setStatus('PRINTING');
         addLog('Processing payment...');
 
         try {
-            const authHeader = await getAuthHeader();
+            const headers = await buildHeaders();
 
             await axios.post(
                 `${API_URL}/api/jobs/${pricing.job_id}/verify-payment`,
                 { payment_id: 'mock_payment_' + Date.now() },
-                { headers: { 'Authorization': authHeader } }
+                { headers }
             );
 
             addLog('Payment verified! Job sent to printer.');
         } catch (e) {
             if (e.response?.status === 401) {
                 addLog('Session expired. Please log in again.');
-                await signOut();
+                if (!isGuest) await signOut();
                 return;
             }
 
             setStatus('ERROR');
             addLog(`Payment failed: ${e.response?.data?.error || e.message}`);
         }
-    }, [pricing, API_URL, addLog, getAuthHeader, signOut]);
+    }, [pricing, API_URL, addLog, buildHeaders, signOut, isGuest]);
 
     const resetFlow = useCallback(() => {
         clearSession();

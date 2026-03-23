@@ -472,7 +472,7 @@ export function PrintSettingsView({ file, pages, pricing, printSettings, updateP
     const effectivePages = pageRange === 'all' ? (pages || 1) : countPagesInRangeLocal(customRange || pageRange, pages || 1);
     const totalPrice = effectivePages * copies * pricePerPage;
 
-    // PDF preview renderer
+    // PDF preview renderer — scales to fit container width
     useEffect(() => {
         if (!isPdf || !file || !canvasRef.current) return;
         let cancelled = false;
@@ -481,19 +481,34 @@ export function PrintSettingsView({ file, pages, pricing, printSettings, updateP
                 const data = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument({ data }).promise;
                 const page = await pdf.getPage(1);
-                const viewport = page.getViewport({ scale: 1.0 });
+
+                // Get the canvas container width to calculate scale
                 const canvas = canvasRef.current;
                 if (!canvas || cancelled) return;
+
+                // Use container width — fallback to 300 if not measurable
+                const containerWidth = canvas.parentElement?.offsetWidth || 300;
+
+                // Get natural viewport at scale 1.0 to know the PDF dimensions
+                const naturalViewport = page.getViewport({ scale: 1.0 });
+
+                // Scale to fit container width
+                const scale = containerWidth / naturalViewport.width;
+                const viewport = page.getViewport({ scale });
+
                 const ctx = canvas.getContext('2d');
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
-                await page.render({ canvasContext: ctx, viewport }).promise;
+
+                if (!cancelled) {
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                }
             } catch (err) {
                 console.error('PDF preview error:', err);
             }
         })();
         return () => { cancelled = true; };
-    }, [file, isPdf, orientation]);
+    }, [file, isPdf, orientation]); // re-render when orientation changes
 
     // Image preview URL
     const [imgUrl, setImgUrl] = useState(null);
@@ -514,9 +529,7 @@ export function PrintSettingsView({ file, pages, pricing, printSettings, updateP
         }
     }, [updatePrintSettings]);
 
-    const previewFilterStyle = {};
-    if (colorMode === 'bw') previewFilterStyle.filter = 'grayscale(1)';
-    if (orientation === 'landscape') previewFilterStyle.transform = 'rotate(90deg)';
+
 
     const ToggleBtn = ({ active, onClick, children, className = '' }) => (
         <button
@@ -538,26 +551,46 @@ export function PrintSettingsView({ file, pages, pricing, printSettings, updateP
             className="space-y-4"
         >
             {/* ─── Preview Section ─── */}
-            <div>
+            {/* Paper shape wrapper */}
+            <div className="w-full relative">
                 <p className="text-xs text-muted-foreground mb-2">Live preview</p>
-                <div className="max-h-52 rounded-xl border border-border overflow-hidden flex items-center justify-center bg-muted/10">
-                    {isPdf ? (
-                        <div style={previewFilterStyle} className="flex flex-col items-center p-2">
-                            <canvas ref={canvasRef} className="max-h-44 max-w-full object-contain" />
-                            <p className="text-xs text-muted-foreground mt-1">Page 1 of {pages}</p>
-                        </div>
-                    ) : isImage ? (
-                        <div style={previewFilterStyle} className="p-2">
-                            {imgUrl && <img src={imgUrl} className="max-h-48 object-contain" alt="Preview" />}
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center">
-                            <FileText className="w-10 h-10 text-muted-foreground mb-2" />
-                            <p className="text-sm text-muted-foreground">Preview not available for this file type</p>
-                            <p className="text-xs text-muted-foreground/60 mt-1">Your document will print as-is</p>
-                        </div>
-                    )}
+
+                {/* A4 paper — white, with shadow, proper aspect ratio */}
+                <div
+                    className="relative w-full mx-auto shadow-lg"
+                    style={{
+                        maxWidth: orientation === 'landscape' ? '100%' : '75%',
+                        paddingBottom: orientation === 'portrait' ? '141.4%' : '70.7%',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                    }}
+                >
+                    {/* Content positioned absolutely to fill the paper */}
+                    <div
+                        className="absolute inset-0 flex items-center justify-center overflow-hidden"
+                        style={colorMode === 'bw' ? { filter: 'grayscale(1)' } : {}}
+                    >
+                        {isPdf ? (
+                            <canvas ref={canvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        ) : isImage ? (
+                            imgUrl && <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="Preview" />
+                        ) : (
+                            <div className="flex flex-col items-center justify-center text-center">
+                                <FileText className="w-10 h-10 text-muted-foreground mb-2" />
+                                <p className="text-sm text-muted-foreground">Preview not available for this file type</p>
+                                <p className="text-xs text-muted-foreground/60 mt-1">Your document will print as-is</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                {/* Page indicator below paper */}
+                {isPdf && (
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                        Page 1 of {pages}
+                    </p>
+                )}
             </div>
 
             {/* ─── Settings ─── */}

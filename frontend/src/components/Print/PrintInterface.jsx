@@ -335,7 +335,7 @@ export function PrintInterface() {
 
   // Can add another job: < 5 jobs AND not a guest AND kiosk connected
   const isConnected = ['SERVICE_SELECT', 'CONNECTED', 'SCAN_OPTIONS',
-    'XEROX_OPTIONS', 'CALCULATING', 'PAYMENT', 'PRINTING', 'SCANNING',
+    'XEROX_OPTIONS', 'CALCULATING', 'SETTINGS_PREVIEW', 'PAYMENT', 'PRINTING', 'SCANNING',
     'XEROXING', 'COMPLETED', 'SCAN_COMPLETE', 'ERROR'].includes(status);
   const canAddJob = jobs.length < 5 && !isGuest && isConnected;
 
@@ -355,7 +355,7 @@ export function PrintInterface() {
   const showTabBar = jobs.length >= 1
     || scanKioskMode
     || ['SERVICE_SELECT', 'CONNECTED', 'SCAN_OPTIONS', 'XEROX_OPTIONS',
-        'CALCULATING', 'PAYMENT'].includes(status);
+        'CALCULATING', 'SETTINGS_PREVIEW', 'PAYMENT'].includes(status);
 
   // Show all-jobs summary when all jobs are done AND we have >0 jobs
   const showSummary = allJobsDone && jobs.length > 0 && !scanKioskMode;

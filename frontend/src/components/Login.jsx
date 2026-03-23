@@ -98,7 +98,7 @@ export function Login() {
                         className="bg-card/80 backdrop-blur-xl border border-border rounded-2xl shadow-2xl p-8 mb-6"
                     >
                         {/* Logo/Header */}
-                        <div className="text-center mb-8">
+                        <div className="text-center mb-6">
                             {/* Floating Logo with pulse effect */}
                             <motion.div
                                 animate={{
@@ -134,8 +134,28 @@ export function Login() {
                                 transition={{ delay: 0.4, duration: 0.5 }}
                                 className="text-muted-foreground text-sm"
                             >
-                                Professional • Fast • Secure
+                                Upload documents, pay online, print at any kiosk
                             </motion.p>
+                        </div>
+
+                        {/* How it works — compact */}
+                        <div className="mb-6 p-4 rounded-xl bg-white/5 border border-border space-y-2">
+                            <p className="text-sm font-semibold text-foreground">How it works</p>
+                            <div className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                                <span className="shrink-0 w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[11px] font-bold text-foreground">1</span>
+                                <span>Scan the QR code at a kiosk & upload your file</span>
+                            </div>
+                            <div className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                                <span className="shrink-0 w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[11px] font-bold text-foreground">2</span>
+                                <span>Pay securely online via Razorpay</span>
+                            </div>
+                            <div className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                                <span className="shrink-0 w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[11px] font-bold text-foreground">3</span>
+                                <span>Collect your printout at the kiosk</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground/60 pt-1">
+                                Printing starts only after successful payment.
+                            </p>
                         </div>
 
                         {/* Error Message with animation */}
@@ -175,19 +195,32 @@ export function Login() {
                             )}
                         </AnimatePresence>
 
-                        {/* Terms & Conditions Checkbox */}
-                        <label className="flex items-start gap-3 mb-6 cursor-pointer group">
-                            <input
-                                type="checkbox"
-                                checked={termsAccepted}
-                                onChange={(e) => setTermsAccepted(e.target.checked)}
-                                className="mt-0.5 w-4 h-4 rounded border-border accent-white cursor-pointer"
-                            />
-                            <span className="text-xs text-muted-foreground leading-relaxed">
+                        {/* Terms & Conditions Checkbox — enlarged for mobile */}
+                        <label className="flex items-start gap-3.5 mb-6 cursor-pointer group p-3 -mx-3 rounded-xl hover:bg-white/5 transition-colors">
+                            <div className="relative shrink-0 mt-0.5">
+                                <input
+                                    type="checkbox"
+                                    checked={termsAccepted}
+                                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                                    className="peer sr-only"
+                                />
+                                <div className={`w-6 h-6 rounded-md border-2 transition-all flex items-center justify-center ${
+                                    termsAccepted
+                                        ? 'bg-white border-white'
+                                        : 'border-muted-foreground/40 group-hover:border-muted-foreground/70'
+                                }`}>
+                                    {termsAccepted && (
+                                        <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    )}
+                                </div>
+                            </div>
+                            <span className="text-sm text-muted-foreground leading-relaxed">
                                 I agree to the{' '}
-                                <a href="/terms" target="_blank" className="text-blue-400 hover:underline">Terms & Conditions</a>{' '}
+                                <a href="/terms" target="_blank" onClick={(e) => e.stopPropagation()} className="text-blue-400 hover:underline">Terms & Conditions</a>{' '}
                                 and{' '}
-                                <a href="/privacy-policy" target="_blank" className="text-blue-400 hover:underline">Privacy Policy</a>
+                                <a href="/privacy-policy" target="_blank" onClick={(e) => e.stopPropagation()} className="text-blue-400 hover:underline">Privacy Policy</a>
                             </span>
                         </label>
 
@@ -264,19 +297,9 @@ export function Login() {
                             <UserX className="w-4 h-4" />
                             Continue as Guest
                         </motion.button>
-                        <p className="mt-3 text-center text-[11px] text-muted-foreground/40">
-                            No account needed. Up to 3 jobs/day. History not saved.
+                        <p className="mt-3 text-center text-[11px] text-muted-foreground/30">
+                            Limited to 3 prints per day
                         </p>
-
-                        {/* Privacy note */}
-                        <motion.p
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.6 }}
-                            className="mt-5 text-center text-xs text-muted-foreground"
-                        >
-                            Secure authentication via Google OAuth
-                        </motion.p>
                     </motion.div>
 
                     <FeatureCards />

@@ -10,6 +10,36 @@ import {
     getFileExt
 } from './printUtils';
 
+// ─── Constants ──────────────────────────────────────────────
+// Matches backend JOB_TIMEOUT_MS in tasks.js (15 * 60 * 1000)
+export const PENDING_JOB_EXPIRY_MINUTES = 15;
+
+// Navigation step flow for the step indicator
+export const NAV_STEPS = [
+    { id: 'SERVICE_SELECT', label: 'Select' },
+    { id: 'UPLOAD',         label: 'Upload' },
+    { id: 'CONFIRM',        label: 'Confirm' },
+    { id: 'PAYMENT',        label: 'Pay' },
+    { id: 'STATUS',         label: 'Status' },
+];
+
+// Map viewStatus values → canonical nav step id
+const VIEW_TO_NAV_STEP = {
+    'SERVICE_SELECT': 'SERVICE_SELECT',
+    'CONNECTED':      'UPLOAD',
+    'SCAN_OPTIONS':   'UPLOAD',
+    'XEROX_OPTIONS':  'UPLOAD',
+    'CALCULATING':    'CONFIRM',
+    'PAYMENT':        'PAYMENT',
+    'PRINTING':       'STATUS',
+    'SCANNING':       'STATUS',
+    'XEROXING':       'STATUS',
+    'COMPLETED':      'STATUS',
+    'SCAN_COMPLETE':  'STATUS',
+    'ERROR':          'STATUS',
+    'FAILED':         'STATUS',
+};
+
 // Session storage key for active job recovery
 const SESSION_KEY = 'juspri_active_jobs';
 const MAX_JOBS = 5;
@@ -48,6 +78,12 @@ function createJobEntry(overrides = {}) {
         scanResult: null,
         serviceType: 'print',
         file: null,
+        kiosk_id: null,
+        // Navigation stack
+        navStack: [],
+        // Expiry tracking
+        expiresAt: null,
+        locallyExpired: false,
         ...overrides
     };
 }
@@ -95,6 +131,15 @@ export function usePrint() {
     // When no job is active or being configured, this drives the UI
     const [viewStatus, setViewStatus] = useState('IDLE');
 
+    // Modal state
+    const [showBackConfirmModal, setShowBackConfirmModal] = useState(false);
+    const [showExpiryModal, setShowExpiryModal] = useState(null); // jobId or null
+
+    // Kiosk session decoupling (Task 5)
+    const sessionKioskId = useRef(null);
+    const [newKioskId, setNewKioskId] = useState(null);
+    const initialUrlProcessed = useRef(false);
+
     // Derived: current active job (or null)
     const activeJob = useMemo(() => jobs[activeJobIndex] || null, [jobs, activeJobIndex]);
 
@@ -109,6 +154,30 @@ export function usePrint() {
         }
         return viewStatus;
     }, [activeJob, viewStatus]);
+
+    // Derived: current canonical nav step
+    const currentNavStep = useMemo(() => {
+        return VIEW_TO_NAV_STEP[status] || null;
+    }, [status]);
+
+    // Derived: current nav step index (for step indicator)
+    const currentNavStepIndex = useMemo(() => {
+        if (!currentNavStep) return -1;
+        return NAV_STEPS.findIndex(s => s.id === currentNavStep);
+    }, [currentNavStep]);
+
+    // Derived: can go back?
+    const canGoBack = useMemo(() => {
+        if (!activeJob) return false;
+        if (activeJob.navStack.length === 0) return false;
+        // Disable back once paid/completed/failed
+        const blocked = ['COMPLETED', 'SCAN_COMPLETE', 'FAILED'];
+        if (blocked.includes(activeJob.status)) return false;
+        // Also block if the job is in an in-flight printing/scanning/xeroxing state
+        // (meaning payment was already made)
+        if (['PRINTING', 'SCANNING', 'XEROXING'].includes(activeJob.status)) return false;
+        return true;
+    }, [activeJob]);
 
     // Derived: are all jobs done?
     const allJobsDone = useMemo(() => {
@@ -151,8 +220,76 @@ export function usePrint() {
     }, []);
 
     // ==========================================
+    // 2b. Navigation Helpers
+    // ==========================================
+
+    // Push current viewStatus onto active job's navStack, then set new step
+    const navigateTo = useCallback((newViewStatus) => {
+        if (activeJob && activeJob.jobId) {
+            // Push current status onto navStack
+            setJobs(prev => prev.map(j =>
+                j.jobId === activeJob.jobId
+                    ? { ...j, navStack: [...j.navStack, viewStatus] }
+                    : j
+            ));
+        }
+        setViewStatus(newViewStatus);
+    }, [activeJob, viewStatus]);
+
+    // Go back one step
+    const goBack = useCallback(() => {
+        if (!activeJob || activeJob.navStack.length === 0) return;
+
+        // Block if paid/completed/failed/in-flight
+        const blocked = ['COMPLETED', 'SCAN_COMPLETE', 'FAILED', 'PRINTING', 'SCANNING', 'XEROXING'];
+        if (blocked.includes(activeJob.status)) return;
+
+        // If at PAYMENT screen or STATUS with PENDING job → show confirmation modal
+        const currentStatus = status;
+        if (currentStatus === 'PAYMENT' || (currentStatus === 'ERROR' && activeJob.status === 'PAYMENT')) {
+            setShowBackConfirmModal(true);
+            return;
+        }
+
+        // Otherwise → pop and navigate
+        const stack = [...activeJob.navStack];
+        const prevStep = stack.pop();
+        setJobs(prev => prev.map(j =>
+            j.jobId === activeJob.jobId
+                ? { ...j, navStack: stack }
+                : j
+        ));
+        setViewStatus(prevStep || 'SERVICE_SELECT');
+    }, [activeJob, status]);
+
+    // Confirm going back from PAYMENT (called by modal)
+    const confirmGoBack = useCallback(() => {
+        if (!activeJob) return;
+
+        const stack = [...activeJob.navStack];
+        const prevStep = stack.pop();
+
+        setJobs(prev => prev.map(j =>
+            j.jobId === activeJob.jobId
+                ? {
+                    ...j,
+                    navStack: stack,
+                    expiresAt: Date.now() + (PENDING_JOB_EXPIRY_MINUTES * 60 * 1000),
+                }
+                : j
+        ));
+        setViewStatus(prevStep || 'SERVICE_SELECT');
+        setShowBackConfirmModal(false);
+    }, [activeJob]);
+
+    // ==========================================
     // 3. Core Helper Functions
     // ==========================================
+
+    // Helper: get the current effective kiosk_id
+    const getCurrentKioskId = useCallback(() => {
+        return newKioskId || sessionKioskId.current || config?.kiosk_id;
+    }, [newKioskId, config]);
 
     // Helper: Connect to printer (used by status check and manual connect)
     const connectPrinterAfterStatusCheck = useCallback(async (kioskId) => {
@@ -261,6 +398,7 @@ export function usePrint() {
 
         // Restore state
         setConfig({ kiosk_id: saved.kiosk_id });
+        sessionKioskId.current = saved.kiosk_id;
         setScannerActive(false);
 
         const recoveredJobs = saved.jobs.map(j => createJobEntry({
@@ -272,6 +410,7 @@ export function usePrint() {
             pages: j.pages,
             createdAt: new Date(j.createdAt),
             pricing: { job_id: j.jobId },
+            kiosk_id: saved.kiosk_id,
         }));
 
         setJobs(recoveredJobs);
@@ -280,6 +419,7 @@ export function usePrint() {
     }, [addLog]);
 
     // Auto-connect if kiosk_id is in the URL (skip if recovering active job)
+    // Also handles kiosk decoupling (Task 5)
     useEffect(() => {
         const saved = loadSession();
         if (saved?.jobs?.length) return;
@@ -289,7 +429,13 @@ export function usePrint() {
         const location = params.get('location');
         const floor = params.get('floor');
 
-        if (kioskIdFromUrl) {
+        if (!kioskIdFromUrl) return;
+
+        // First time processing URL
+        if (!initialUrlProcessed.current) {
+            initialUrlProcessed.current = true;
+            sessionKioskId.current = kioskIdFromUrl;
+
             setConfig({
                 kiosk_id: kioskIdFromUrl,
                 location: location,
@@ -302,8 +448,29 @@ export function usePrint() {
             if (location) addLog(`Location: ${location}, Floor: ${floor || 'N/A'}`);
 
             checkKioskStatus(kioskIdFromUrl);
+            return;
         }
-    }, [addLog, checkKioskStatus]);
+
+        // Subsequent URL changes — kiosk switch detection
+        if (kioskIdFromUrl !== sessionKioskId.current) {
+            if (jobs.length === 0) {
+                // No active jobs — update session kiosk
+                sessionKioskId.current = kioskIdFromUrl;
+                setConfig({
+                    kiosk_id: kioskIdFromUrl,
+                    location: location,
+                    floor: floor
+                });
+                setViewStatus('SCANNED');
+                addLog(`Auto-scanned: ${kioskIdFromUrl}`);
+                checkKioskStatus(kioskIdFromUrl);
+            } else {
+                // Active jobs exist — store new kiosk for next "+" job
+                setNewKioskId(kioskIdFromUrl);
+                addLog(`[Session] New kiosk detected: ${kioskIdFromUrl} — will apply to next job`);
+            }
+        }
+    }, [addLog, checkKioskStatus, jobs.length]);
 
     // Status polling for all in-flight jobs
     useEffect(() => {
@@ -375,6 +542,58 @@ export function usePrint() {
         }
     }, [allJobsDone, jobs, notifyAllComplete]);
 
+    // ─── Job Expiry Tracking (Task 4) ───────────────────────────
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = Date.now();
+            setJobs(prev => {
+                let changed = false;
+                const updated = prev.map(j => {
+                    if (j.expiresAt && !j.locallyExpired && now > j.expiresAt) {
+                        // Only expire if still in a pre-payment state
+                        const prePaid = ['IDLE', 'PAYMENT', 'CALCULATING', 'ERROR'].includes(j.status);
+                        if (prePaid) {
+                            changed = true;
+                            return { ...j, locallyExpired: true };
+                        }
+                    }
+                    return j;
+                });
+                return changed ? updated : prev;
+            });
+        }, 30000); // every 30 seconds
+
+        return () => clearInterval(interval);
+    }, []);
+
+    // Show expiry modal when a job becomes locally expired
+    useEffect(() => {
+        const expiredJob = jobs.find(j => j.locallyExpired && !showExpiryModal);
+        if (expiredJob) {
+            setShowExpiryModal(expiredJob.jobId);
+        }
+    }, [jobs, showExpiryModal]);
+
+    // Remove locally expired jobs after 30s
+    useEffect(() => {
+        const expiredJobs = jobs.filter(j => j.locallyExpired);
+        if (expiredJobs.length === 0) return;
+
+        const timers = expiredJobs.map(j => {
+            return setTimeout(() => {
+                setJobs(prev => prev.filter(pj => pj.jobId !== j.jobId));
+                // If this was the active job, reset index
+                setActiveJobIndex(prev => {
+                    const remaining = jobs.filter(pj => pj.jobId !== j.jobId);
+                    if (prev >= remaining.length) return Math.max(0, remaining.length - 1);
+                    return prev;
+                });
+            }, 30000);
+        });
+
+        return () => timers.forEach(t => clearTimeout(t));
+    }, [jobs]);
+
     // ==========================================
     // 5. Handlers
     // ==========================================
@@ -438,6 +657,14 @@ export function usePrint() {
                 addLog(`✅ QR Decoded: Kiosk ${value}`);
             }
 
+            // Handle kiosk switching (Task 5)
+            if (jobs.length > 0 && sessionKioskId.current && printerData.kiosk_id !== sessionKioskId.current) {
+                setNewKioskId(printerData.kiosk_id);
+                addLog(`[Session] New kiosk detected: ${printerData.kiosk_id} — will apply to next job`);
+                return;
+            }
+
+            sessionKioskId.current = printerData.kiosk_id;
             setConfig(printerData);
             setViewStatus('SCANNED');
             checkKioskStatus(printerData.kiosk_id);
@@ -446,7 +673,7 @@ export function usePrint() {
             addLog('Invalid QR format');
             setScannerActive(true);
         }
-    }, [addLog, setConfig, checkKioskStatus]);
+    }, [addLog, setConfig, checkKioskStatus, jobs.length]);
 
     const handleScanError = useCallback((error) => {
         setCameraError(
@@ -480,16 +707,16 @@ export function usePrint() {
 
     const selectService = useCallback((type) => {
         if (type === 'print') {
-            setViewStatus('CONNECTED');
+            navigateTo('CONNECTED');
             addLog('Selected: Print');
         } else if (type === 'scan') {
-            setViewStatus('SCAN_OPTIONS');
+            navigateTo('SCAN_OPTIONS');
             addLog('Selected: Scan');
         } else if (type === 'xerox') {
-            setViewStatus('XEROX_OPTIONS');
+            navigateTo('XEROX_OPTIONS');
             addLog('Selected: Xerox (Photocopy)');
         }
-    }, [addLog]);
+    }, [addLog, navigateTo]);
 
     // ---- Scan Job ----
 
@@ -512,10 +739,12 @@ export function usePrint() {
 
         addLog('Creating scan job...');
 
+        const kioskId = getCurrentKioskId();
+
         try {
             const headers = await buildHeaders();
             const response = await axios.post(`${API_URL}/api/jobs/scan`, {
-                kiosk_id: config.kiosk_id,
+                kiosk_id: kioskId,
                 scan_options: scanOptions
             }, {
                 headers,
@@ -533,6 +762,8 @@ export function usePrint() {
                 filename: `scan_${Date.now()}.pdf`,
                 createdAt: new Date(),
                 pricing: { job_id, totalPrice: 5 },
+                kiosk_id: kioskId,
+                navStack: [viewStatus],
             });
 
             setJobs(prev => [...prev, newJob]);
@@ -555,7 +786,7 @@ export function usePrint() {
             setViewStatus('ERROR');
             addLog(`Scan error: ${e.response?.data?.error || e.message}`);
         }
-    }, [config, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length]);
+    }, [config, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length, viewStatus, getCurrentKioskId]);
 
     // ---- Xerox Job ----
 
@@ -568,10 +799,12 @@ export function usePrint() {
 
         addLog(`Creating xerox job (${xeroxCopies} copies)...`);
 
+        const kioskId = getCurrentKioskId();
+
         try {
             const headers = await buildHeaders();
             const response = await axios.post(`${API_URL}/api/jobs/xerox`, {
-                kiosk_id: config.kiosk_id,
+                kiosk_id: kioskId,
                 copies: xeroxCopies,
                 scan_options: scanOptions
             }, {
@@ -598,6 +831,8 @@ export function usePrint() {
                 pages: xeroxCopies,
                 createdAt: new Date(),
                 pricing: { job_id, totalPrice: total_cost },
+                kiosk_id: kioskId,
+                navStack: [viewStatus],
             });
 
             setJobs(prev => [...prev, newJob]);
@@ -620,7 +855,7 @@ export function usePrint() {
             setViewStatus('ERROR');
             addLog(`Xerox error: ${e.response?.data?.error || e.message}`);
         }
-    }, [config, xeroxCopies, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length]);
+    }, [config, xeroxCopies, scanOptions, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length, viewStatus, getCurrentKioskId]);
 
     // ---- Print Handlers ----
 
@@ -643,12 +878,14 @@ export function usePrint() {
             addLog(`File will be converted to PDF before printing`);
         }
 
-        setViewStatus('CALCULATING');
+        navigateTo('CALCULATING');
         addLog(`Creating job for ${selectedFile.name}...`);
+
+        const kioskId = getCurrentKioskId();
 
         const fd = new FormData();
         fd.append('file', selectedFile);
-        fd.append('kiosk_id', config.kiosk_id);
+        fd.append('kiosk_id', kioskId);
         fd.append('job_type', 'print');
 
         try {
@@ -677,6 +914,8 @@ export function usePrint() {
                     pricePerPage: price_per_page,
                     totalPrice: total_cost
                 },
+                kiosk_id: kioskId,
+                navStack: ['SERVICE_SELECT', 'CONNECTED'],
             });
 
             setJobs(prev => [...prev, newJob]);
@@ -698,7 +937,7 @@ export function usePrint() {
             setViewStatus('ERROR');
             addLog(`Error: ${e.response?.data?.error || e.message}`);
         }
-    }, [config, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length]);
+    }, [config, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length, navigateTo, getCurrentKioskId]);
 
     const handlePayment = useCallback(async () => {
         if (!activeJob?.jobId) return;
@@ -740,6 +979,9 @@ export function usePrint() {
         setScannerActive(true);
         setScanOptions({ resolution: 300, colorMode: 'RGB24' });
         setXeroxCopies(1);
+        sessionKioskId.current = null;
+        setNewKioskId(null);
+        initialUrlProcessed.current = false;
         addLog('Reset to scanner');
     }, [addLog]);
 
@@ -767,15 +1009,27 @@ export function usePrint() {
         // Guests capped at 1
         if (isGuest === true) return;
 
+        // Use newKioskId if available (Task 5), otherwise sessionKioskId
+        const kioskForNewJob = newKioskId || sessionKioskId.current || config?.kiosk_id;
+
         // Create new job entry and switch to it
-        const newJob = createJobEntry({ status: 'IDLE' });
+        const newJob = createJobEntry({
+            status: 'IDLE',
+            kiosk_id: kioskForNewJob,
+        });
         setJobs(prev => [...prev, newJob]);
         setActiveJobIndex(jobs.length); // point to the new entry (0-based)
         setViewStatus('SERVICE_SELECT');
         setScanOptions({ resolution: 300, colorMode: 'RGB24' });
         setXeroxCopies(1);
-        addLog('Adding another job...');
-    }, [jobs.length, isGuest, addLog]);
+
+        if (newKioskId) {
+            addLog(`Adding another job on kiosk ${newKioskId}...`);
+            setNewKioskId(null); // consumed
+        } else {
+            addLog('Adding another job...');
+        }
+    }, [jobs.length, isGuest, addLog, newKioskId, config]);
 
     // ==========================================
     // 6. Return
@@ -802,6 +1056,19 @@ export function usePrint() {
         scanOptions,
         xeroxCopies,
         jobPhase,
+
+        // Navigation
+        canGoBack,
+        goBack,
+        currentNavStep,
+        currentNavStepIndex,
+
+        // Modals
+        showBackConfirmModal,
+        setShowBackConfirmModal,
+        confirmGoBack,
+        showExpiryModal,
+        setShowExpiryModal,
 
         // Handlers
         handleScan,

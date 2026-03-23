@@ -8,6 +8,11 @@ import { getFileIcon, getFileExt } from './printUtils';
 import { AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog, DialogContent, DialogHeader, DialogFooter,
+  DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
+import { PENDING_JOB_EXPIRY_MINUTES } from './usePrint';
 import ZXingScanner from './ZXingScanner'
 
 export function QRScannerView({ 
@@ -452,14 +457,6 @@ export function PaymentView({ pricing, handlePayment, setStatus, setFile, setPri
         Pay ₹{pricing.totalPrice} & Print
       </Button>
       
-      <Button 
-        variant="ghost" 
-        size="sm" 
-        onClick={() => { setStatus('CONNECTED'); setFile(null); setPricing(null); }} 
-        className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5"
-      >
-        ← Choose Different File
-      </Button>
     </div>
   );
 }
@@ -1165,5 +1162,67 @@ export function LogTerminal({ logs }) {
         logs.slice(0, 10).map((l, i) => <div key={i} className="mb-1">{l}</div>)
       )}
     </div>
+  );
+}
+
+
+// ─── Modal: Back Confirmation (Task 3) ──────────────────────
+const JOB_TYPE_LABELS = { print: 'Print', scan: 'Scan', xerox: 'Xerox' };
+
+export function BackConfirmModal({ open, onOpenChange, onConfirm }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Go back?</DialogTitle>
+          <DialogDescription>
+            This job will stay as pending. You have {PENDING_JOB_EXPIRY_MINUTES} minutes to resume
+            it before it expires.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Stay here
+          </Button>
+          <Button
+            onClick={onConfirm}
+            className="bg-white text-black hover:bg-neutral-200"
+          >
+            Go back
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+// ─── Modal: Job Expired (Task 4) ────────────────────────────
+export function ExpiryModal({ open, onOpenChange, jobType }) {
+  const label = JOB_TYPE_LABELS[jobType] || 'Print';
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Job expired</DialogTitle>
+          <DialogDescription>
+            Your {label} job expired before payment was completed. No charge was made.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            onClick={() => onOpenChange(false)}
+            className="w-full bg-white text-black hover:bg-neutral-200"
+          >
+            OK
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

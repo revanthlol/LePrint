@@ -171,16 +171,19 @@ export function usePrint() {
 
     // Derived: can go back?
     const canGoBack = useMemo(() => {
+        // Pre-job screens: always allow back to SERVICE_SELECT
+        const preJobScreens = ['CONNECTED', 'SCAN_OPTIONS', 'XEROX_OPTIONS'];
+        if (preJobScreens.includes(viewStatus) && (!activeJob || !activeJob.jobId)) {
+            return true;
+        }
+        // Post-job-creation screens
         if (!activeJob) return false;
         if (activeJob.navStack.length === 0) return false;
-        // Disable back once paid/completed/failed
         const blocked = ['COMPLETED', 'SCAN_COMPLETE', 'FAILED'];
         if (blocked.includes(activeJob.status)) return false;
-        // Also block if the job is in an in-flight printing/scanning/xeroxing state
-        // (meaning payment was already made)
         if (['PRINTING', 'SCANNING', 'XEROXING'].includes(activeJob.status)) return false;
         return true;
-    }, [activeJob]);
+    }, [activeJob, viewStatus]);
 
     // Derived: are all jobs done?
     const allJobsDone = useMemo(() => {
@@ -241,15 +244,21 @@ export function usePrint() {
 
     // Go back one step
     const goBack = useCallback(() => {
+        // Pre-job screens: just go back to SERVICE_SELECT
+        const preJobScreens = ['CONNECTED', 'SCAN_OPTIONS', 'XEROX_OPTIONS'];
+        if (preJobScreens.includes(status) && (!activeJob || !activeJob.jobId)) {
+            setViewStatus('SERVICE_SELECT');
+            return;
+        }
+
         if (!activeJob || activeJob.navStack.length === 0) return;
 
         // Block if paid/completed/failed/in-flight
         const blocked = ['COMPLETED', 'SCAN_COMPLETE', 'FAILED', 'PRINTING', 'SCANNING', 'XEROXING'];
         if (blocked.includes(activeJob.status)) return;
 
-        // If at PAYMENT screen or STATUS with PENDING job → show confirmation modal
-        const currentStatus = status;
-        if (currentStatus === 'PAYMENT' || (currentStatus === 'ERROR' && activeJob.status === 'PAYMENT')) {
+        // If at PAYMENT screen → show confirmation modal
+        if (status === 'PAYMENT') {
             setShowBackConfirmModal(true);
             return;
         }
@@ -268,6 +277,7 @@ export function usePrint() {
     // Confirm going back from PAYMENT (called by modal)
     const confirmGoBack = useCallback(() => {
         if (!activeJob) return;
+        const isBackingFromPayment = viewStatus === 'PAYMENT';
 
         const stack = [...activeJob.navStack];
         const prevStep = stack.pop();
@@ -277,13 +287,16 @@ export function usePrint() {
                 ? {
                     ...j,
                     navStack: stack,
-                    expiresAt: Date.now() + (PENDING_JOB_EXPIRY_MINUTES * 60 * 1000),
+                    // Only set expiry when backing out of PAYMENT specifically
+                    ...(isBackingFromPayment ? {
+                        expiresAt: Date.now() + (PENDING_JOB_EXPIRY_MINUTES * 60 * 1000)
+                    } : {})
                 }
                 : j
         ));
         setViewStatus(prevStep || 'SERVICE_SELECT');
         setShowBackConfirmModal(false);
-    }, [activeJob]);
+    }, [activeJob, viewStatus]);
 
     // ==========================================
     // 3. Core Helper Functions
@@ -1059,25 +1072,61 @@ export function usePrint() {
 
                 // Exit scan mode
                 setScanKioskMode(false);
-
-                // Auto-create a new job on the new kiosk
-                const newJob = createJobEntry({
-                    status: 'IDLE',
-                    kiosk_id: kioskId,
-                });
-                setJobs(prev => [...prev, newJob]);
-                setActiveJobIndex(prev => prev + 1 >= 0 ? jobs.length : 0);
-                setViewStatus('SERVICE_SELECT');
                 setScanOptions({ resolution: 300, colorMode: 'RGB24' });
                 setXeroxCopies(1);
 
-                addLog(`✓ Connected to "${response.data.kiosk_name || kioskId}" — new job started`);
+                // Check if current active job is still IDLE (not yet submitted)
+                const currentActiveJob = jobs[activeJobIndex];
+                if (currentActiveJob && !currentActiveJob.jobId) {
+                    // Reuse the existing IDLE job entry — just update its kiosk_id
+                    setJobs(prev => prev.map((j, i) =>
+                        i === activeJobIndex ? { ...j, kiosk_id: kioskId } : j
+                    ));
+                    setViewStatus('SERVICE_SELECT');
+                } else {
+                    // Active job already submitted — create a new job entry
+                    const newJob = createJobEntry({ status: 'IDLE', kiosk_id: kioskId });
+                    setJobs(prev => [...prev, newJob]);
+                    setActiveJobIndex(jobs.length);
+                    setViewStatus('SERVICE_SELECT');
+                }
+
+                addLog(`✓ Connected to "${response.data.kiosk_name || kioskId}"`);
                 setNewKioskId(null); // consumed
             }
         } catch (e) {
             addLog(`✗ Failed to connect to ${kioskId}: ${e.message}`);
         }
-    }, [API_URL, addLog, jobs.length]);
+    }, [API_URL, addLog, jobs, activeJobIndex]);
+
+    // ---- Cancel a pending job ----
+    const cancelJob = useCallback((jobIndex) => {
+        const job = jobs[jobIndex];
+        if (!job) return;
+        // Only allow cancelling jobs that haven't been paid
+        const cancellable = ['IDLE', 'PAYMENT', 'CALCULATING', 'ERROR'];
+        if (!cancellable.includes(job.status)) return;
+
+        setJobs(prev => {
+            const filtered = prev.filter((_, i) => i !== jobIndex);
+            // If no jobs left, reset to scanner
+            if (filtered.length === 0) {
+                setViewStatus('IDLE');
+                setConfig(null);
+                sessionKioskId.current = null;
+            }
+            return filtered;
+        });
+
+        // Adjust activeJobIndex
+        setActiveJobIndex(prev => {
+            if (jobIndex < prev) return prev - 1;
+            if (jobIndex === prev) return Math.max(0, prev - 1);
+            return prev;
+        });
+
+        addLog(`Job cancelled`);
+    }, [jobs, addLog]);
 
     // ==========================================
     // 6. Return
@@ -1139,6 +1188,7 @@ export function usePrint() {
         handleXeroxStart,
         backToServiceSelect,
         addAnotherJob,
+        cancelJob,
         addLog,
 
         // Setters (backward compat)

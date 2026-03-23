@@ -76,12 +76,13 @@ function CountdownTimer({ expiresAt }) {
   return <span className="text-[10px] text-muted-foreground tabular-nums">{timeLeft}</span>;
 }
 
-function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, scanKioskMode, setScanKioskMode }) {
+function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, scanKioskMode, setScanKioskMode, cancelJob }) {
   return (
     <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-1 py-2 border-b border-border -mx-6 px-6">
       {jobs.map((job, i) => {
         const isActive = i === activeJobIndex && !scanKioskMode;
         const isExpired = job.locallyExpired;
+        const isCancellable = ['IDLE', 'PAYMENT', 'CALCULATING', 'ERROR'].includes(job.status) && !isExpired;
 
         return (
           <button
@@ -99,6 +100,16 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
               <span>{isExpired ? '⚠' : (JOB_ICONS[job.jobType] || '🖨️')}</span>
               <span>{isExpired ? 'Expired' : (JOB_LABELS[job.jobType] || 'Job')}</span>
               {!isExpired && <StatusDot status={job.status} />}
+              {isCancellable && (
+                <span
+                  role="button"
+                  onClick={(e) => { e.stopPropagation(); cancelJob(i); }}
+                  className="ml-0.5 text-muted-foreground hover:text-red-400 transition-colors text-[10px] leading-none cursor-pointer"
+                  title="Cancel job"
+                >
+                  ✕
+                </span>
+              )}
             </div>
             {/* Countdown timer for pending jobs with expiry */}
             {job.expiresAt && !isExpired && (
@@ -308,6 +319,7 @@ export function PrintInterface() {
     scanKioskMode,
     setScanKioskMode,
     handleScanKioskConnect,
+    cancelJob,
   } = printState;
 
   // Can add another job: < 5 jobs AND not a guest
@@ -354,6 +366,7 @@ export function PrintInterface() {
               canAdd={canAddJob}
               scanKioskMode={scanKioskMode}
               setScanKioskMode={setScanKioskMode}
+              cancelJob={cancelJob}
             />
           )}
 

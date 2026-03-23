@@ -163,13 +163,14 @@ function pollCupsJobStatus(cupsJobId, logger) {
 }
 
 // ==================== PRINT EXECUTION ====================
-async function printDocument(printerName, filePath, pages, logger) {
+async function printDocument(printerName, filePath, pages, logger, settings = {}) {
   if (SIMULATE) {
     const fileName = filePath.split('/').pop();
     logger.info(`🖨️  [SIM] Simulating Print Job`);
     logger.info(`   File: ${fileName}`);
     logger.info(`   Pages: ${pages}`);
     logger.info(`   Printer: VIRTUAL_PRINTER`);
+    logger.info(`   [SIM] Settings: ${JSON.stringify(settings)}`);
 
     // Simulate print delay (2-3 seconds)
     const delay = 2000 + Math.random() * 1000;
@@ -182,7 +183,16 @@ async function printDocument(printerName, filePath, pages, logger) {
   return new Promise((resolve, reject) => {
     logger.info(`🖨️  Sending to CUPS — file: ${filePath.split('/').pop()}, pages: ${pages}`);
 
-    const cmd = `lp -d ${printerName} "${filePath}"`;
+    const opts = [];
+    if (settings.colorMode === 'bw') opts.push('-o ColorModel=KGray');
+    if (settings.orientation === 'landscape') opts.push('-o landscape');
+    if (settings.copies && settings.copies > 1) opts.push(`-n ${settings.copies}`);
+    if (settings.pageRange && settings.pageRange !== 'all' && /^[\d,\-]+$/.test(settings.pageRange)) {
+      opts.push(`-o page-ranges=${settings.pageRange}`);
+    }
+    if (settings.scaling === 'fit') opts.push('-o fit-to-page');
+    const optStr = opts.length ? opts.join(' ') + ' ' : '';
+    const cmd = `lp -d ${printerName} ${optStr}"${filePath}"`;
 
     exec(cmd, async (error, stdout, stderr) => {
       if (error) {

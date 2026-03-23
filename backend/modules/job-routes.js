@@ -230,13 +230,27 @@ router.post('/jobs/:job_id/verify-payment', verifyToken, async (req, res) => {
 
         const { token, timestamp } = generatePrintToken(job_id, job.kiosk_id);
 
+        const printSettings = req.body.print_settings || {};
+        const copies = req.body.copies || 1;
+        const existingMetadata = job.metadata || {};
+
         await db.updateJob(job_id, {
             status: 'PAID',
             payment_status: 'paid',
             payment_id: req.body.payment_id,
             paid_at: new Date(),
             print_token: token,
-            token_timestamp: timestamp
+            token_timestamp: timestamp,
+            metadata: {
+                ...existingMetadata,
+                print_settings: printSettings,
+                copies,
+                total_pages_to_print: (
+                    printSettings.pageRange && printSettings.pageRange !== 'all'
+                        ? Math.max(1, copies)
+                        : (job.pages || 1) * copies
+                )
+            }
         });
 
         const payerId = req.user.isGuest ? 'guest:' + req.user.guestId : req.user.uid;

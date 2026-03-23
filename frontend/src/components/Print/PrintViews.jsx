@@ -1,10 +1,17 @@
-import React, { Suspense, useState, useEffect, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import {
   Loader2, QrCode, AlertCircle, Zap, FileUp,
   IndianRupee, CheckCircle, Printer,
-  ScanLine, Copy, Download, Minus, Plus, ArrowLeft, ExternalLink
+  ScanLine, Copy, Download, Minus, Plus, ArrowLeft, ExternalLink,
+  ArrowUp, ArrowRight, FileText
 } from 'lucide-react';
 import { getFileIcon, getFileExt } from './printUtils';
+import * as pdfjsLib from 'pdfjs-dist';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).href;
 import { AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -424,6 +431,255 @@ export function FileUploadView({ file, status, handleFileSelect }) {
    </div>
   );
 }
+
+
+// ─── VIEW: Print Settings + Live Preview ────────────────────
+// Helper to parse page range
+function countPagesInRangeLocal(rangeStr, maxPages) {
+    if (!rangeStr || rangeStr === 'all') return maxPages;
+    try {
+        const pages = new Set();
+        const parts = rangeStr.split(',');
+        for (const part of parts) {
+            const trimmed = part.trim();
+            if (trimmed.includes('-')) {
+                const [s, e] = trimmed.split('-');
+                const start = Math.max(1, parseInt(s) || 1);
+                const end = Math.min(maxPages, parseInt(e) || maxPages);
+                for (let i = start; i <= end; i++) pages.add(i);
+            } else {
+                const p = parseInt(trimmed);
+                if (p >= 1 && p <= maxPages) pages.add(p);
+            }
+        }
+        return Math.max(1, pages.size);
+    } catch {
+        return maxPages;
+    }
+}
+
+export function PrintSettingsView({ file, pages, pricing, printSettings, updatePrintSettings, onProceed }) {
+    const canvasRef = useRef(null);
+    const [customRange, setCustomRange] = useState('');
+    const [rangeError, setRangeError] = useState(false);
+
+    const ext = file ? getFileExt(file.name) : '';
+    const isPdf = ext === 'pdf';
+    const isImage = ['jpg', 'jpeg', 'png'].includes(ext);
+
+    const { colorMode = 'bw', orientation = 'portrait', copies = 1, pageRange = 'all', scaling = 'fit' } = printSettings || {};
+    const pricePerPage = colorMode === 'color' ? 10 : 3;
+    const effectivePages = pageRange === 'all' ? (pages || 1) : countPagesInRangeLocal(customRange || pageRange, pages || 1);
+    const totalPrice = effectivePages * copies * pricePerPage;
+
+    // PDF preview renderer
+    useEffect(() => {
+        if (!isPdf || !file || !canvasRef.current) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data }).promise;
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 1.0 });
+                const canvas = canvasRef.current;
+                if (!canvas || cancelled) return;
+                const ctx = canvas.getContext('2d');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                await page.render({ canvasContext: ctx, viewport }).promise;
+            } catch (err) {
+                console.error('PDF preview error:', err);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [file, isPdf, orientation]);
+
+    // Image preview URL
+    const [imgUrl, setImgUrl] = useState(null);
+    useEffect(() => {
+        if (!isImage || !file) return;
+        const url = URL.createObjectURL(file);
+        setImgUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [file, isImage]);
+
+    // Handle custom range changes
+    const handleRangeInput = useCallback((val) => {
+        setCustomRange(val);
+        const valid = /^[\d,\- ]+$/.test(val) || val === '';
+        setRangeError(!valid && val !== '');
+        if (valid && val.trim()) {
+            updatePrintSettings({ pageRange: val.trim() });
+        }
+    }, [updatePrintSettings]);
+
+    const previewFilterStyle = {};
+    if (colorMode === 'bw') previewFilterStyle.filter = 'grayscale(1)';
+    if (orientation === 'landscape') previewFilterStyle.transform = 'rotate(90deg)';
+
+    const ToggleBtn = ({ active, onClick, children, className = '' }) => (
+        <button
+            onClick={onClick}
+            className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-all ${
+                active
+                    ? 'bg-white text-black'
+                    : 'bg-white/5 text-muted-foreground border border-border hover:bg-white/10'
+            } ${className}`}
+        >
+            {children}
+        </button>
+    );
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4"
+        >
+            {/* ─── Preview Section ─── */}
+            <div>
+                <p className="text-xs text-muted-foreground mb-2">Live preview</p>
+                <div className="max-h-52 rounded-xl border border-border overflow-hidden flex items-center justify-center bg-muted/10">
+                    {isPdf ? (
+                        <div style={previewFilterStyle} className="flex flex-col items-center p-2">
+                            <canvas ref={canvasRef} className="max-h-44 max-w-full object-contain" />
+                            <p className="text-xs text-muted-foreground mt-1">Page 1 of {pages}</p>
+                        </div>
+                    ) : isImage ? (
+                        <div style={previewFilterStyle} className="p-2">
+                            {imgUrl && <img src={imgUrl} className="max-h-48 object-contain" alt="Preview" />}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                            <FileText className="w-10 h-10 text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">Preview not available for this file type</p>
+                            <p className="text-xs text-muted-foreground/60 mt-1">Your document will print as-is</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ─── Settings ─── */}
+            <div className="space-y-3 mt-4">
+                {/* Color Mode */}
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Color Mode</span>
+                    <div className="flex gap-1.5">
+                        <ToggleBtn active={colorMode === 'bw'} onClick={() => updatePrintSettings({ colorMode: 'bw' })}>
+                            B&W · ₹3/pg
+                        </ToggleBtn>
+                        <ToggleBtn active={colorMode === 'color'} onClick={() => updatePrintSettings({ colorMode: 'color' })}>
+                            Color · ₹10/pg
+                        </ToggleBtn>
+                    </div>
+                </div>
+
+                {/* Orientation */}
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Orientation</span>
+                    <div className="flex gap-1.5">
+                        <ToggleBtn active={orientation === 'portrait'} onClick={() => updatePrintSettings({ orientation: 'portrait' })}>
+                            <ArrowUp className="w-3 h-3 inline mr-1" /> Portrait
+                        </ToggleBtn>
+                        <ToggleBtn active={orientation === 'landscape'} onClick={() => updatePrintSettings({ orientation: 'landscape' })}>
+                            <ArrowRight className="w-3 h-3 inline mr-1" /> Landscape
+                        </ToggleBtn>
+                    </div>
+                </div>
+
+                {/* Copies */}
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Copies</span>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => updatePrintSettings({ copies: Math.max(1, copies - 1) })}
+                            disabled={copies <= 1}
+                            className="w-8 h-8 rounded-lg bg-white/5 border border-border hover:bg-white/10 flex items-center justify-center disabled:opacity-30 transition-all"
+                        >
+                            <Minus className="w-4 h-4 text-foreground" />
+                        </button>
+                        <span className="text-lg font-bold text-foreground w-8 text-center">{copies}</span>
+                        <button
+                            onClick={() => updatePrintSettings({ copies: Math.min(20, copies + 1) })}
+                            disabled={copies >= 20}
+                            className="w-8 h-8 rounded-lg bg-white/5 border border-border hover:bg-white/10 flex items-center justify-center disabled:opacity-30 transition-all"
+                        >
+                            <Plus className="w-4 h-4 text-foreground" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Page Range */}
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Page Range</span>
+                        <div className="flex gap-1.5">
+                            <ToggleBtn active={pageRange === 'all'} onClick={() => { updatePrintSettings({ pageRange: 'all' }); setCustomRange(''); setRangeError(false); }}>
+                                All pages
+                            </ToggleBtn>
+                            <ToggleBtn active={pageRange !== 'all'} onClick={() => { updatePrintSettings({ pageRange: customRange || '1' }); }}>
+                                Custom
+                            </ToggleBtn>
+                        </div>
+                    </div>
+                    {pageRange !== 'all' && (
+                        <div className="space-y-1">
+                            <input
+                                type="text"
+                                value={customRange}
+                                onChange={(e) => handleRangeInput(e.target.value)}
+                                placeholder="e.g. 1-3 or 1,3,5"
+                                className={`w-full px-3 py-2 bg-muted/10 border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 text-sm transition-all ${
+                                    rangeError ? 'border-red-500 focus:ring-red-500/30' : 'border-border focus:ring-white/30'
+                                }`}
+                            />
+                            {!rangeError && customRange && (
+                                <p className="text-xs text-muted-foreground">{effectivePages} page{effectivePages !== 1 ? 's' : ''} selected</p>
+                            )}
+                            {rangeError && (
+                                <p className="text-xs text-red-400">Invalid format. Use numbers, commas, and dashes.</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Scaling */}
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Scaling</span>
+                    <div className="flex gap-1.5">
+                        <ToggleBtn active={scaling === 'fit'} onClick={() => updatePrintSettings({ scaling: 'fit' })}>
+                            Fit to page
+                        </ToggleBtn>
+                        <ToggleBtn active={scaling === 'actual'} onClick={() => updatePrintSettings({ scaling: 'actual' })}>
+                            Actual size
+                        </ToggleBtn>
+                    </div>
+                </div>
+            </div>
+
+            {/* ─── Price Summary ─── */}
+            <div className="mt-4 p-3 rounded-xl bg-white/5 border border-border text-sm">
+                <p className="text-foreground">
+                    {effectivePages} page{effectivePages !== 1 ? 's' : ''} × {copies} {copies === 1 ? 'copy' : 'copies'} × ₹{pricePerPage}/page = <span className="font-bold">₹{totalPrice}</span>
+                </p>
+                {colorMode === 'color' && (
+                    <p className="text-amber-400 text-xs mt-1">Color printing: ₹10/page</p>
+                )}
+            </div>
+
+            {/* ─── Proceed Button ─── */}
+            <button
+                onClick={onProceed}
+                disabled={rangeError}
+                className="w-full bg-white text-black hover:bg-neutral-200 py-3 mt-4 rounded-xl font-medium transition-colors disabled:opacity-50"
+            >
+                Continue to Payment →
+            </button>
+        </motion.div>
+    );
+}
+
 
 export function PaymentView({ pricing, handlePayment, setStatus, setFile, setPricing }) {
   return (

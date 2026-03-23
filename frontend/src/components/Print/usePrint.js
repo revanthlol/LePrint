@@ -25,19 +25,20 @@ export const NAV_STEPS = [
 
 // Map viewStatus values → canonical nav step id
 const VIEW_TO_NAV_STEP = {
-    'SERVICE_SELECT': 'SERVICE_SELECT',
-    'CONNECTED':      'UPLOAD',
-    'SCAN_OPTIONS':   'UPLOAD',
-    'XEROX_OPTIONS':  'UPLOAD',
-    'CALCULATING':    'CONFIRM',
-    'PAYMENT':        'PAYMENT',
-    'PRINTING':       'STATUS',
-    'SCANNING':       'STATUS',
-    'XEROXING':       'STATUS',
-    'COMPLETED':      'STATUS',
-    'SCAN_COMPLETE':  'STATUS',
-    'ERROR':          'STATUS',
-    'FAILED':         'STATUS',
+    'SERVICE_SELECT':    'SERVICE_SELECT',
+    'CONNECTED':         'UPLOAD',
+    'SCAN_OPTIONS':      'UPLOAD',
+    'XEROX_OPTIONS':     'UPLOAD',
+    'CALCULATING':       'CONFIRM',
+    'SETTINGS_PREVIEW':  'CONFIRM',
+    'PAYMENT':           'PAYMENT',
+    'PRINTING':          'STATUS',
+    'SCANNING':          'STATUS',
+    'XEROXING':          'STATUS',
+    'COMPLETED':         'STATUS',
+    'SCAN_COMPLETE':     'STATUS',
+    'ERROR':             'STATUS',
+    'FAILED':            'STATUS',
 };
 
 // Session storage key for active job recovery
@@ -57,6 +58,43 @@ function loadSession() {
 
 function clearSession() {
     try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+}
+
+// ─── Helpers ────────────────────────────────────────────────
+
+// Parse a page range string like "1-3" or "1,3,5" into a count
+function countPagesInRange(rangeStr, maxPages) {
+    if (!rangeStr || rangeStr === 'all') return maxPages;
+    try {
+        const pages = new Set();
+        const parts = rangeStr.split(',');
+        for (const part of parts) {
+            const trimmed = part.trim();
+            if (trimmed.includes('-')) {
+                const [startStr, endStr] = trimmed.split('-');
+                const start = Math.max(1, parseInt(startStr) || 1);
+                const end = Math.min(maxPages, parseInt(endStr) || maxPages);
+                for (let i = start; i <= end; i++) pages.add(i);
+            } else {
+                const p = parseInt(trimmed);
+                if (p >= 1 && p <= maxPages) pages.add(p);
+            }
+        }
+        return Math.max(1, pages.size);
+    } catch {
+        return maxPages;
+    }
+}
+
+// Recalculate pricing based on print settings
+function recalcPricing(job) {
+    if (!job?.printSettings || !job?.pages) return job?.pricing;
+    const effectivePages = job.printSettings.pageRange === 'all'
+        ? job.pages
+        : countPagesInRange(job.printSettings.pageRange, job.pages);
+    const pricePerPage = job.printSettings.colorMode === 'color' ? 10 : 3;
+    const totalPrice = effectivePages * (job.printSettings.copies || 1) * pricePerPage;
+    return { ...job.pricing, totalPrice, effectivePages, pricePerPage };
 }
 
 // ─── Job entry factory ──────────────────────────────────────
@@ -79,6 +117,14 @@ function createJobEntry(overrides = {}) {
         serviceType: 'print',
         file: null,
         kiosk_id: null,
+        // Print settings
+        printSettings: {
+            colorMode: 'bw',
+            orientation: 'portrait',
+            copies: 1,
+            pageRange: 'all',
+            scaling: 'fit',
+        },
         // Navigation stack
         navStack: [],
         // Expiry tracking
@@ -915,12 +961,13 @@ export function usePrint() {
 
             const { job_id, pages, price_per_page, total_cost } = response.data;
 
-            // Create job entry in PAYMENT state
+            // Create job entry in IDLE state (not PAYMENT) so derived status
+            // useMemo doesn't override viewStatus before SETTINGS_PREVIEW renders
             const newJob = createJobEntry({
                 jobId: job_id,
                 jobType: 'print',
                 serviceType: 'print',
-                status: 'PAYMENT',
+                status: 'IDLE',
                 filename: selectedFile.name,
                 file: selectedFile,
                 pages,
@@ -937,9 +984,9 @@ export function usePrint() {
 
             setJobs(prev => [...prev, newJob]);
             setActiveJobIndex(prev => jobs.length);
-            setViewStatus('PAYMENT');
+            navigateTo('SETTINGS_PREVIEW');
 
-            addLog(`Job created: ${pages} pages × ₹${price_per_page} = ₹${total_cost}`);
+            addLog(`Job created: ${pages} pages — configure settings`);
 
             if (isGuest) incrementJobCount();
             if (isGuest && isLastJob) addLog('⚠ This is your last guest job today. Sign in for unlimited access.');
@@ -956,6 +1003,25 @@ export function usePrint() {
         }
     }, [config, API_URL, addLog, buildHeaders, signOut, isGuest, canCreateJob, isLastJob, incrementJobCount, jobs.length, navigateTo, getCurrentKioskId]);
 
+    // Update print settings on active job and recalculate pricing
+    const updatePrintSettings = useCallback((updates) => {
+        if (!activeJob?.jobId) return;
+        setJobs(prev => prev.map(j => {
+            if (j.jobId !== activeJob.jobId) return j;
+            const updated = { ...j, printSettings: { ...j.printSettings, ...updates } };
+            updated.pricing = recalcPricing(updated);
+            return updated;
+        }));
+    }, [activeJob]);
+
+    // Proceed from SETTINGS_PREVIEW to PAYMENT
+    const handleProceedToPayment = useCallback(() => {
+        if (!activeJob?.jobId) return;
+        const updatedPricing = recalcPricing(activeJob);
+        updateJob(activeJob.jobId, { status: 'PAYMENT', pricing: updatedPricing });
+        navigateTo('PAYMENT');
+    }, [activeJob, updateJob, navigateTo]);
+
     const handlePayment = useCallback(async () => {
         if (!activeJob?.jobId) return;
 
@@ -968,7 +1034,11 @@ export function usePrint() {
 
             await axios.post(
                 `${API_URL}/api/jobs/${activeJob.jobId}/verify-payment`,
-                { payment_id: 'mock_payment_' + Date.now() },
+                {
+                    payment_id: 'mock_payment_' + Date.now(),
+                    print_settings: activeJob.printSettings,
+                    copies: activeJob.printSettings?.copies || 1
+                },
                 { headers }
             );
 
@@ -1172,6 +1242,10 @@ export function usePrint() {
         scanKioskMode,
         setScanKioskMode,
         handleScanKioskConnect,
+
+        // Print settings
+        updatePrintSettings,
+        handleProceedToPayment,
 
         // Handlers
         handleScan,

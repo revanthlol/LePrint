@@ -171,11 +171,13 @@ async function processJob(jobId, state, socket, logger) {
     logger.job(`[PRINT] ${jobId} starting print phase — ${elapsedSince(jobStartTime)} since job start`);
     safeEmit(socket, state, "print_started", { job_id: jobId });
 
+    const settings = job.metadata?.print_settings || {};
     const printResult = await printer.printDocument(
       state.printerName,
       finalPdfPath,
       job.pages,
       logger,
+      settings
     );
 
     safeEmit(socket, state, "print_complete", {
@@ -353,11 +355,13 @@ async function processXeroxJob(jobId, cloudServer, state, socket, logger) {
       status_message: `Printing ${copies} copy${copies > 1 ? "ies" : ""}`,
     });
 
+    const settings = job.metadata?.print_settings || {};
     const printResult = await printer.printDocument(
       state.printerName,
       scanOutputPath,
       copies,
       logger,
+      settings
     );
 
     safeEmit(socket, state, "print_complete", {

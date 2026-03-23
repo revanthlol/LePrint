@@ -16,6 +16,7 @@ import {
   QRScannerView,
   ConnectView,
   FileUploadView,
+  PrintSettingsView,
   PaymentView,
   JobProgressView,
   CompletedView,
@@ -328,6 +329,8 @@ export function PrintInterface() {
     setScanKioskMode,
     handleScanKioskConnect,
     cancelJob,
+    updatePrintSettings,
+    handleProceedToPayment,
   } = printState;
 
   // Can add another job: < 5 jobs AND not a guest AND kiosk connected
@@ -451,6 +454,18 @@ export function PrintInterface() {
               {/* VIEW: File upload / calculation (Print flow) */}
               {(status === 'CONNECTED' || status === 'CALCULATING') && (
                 <FileUploadView {...viewProps} />
+              )}
+
+              {/* VIEW: Print Settings + Preview (Print flow) */}
+              {status === 'SETTINGS_PREVIEW' && (
+                <PrintSettingsView
+                  file={activeJob?.file}
+                  pages={activeJob?.pages}
+                  pricing={activeJob?.pricing}
+                  printSettings={activeJob?.printSettings}
+                  updatePrintSettings={updatePrintSettings}
+                  onProceed={handleProceedToPayment}
+                />
               )}
 
               {/* VIEW: Payment (Print flow) */}

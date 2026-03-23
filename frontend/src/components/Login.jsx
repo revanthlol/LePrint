@@ -38,6 +38,7 @@ export function Login() {
     const { startGuestSession } = useGuest();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [termsAccepted, setTermsAccepted] = useState(false);
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
@@ -174,12 +175,28 @@ export function Login() {
                             )}
                         </AnimatePresence>
 
+                        {/* Terms & Conditions Checkbox */}
+                        <label className="flex items-start gap-3 mb-6 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={termsAccepted}
+                                onChange={(e) => setTermsAccepted(e.target.checked)}
+                                className="mt-0.5 w-4 h-4 rounded border-border accent-white cursor-pointer"
+                            />
+                            <span className="text-xs text-muted-foreground leading-relaxed">
+                                I agree to the{' '}
+                                <a href="/terms" target="_blank" className="text-blue-400 hover:underline">Terms & Conditions</a>{' '}
+                                and{' '}
+                                <a href="/privacy-policy" target="_blank" className="text-blue-400 hover:underline">Privacy Policy</a>
+                            </span>
+                        </label>
+
                         {/* Google Sign In Button with enhanced interactions */}
                         <motion.button
                             onClick={handleGoogleSignIn}
-                            disabled={loading}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                            disabled={loading || !termsAccepted}
+                            whileHover={{ scale: termsAccepted ? 1.02 : 1 }}
+                            whileTap={{ scale: termsAccepted ? 0.98 : 1 }}
                             className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-white hover:bg-gray-50 border-2 border-gray-200 rounded-xl font-semibold text-gray-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                         >
                             <AnimatePresence mode="wait">
@@ -239,9 +256,10 @@ export function Login() {
                         {/* Continue as Guest */}
                         <motion.button
                             onClick={handleGuestContinue}
-                            whileHover={{ scale: 1.01 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 bg-transparent border border-border rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all duration-200"
+                            disabled={!termsAccepted}
+                            whileHover={{ scale: termsAccepted ? 1.01 : 1 }}
+                            whileTap={{ scale: termsAccepted ? 0.98 : 1 }}
+                            className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 bg-transparent border border-border rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <UserX className="w-4 h-4" />
                             Continue as Guest

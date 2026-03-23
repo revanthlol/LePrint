@@ -287,6 +287,7 @@ export function usePrint() {
                 ? {
                     ...j,
                     navStack: stack,
+                    status: 'IDLE', // Reset so status useMemo stops overriding viewStatus
                     // Only set expiry when backing out of PAYMENT specifically
                     ...(isBackingFromPayment ? {
                         expiresAt: Date.now() + (PENDING_JOB_EXPIRY_MINUTES * 60 * 1000)

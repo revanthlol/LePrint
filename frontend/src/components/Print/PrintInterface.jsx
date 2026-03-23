@@ -79,6 +79,14 @@ function CountdownTimer({ expiresAt }) {
 function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, scanKioskMode, setScanKioskMode, cancelJob }) {
   return (
     <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-1 py-2 border-b border-border -mx-6 px-6">
+      {/* Placeholder tab when no jobs exist yet */}
+      {jobs.length === 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground border border-dashed border-border/50 shrink-0 whitespace-nowrap">
+          <span>🖨️</span>
+          <span>New job</span>
+        </div>
+      )}
+
       {jobs.map((job, i) => {
         const isActive = i === activeJobIndex && !scanKioskMode;
         const isExpired = job.locallyExpired;
@@ -88,7 +96,7 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
           <button
             key={job.jobId || i}
             onClick={() => { setActiveJobIndex(i); setScanKioskMode(false); }}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
+            className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-all ${
               isExpired
                 ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                 : isActive
@@ -104,7 +112,7 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
                 <span
                   role="button"
                   onClick={(e) => { e.stopPropagation(); cancelJob(i); }}
-                  className="ml-0.5 text-muted-foreground hover:text-red-400 transition-colors text-[10px] leading-none cursor-pointer"
+                  className="ml-0.5 w-5 h-5 flex items-center justify-center rounded-full text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors text-xs leading-none cursor-pointer"
                   title="Cancel job"
                 >
                   ✕
@@ -123,7 +131,7 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
       {scanKioskMode && (
         <button
           onClick={() => setScanKioskMode(true)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all bg-white/15 text-foreground border border-white/20"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-all bg-white/15 text-foreground border border-white/20"
         >
           <span>📡</span>
           <span>New Kiosk</span>
@@ -134,7 +142,7 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
       {canAdd && (
         <button
           onClick={onAddJob}
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 border border-dashed border-border shrink-0 transition-all text-lg leading-none"
+          className="flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 border border-dashed border-border shrink-0 transition-all text-xl leading-none"
           title="Add another job"
         >
           +
@@ -322,8 +330,11 @@ export function PrintInterface() {
     cancelJob,
   } = printState;
 
-  // Can add another job: < 5 jobs AND not a guest
-  const canAddJob = jobs.length < 5 && !isGuest;
+  // Can add another job: < 5 jobs AND not a guest AND kiosk connected
+  const isConnected = ['SERVICE_SELECT', 'CONNECTED', 'SCAN_OPTIONS',
+    'XEROX_OPTIONS', 'CALCULATING', 'PAYMENT', 'PRINTING', 'SCANNING',
+    'XEROXING', 'COMPLETED', 'SCAN_COMPLETE', 'ERROR'].includes(status);
+  const canAddJob = jobs.length < 5 && !isGuest && isConnected;
 
   // Get the expired job for the expiry modal
   const expiredJob = showExpiryModal ? jobs.find(j => j.jobId === showExpiryModal) : null;
@@ -337,8 +348,11 @@ export function PrintInterface() {
     isGuest,
   };
 
-  // Show tab bar when there are 1+ jobs or scanKioskMode
-  const showTabBar = jobs.length >= 1 || scanKioskMode;
+  // Show tab bar when there are 1+ jobs, scanning kiosk, or kiosk connected
+  const showTabBar = jobs.length >= 1
+    || scanKioskMode
+    || ['SERVICE_SELECT', 'CONNECTED', 'SCAN_OPTIONS', 'XEROX_OPTIONS',
+        'CALCULATING', 'PAYMENT'].includes(status);
 
   // Show all-jobs summary when all jobs are done AND we have >0 jobs
   const showSummary = allJobsDone && jobs.length > 0 && !scanKioskMode;

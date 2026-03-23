@@ -108,6 +108,19 @@ export function QRScannerView({
           Connect
         </Button>
       </div>
+
+      <div className="mt-4 p-3 rounded-xl bg-white/5 border border-border text-xs text-muted-foreground space-y-1">
+        <p className="font-medium text-foreground text-sm">
+          How LePrint works
+        </p>
+        <p>1. Scan the QR code at the printer kiosk</p>
+        <p>2. Upload your document and choose print settings</p>
+        <p>3. Pay securely online via Razorpay</p>
+        <p>4. Collect your printout at the kiosk</p>
+        <p className="pt-1 text-muted-foreground/70">
+          Printing starts only after successful payment confirmation.
+        </p>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 # Razorpay Payment Integration Guide
 
-This guide covers integrating Razorpay into JusPri for real payments. Currently the system uses mock payments (`mock_payment_*`). Follow this guide to enable real payment processing.
+This guide covers integrating Razorpay into LePrint for real payments. Currently the system uses mock payments (`mock_payment_*`). Follow this guide to enable real payment processing.
+
+> **Note:** The `razorpay` npm package (`razorpay@2.9.6`) is already installed in `backend/package.json` — no `npm install` needed.
 
 ---
 
@@ -198,20 +200,29 @@ Add to `frontend/index.html` inside `<head>`:
 
 ### 4.2 Update Payment Handler
 
-Replace the mock `handlePayment` in `usePrint.js`:
+Replace the mock `handlePayment` in `usePrint.js`.
+
+> **Current mock flow:** Currently `handlePayment()` uses `mock_payment_*` IDs via `POST /api/jobs/:id/verify-payment`. Replace this with the Razorpay order flow described below when ready to go live.
+
+The current `usePrint.js` uses a multi-job architecture. The active job is accessed via `activeJob` (derived from `jobs[activeJobIndex]`). Key state references:
+- `activeJob.jobId` — the job ID
+- `activeJob.pricing.totalPrice` — the total price
+- `activeJob.pricing.pages` — page count
+- `activeJob.printSettings` — print settings (colorMode, orientation, copies, etc.)
 
 ```javascript
 const handlePayment = useCallback(async () => {
+    if (!activeJob?.jobId) return;
     addLog('Initiating payment...');
 
     try {
-        const authHeader = await getAuthHeader();
+        const headers = await buildHeaders();
 
         // Step 1: Create order
         const { data } = await axios.post(
             `${API_URL}/api/payments/create-order`,
-            { job_id: pricing.job_id },
-            { headers: { Authorization: authHeader } }
+            { job_id: activeJob.jobId },
+            { headers }
         );
 
         // Step 2: Open Razorpay checkout
@@ -219,8 +230,8 @@ const handlePayment = useCallback(async () => {
             key: data.key_id,
             amount: data.amount,
             currency: data.currency,
-            name: 'JusPri',
-            description: `Print Job — ${pricing.pages} pages`,
+            name: 'LePrint',
+            description: `Print Job — ${activeJob.pricing.pages} pages`,
             order_id: data.order_id,
             handler: async (response) => {
                 // Step 3: Verify on backend
@@ -230,23 +241,25 @@ const handlePayment = useCallback(async () => {
                         razorpay_order_id: response.razorpay_order_id,
                         razorpay_payment_id: response.razorpay_payment_id,
                         razorpay_signature: response.razorpay_signature,
-                        job_id: pricing.job_id
+                        job_id: activeJob.jobId
                     },
-                    { headers: { Authorization: authHeader } }
+                    { headers }
                 );
-                setStatus('PRINTING');
+                updateJob(activeJob.jobId, { status: 'PRINTING' });
+                setViewStatus('PRINTING');
             },
             modal: {
-                ondismiss: () => setStatus('PAYMENT')
+                ondismiss: () => setViewStatus('PAYMENT')
             },
             theme: { color: '#000000' }
         });
         rzp.open();
     } catch (e) {
-        setStatus('ERROR');
+        updateJob(activeJob.jobId, { status: 'ERROR', success: false, completedAt: new Date() });
+        setViewStatus('ERROR');
         addLog(`Payment failed: ${e.response?.data?.error || e.message}`);
     }
-}, [pricing, API_URL, addLog, getAuthHeader, setStatus]);
+}, [activeJob, API_URL, addLog, buildHeaders, updateJob, setViewStatus]);
 ```
 
 ### 4.3 Update Xerox Payment
@@ -301,7 +314,7 @@ Alternatively, store `razorpay_order_id` and `razorpay_payment_id` inside the ex
 ## 7. Webhook Setup
 
 1. Go to Razorpay Dashboard → **Settings → Webhooks**
-2. Add webhook URL: `https://justpri.duckdns.org/api/payments/webhook`
+2. Add webhook URL: `https://api.leprint.in/api/payments/webhook`
 3. Select events:
    - `payment.captured`
    - `payment.failed`
@@ -359,7 +372,7 @@ ngrok http 3001
    RAZORPAY_KEY_SECRET=your_live_secret
    RAZORPAY_WEBHOOK_SECRET=whsec_live_xxxxx
    ```
-4. Update webhook URL to production: `https://justpri.duckdns.org/api/payments/webhook`
+4. Update webhook URL to production: `https://api.leprint.in/api/payments/webhook`
 5. Verify HTTPS/SSL is valid
 6. Test with a small real payment (₹1)
 

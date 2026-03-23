@@ -107,13 +107,23 @@ export default function Terms() {
 
           <Section title="5. Payments">
             <p>
-              Payments are processed securely through PayU, a PCI-DSS compliant
-              payment gateway. By making a payment, you agree to PayU's terms of
-              service. {BRAND} does not store your card details.
+              Payments are processed securely via Razorpay (PCI-DSS compliant).
+              LePrint does not store card or UPI details.
+            </p>
+            <p>
+              All services are prepaid. Jobs are processed only after successful
+              payment confirmation.
             </p>
             <p>
               Payment must be completed before a print or xerox job is dispatched
               to the kiosk. Scan jobs are initiated after payment confirmation.
+            </p>
+          </Section>
+
+          <Section title="5A. Service Delivery">
+            <p>
+              A service is considered successfully delivered once the document is
+              printed at the kiosk, or made available for download (scan jobs).
             </p>
           </Section>
 

@@ -79,9 +79,9 @@ export default function PrivacyPolicy() {
               </li>
               <li>
                 <strong className="text-foreground/80">Payment Information:</strong>{" "}
-                Transaction IDs and payment status processed through PayU. We do
-                not store card details or sensitive financial data — this is
-                handled entirely by PayU's PCI-DSS compliant infrastructure.
+                Transaction IDs and payment status processed through Razorpay.
+                Payments are processed securely via Razorpay (PCI-DSS compliant).
+                LePrint does not store card or UPI details.
               </li>
               <li>
                 <strong className="text-foreground/80">Usage Data:</strong> Job
@@ -116,7 +116,7 @@ export default function PrivacyPolicy() {
             </p>
             <ul className="list-disc pl-5 space-y-2 mt-2">
               <li>
-                <strong className="text-foreground/80">PayU:</strong> Payment
+                <strong className="text-foreground/80">Razorpay:</strong> Payment
                 processing (transaction data only)
               </li>
               <li>

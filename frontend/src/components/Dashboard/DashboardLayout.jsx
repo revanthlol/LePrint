@@ -387,7 +387,7 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                 >
                     {children}
                 </motion.div>
-                {activeTab !== 'print' && <Footer />}
+                <Footer />
             </main>
         </div>
     );

@@ -47,7 +47,7 @@ const faqs = [
       },
       {
         q: 'How do I request a refund?',
-        a: 'Refunds are handled per kiosk operator policy. To request one:\n\n1. Go to History and copy your Job ID\n2. Note the failure reason shown\n3. Contact the kiosk location or email support\n\nFull Razorpay payment integration with automated refunds is coming soon.'
+        a: 'All refunds are handled centrally by LePrint as per our Refund Policy. To request a refund, email support@leprint.in with your Job ID and transaction details.\n\nSee our full Refund Policy at leprint.in/refund-policy for eligibility details and timelines.'
       }
     ]
   },

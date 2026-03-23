@@ -223,8 +223,12 @@ export default function RefundPolicy() {
               disputes within 7 business days.
             </p>
             <p>
-              For payment disputes, you may also contact PayU's customer support
+              For payment disputes, you may also contact Razorpay's customer support
               directly if the issue is payment-gateway related.
+            </p>
+            <p>
+              Payments are processed securely via Razorpay (PCI-DSS compliant).
+              LePrint does not store card or UPI details.
             </p>
           </Section>
 

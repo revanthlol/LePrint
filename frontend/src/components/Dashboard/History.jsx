@@ -2,12 +2,226 @@
 import { useState, useEffect, memo } from 'react';
 import { useAuth } from '../AuthProvider';
 import axios from 'axios';
-import { FileText, Clock, CheckCircle, XCircle, Loader2, Calendar, IndianRupee, TrendingUp } from 'lucide-react';
+import { FileText, Clock, CheckCircle, XCircle, Loader2, Calendar, IndianRupee, TrendingUp, Copy, Download, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
-// Memoized stat card to prevent unnecessary re-renders
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+const JOB_TYPE_ICONS = { print: '🖨️', scan: '📄', xerox: '📋' };
+const JOB_TYPE_LABELS = { print: 'Print', scan: 'Scan', xerox: 'Xerox' };
+
+const STATUS_STYLES = {
+    COMPLETED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    PRINTING: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    FAILED: 'bg-red-500/10 text-red-400 border-red-500/20',
+    PENDING: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+    PAID: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    CANCELLED: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+};
+
+function StatusBadge({ status }) {
+    return (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${STATUS_STYLES[status] || STATUS_STYLES.PENDING}`}>
+            {status}
+        </span>
+    );
+}
+
+// ─── Job Detail Modal ───────────────────────────────────────
+function JobDetailModal({ job, open, onClose }) {
+    const [copied, setCopied] = useState(false);
+
+    if (!job) return null;
+
+    const copyId = () => {
+        navigator.clipboard.writeText(job.id);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+    };
+
+    const jobType = job.job_type || 'print';
+    const printSettings = job.metadata?.print_settings;
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+            <DialogContent className="sm:max-w-md rounded-2xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-lg">
+                        <span>{JOB_TYPE_ICONS[jobType] || '🖨️'}</span>
+                        <span className="truncate">{job.filename || 'Untitled'}</span>
+                    </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-5 text-sm">
+                    {/* Job Info */}
+                    <section className="space-y-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Job Info</h4>
+                        <div className="bg-muted/10 border border-border rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Job ID</span>
+                                <div className="flex items-center gap-1.5">
+                                    <code className="text-xs font-mono text-foreground bg-muted/20 px-1.5 py-0.5 rounded">{job.id}</code>
+                                    <button onClick={copyId} className="text-muted-foreground hover:text-foreground transition-colors" title="Copy ID">
+                                        <Copy className="w-3 h-3" />
+                                    </button>
+                                    {copied && <span className="text-[10px] text-emerald-400">Copied!</span>}
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Type</span>
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/5 border border-border">
+                                    {JOB_TYPE_LABELS[jobType] || 'Print'}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Status</span>
+                                <StatusBadge status={job.status} />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Created</span>
+                                <span className="text-foreground text-xs">{new Date(job.created_at).toLocaleString()}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Completed</span>
+                                <span className="text-foreground text-xs">{job.completed_at ? new Date(job.completed_at).toLocaleString() : '—'}</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Document Info */}
+                    <section className="space-y-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Document</h4>
+                        <div className="bg-muted/10 border border-border rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Filename</span>
+                                <span className="text-foreground truncate max-w-[200px] text-xs" title={job.filename}>{job.filename || '—'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Pages</span>
+                                <span className="text-foreground">{job.pages ? `${job.pages} page${job.pages !== 1 ? 's' : ''}` : '—'}</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Print Settings */}
+                    {printSettings && (jobType === 'print' || jobType === 'xerox') && (
+                        <section className="space-y-2">
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Print Settings</h4>
+                            <div className="bg-muted/10 border border-border rounded-lg p-3 space-y-2">
+                                {printSettings.color_mode && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-muted-foreground">Color</span>
+                                        <span className="text-foreground">{printSettings.color_mode === 'bw' ? 'B&W' : 'Color'}</span>
+                                    </div>
+                                )}
+                                {printSettings.copies && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-muted-foreground">Copies</span>
+                                        <span className="text-foreground">{printSettings.copies}</span>
+                                    </div>
+                                )}
+                                {printSettings.page_range && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-muted-foreground">Page range</span>
+                                        <span className="text-foreground">{printSettings.page_range}</span>
+                                    </div>
+                                )}
+                                {printSettings.orientation && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-muted-foreground">Orientation</span>
+                                        <span className="text-foreground">{printSettings.orientation}</span>
+                                    </div>
+                                )}
+                                {printSettings.scaling && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-muted-foreground">Scaling</span>
+                                        <span className="text-foreground">{printSettings.scaling}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    )}
+
+                    {/* Payment */}
+                    <section className="space-y-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment</h4>
+                        <div className="bg-muted/10 border border-border rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Amount</span>
+                                <span className="text-foreground font-semibold">₹{job.total_cost || 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Transaction ID</span>
+                                <span className="text-muted-foreground/60 text-xs italic">PayU integration pending</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Payment status</span>
+                                <StatusBadge status={job.status === 'COMPLETED' || job.status === 'PRINTING' ? 'PAID' : job.status} />
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Kiosk */}
+                    <section className="space-y-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kiosk</h4>
+                        <div className="bg-muted/10 border border-border rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Kiosk ID</span>
+                                <code className="text-xs font-mono text-foreground bg-muted/20 px-1.5 py-0.5 rounded">{job.kiosk_id || '—'}</code>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Location</span>
+                                <span className="text-foreground text-xs">{job.kiosk_location_name || job.kiosk_id || '—'}</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Scan download */}
+                    {jobType === 'scan' && job.status === 'COMPLETED' && (
+                        <a href={`${API_URL}/api/jobs/${job.id}/download`} target="_blank" rel="noopener noreferrer" className="block">
+                            <Button className="w-full bg-white text-black hover:bg-neutral-200 font-semibold">
+                                <Download className="mr-2 h-4 w-4" />
+                                Download Scanned PDF
+                            </Button>
+                        </a>
+                    )}
+
+                    {/* Error section */}
+                    {job.status === 'FAILED' && (
+                        <section className="space-y-2">
+                            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                                <div className="flex items-start gap-2">
+                                    <XCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="text-sm text-red-400 font-medium">Job Failed</p>
+                                        <p className="text-xs text-red-400/70 mt-1">{job.error_message || 'Unknown error'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="/contact?subject=Refund%20Request" className="block">
+                                <Button variant="outline" className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10">
+                                    <ExternalLink className="mr-2 w-4 h-4" /> Request Refund →
+                                </Button>
+                            </a>
+                        </section>
+                    )}
+                </div>
+
+                <DialogFooter>
+                    <Button variant="ghost" onClick={onClose} className="w-full text-muted-foreground hover:text-foreground">
+                        Close
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// ─── Stat Card ──────────────────────────────────────────────
 const StatCard = memo(({ icon: Icon, label, value, color, delay }) => (
     <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -32,8 +246,8 @@ const StatCard = memo(({ icon: Icon, label, value, color, delay }) => (
 
 StatCard.displayName = 'StatCard';
 
-// Memoized job card for better performance
-const JobCard = memo(({ job, index }) => {
+// ─── Job Card ───────────────────────────────────────────────
+const JobCard = memo(({ job, index, onClick }) => {
     const getStatusIcon = (status) => {
         switch (status) {
             case 'COMPLETED': return <CheckCircle className="w-5 h-5 text-emerald-400" />;
@@ -41,22 +255,6 @@ const JobCard = memo(({ job, index }) => {
             case 'FAILED': return <XCircle className="w-5 h-5 text-red-400" />;
             default: return <Clock className="w-5 h-5 text-yellow-400" />;
         }
-    };
-
-    const getStatusBadge = (status) => {
-        const styles = {
-            COMPLETED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-            PRINTING: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-            FAILED: 'bg-red-500/10 text-red-400 border-red-500/20',
-            PENDING: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-            PAID: 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-        };
-
-        return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.PENDING}`}>
-                {status}
-            </span>
-        );
     };
 
     return (
@@ -69,6 +267,7 @@ const JobCard = memo(({ job, index }) => {
             className="p-4 hover:bg-card/30 transition-colors cursor-pointer"
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
+            onClick={() => onClick(job)}
         >
             <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -105,7 +304,7 @@ const JobCard = memo(({ job, index }) => {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: index * 0.05 + 0.15 }}
                 >
-                    {getStatusBadge(job.status)}
+                    <StatusBadge status={job.status} />
                 </motion.div>
             </div>
         </motion.div>
@@ -157,8 +356,7 @@ export function History() {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
-
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const [selectedJob, setSelectedJob] = useState(null);
 
     useEffect(() => {
         fetchHistory();
@@ -293,13 +491,25 @@ export function History() {
                         >
                             <AnimatePresence>
                                 {jobs.map((job, index) => (
-                                    <JobCard key={job.id} job={job} index={index} />
+                                    <JobCard
+                                        key={job.id}
+                                        job={job}
+                                        index={index}
+                                        onClick={setSelectedJob}
+                                    />
                                 ))}
                             </AnimatePresence>
                         </motion.div>
                     )}
                 </AnimatePresence>
             </motion.div>
+
+            {/* Job Detail Modal */}
+            <JobDetailModal
+                job={selectedJob}
+                open={!!selectedJob}
+                onClose={() => setSelectedJob(null)}
+            />
         </motion.div>
     );
 }

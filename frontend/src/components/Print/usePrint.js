@@ -135,6 +135,9 @@ export function usePrint() {
     const [showBackConfirmModal, setShowBackConfirmModal] = useState(false);
     const [showExpiryModal, setShowExpiryModal] = useState(null); // jobId or null
 
+    // Scan kiosk mode (Bug 4)
+    const [scanKioskMode, setScanKioskMode] = useState(false);
+
     // Kiosk session decoupling (Task 5)
     const sessionKioskId = useRef(null);
     const [newKioskId, setNewKioskId] = useState(null);
@@ -1012,6 +1015,12 @@ export function usePrint() {
         // Use newKioskId if available (Task 5), otherwise sessionKioskId
         const kioskForNewJob = newKioskId || sessionKioskId.current || config?.kiosk_id;
 
+        // If no kiosk is known, activate scan kiosk mode instead
+        if (!kioskForNewJob) {
+            setScanKioskMode(true);
+            return;
+        }
+
         // Create new job entry and switch to it
         const newJob = createJobEntry({
             status: 'IDLE',
@@ -1030,6 +1039,45 @@ export function usePrint() {
             addLog('Adding another job...');
         }
     }, [jobs.length, isGuest, addLog, newKioskId, config]);
+
+    // ---- Scan Kiosk Mode: connect to scanned kiosk ----
+    const handleScanKioskConnect = useCallback(async (kioskId) => {
+        if (!kioskId) return;
+
+        addLog(`Connecting to new kiosk: ${kioskId}...`);
+
+        try {
+            const response = await axios.post(`${API_URL}/api/connect`, {
+                kiosk_id: kioskId
+            }, { timeout: 5000 });
+
+            if (response.data.status === 'connected') {
+                // Update kiosk session
+                setNewKioskId(kioskId);
+                sessionKioskId.current = kioskId;
+                setConfig(prev => ({ ...prev, kiosk_id: kioskId }));
+
+                // Exit scan mode
+                setScanKioskMode(false);
+
+                // Auto-create a new job on the new kiosk
+                const newJob = createJobEntry({
+                    status: 'IDLE',
+                    kiosk_id: kioskId,
+                });
+                setJobs(prev => [...prev, newJob]);
+                setActiveJobIndex(prev => prev + 1 >= 0 ? jobs.length : 0);
+                setViewStatus('SERVICE_SELECT');
+                setScanOptions({ resolution: 300, colorMode: 'RGB24' });
+                setXeroxCopies(1);
+
+                addLog(`✓ Connected to "${response.data.kiosk_name || kioskId}" — new job started`);
+                setNewKioskId(null); // consumed
+            }
+        } catch (e) {
+            addLog(`✗ Failed to connect to ${kioskId}: ${e.message}`);
+        }
+    }, [API_URL, addLog, jobs.length]);
 
     // ==========================================
     // 6. Return
@@ -1070,6 +1118,11 @@ export function usePrint() {
         showExpiryModal,
         setShowExpiryModal,
 
+        // Scan Kiosk Mode
+        scanKioskMode,
+        setScanKioskMode,
+        handleScanKioskConnect,
+
         // Handlers
         handleScan,
         handleScanError,
@@ -1086,6 +1139,7 @@ export function usePrint() {
         handleXeroxStart,
         backToServiceSelect,
         addAnotherJob,
+        addLog,
 
         // Setters (backward compat)
         setStatus: setViewStatus,

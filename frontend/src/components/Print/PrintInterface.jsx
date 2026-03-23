@@ -1,8 +1,8 @@
 // frontend/src/components/Print/PrintInterface.jsx
 // Supports Print, Scan, and Xerox flows with multi-job tab switching.
 
-import React, { useState, useEffect } from 'react';
-import { Printer, ChevronLeft, Check } from 'lucide-react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { Printer, ChevronLeft, Check, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useGuest } from '../GuestContext';
 
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePrint } from './usePrint';
 import { NAV_STEPS } from './usePrint';
 import { getFileExt, getFileIcon } from './printUtils';
+import ZXingScanner from './ZXingScanner';
 
 import {
   QRScannerView,
@@ -75,17 +76,17 @@ function CountdownTimer({ expiresAt }) {
   return <span className="text-[10px] text-muted-foreground tabular-nums">{timeLeft}</span>;
 }
 
-function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd }) {
+function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, scanKioskMode, setScanKioskMode }) {
   return (
     <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-1 py-2 border-b border-border -mx-6 px-6">
       {jobs.map((job, i) => {
-        const isActive = i === activeJobIndex;
+        const isActive = i === activeJobIndex && !scanKioskMode;
         const isExpired = job.locallyExpired;
 
         return (
           <button
             key={job.jobId || i}
-            onClick={() => setActiveJobIndex(i)}
+            onClick={() => { setActiveJobIndex(i); setScanKioskMode(false); }}
             className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
               isExpired
                 ? 'bg-red-500/20 text-red-400 border border-red-500/30'
@@ -107,6 +108,17 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd }
         );
       })}
 
+      {/* Scan kiosk tab — shown when scanKioskMode is active */}
+      {scanKioskMode && (
+        <button
+          onClick={() => setScanKioskMode(true)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all bg-white/15 text-foreground border border-white/20"
+        >
+          <span>📡</span>
+          <span>New Kiosk</span>
+        </button>
+      )}
+
       {/* Add another job "+" tab */}
       {canAdd && (
         <button
@@ -122,9 +134,10 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd }
 }
 
 // ─── Navigation Bar (Back + Step Indicator) ─────────────────
-function NavigationBar({ canGoBack, goBack, currentNavStepIndex }) {
-  // Don't show on SERVICE_SELECT (step 0) or when no step is active
-  if (currentNavStepIndex <= 0) return null;
+function NavigationBar({ canGoBack, goBack, currentNavStep, currentNavStepIndex }) {
+  // Hide entirely when on SERVICE_SELECT or when no step is active
+  const isServiceSelect = !currentNavStep || currentNavStep === 'SERVICE_SELECT';
+  if (isServiceSelect) return null;
 
   // Steps to show (skip SERVICE_SELECT since it's the starting point)
   const stepsToShow = NAV_STEPS.slice(1); // Upload, Confirm, Pay, Status
@@ -132,7 +145,7 @@ function NavigationBar({ canGoBack, goBack, currentNavStepIndex }) {
 
   return (
     <div className="flex items-center gap-3 py-2 -mx-1">
-      {/* Back arrow — left side */}
+      {/* Back arrow — left side: show whenever canGoBack is true */}
       {canGoBack ? (
         <button
           onClick={goBack}
@@ -187,6 +200,89 @@ function NavigationBar({ canGoBack, goBack, currentNavStepIndex }) {
   );
 }
 
+// ─── Inline Kiosk Scanner View (for scan kiosk mode) ────────
+function KioskScannerInline({ handleScanKioskConnect, scannerActive, setScannerActive, cameraError, setCameraError, handleScanError, addLog }) {
+  const [manualKioskId, setManualKioskId] = useState('');
+
+  const onScanDetect = (detectedCodes) => {
+    if (!Array.isArray(detectedCodes) || detectedCodes.length === 0) return;
+    const rawValue = detectedCodes[0]?.rawValue;
+    if (!rawValue) return;
+
+    let kioskId = rawValue;
+    try {
+      if (rawValue.startsWith('http://') || rawValue.startsWith('https://')) {
+        const url = new URL(rawValue);
+        kioskId = url.searchParams.get('kiosk_id') || rawValue;
+      } else if (rawValue.trim().startsWith('{')) {
+        const parsed = JSON.parse(rawValue);
+        kioskId = parsed.kiosk_id || parsed.ip || rawValue;
+      }
+    } catch {}
+
+    handleScanKioskConnect(kioskId.trim());
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <p className="text-sm text-muted-foreground mb-3">Scan a new kiosk QR code</p>
+      </div>
+
+      <div className="relative rounded-2xl overflow-hidden border border-border shadow-inner">
+        <Suspense fallback={
+          <div className="aspect-square bg-muted/20 flex items-center justify-center">
+            <Loader2 className="animate-spin h-8 w-8 text-white"/>
+          </div>
+        }>
+          <ZXingScanner
+            active={true}
+            onScan={onScanDetect}
+            onError={handleScanError}
+          />
+        </Suspense>
+      </div>
+
+      {/* Manual entry */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border"></div>
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-card px-2 text-muted-foreground">Or enter manually</span>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <input
+          type="text"
+          placeholder="Kiosk ID (e.g., kiosk_001)"
+          value={manualKioskId}
+          onChange={(e) => setManualKioskId(e.target.value)}
+          className="w-full px-4 py-3 bg-muted/10 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30 text-sm transition-all"
+          onKeyPress={(e) => {
+            if (e.key === 'Enter' && manualKioskId.trim()) {
+              handleScanKioskConnect(manualKioskId.trim());
+              setManualKioskId('');
+            }
+          }}
+        />
+        <button
+          onClick={() => {
+            if (manualKioskId.trim()) {
+              handleScanKioskConnect(manualKioskId.trim());
+              setManualKioskId('');
+            }
+          }}
+          className="w-full bg-white text-black hover:bg-neutral-200 py-3 rounded-md text-sm font-medium transition-colors"
+        >
+          Connect to Kiosk
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function PrintInterface() {
   const printState = usePrint();
   const { isGuest } = useGuest();
@@ -202,12 +298,16 @@ export function PrintInterface() {
     addAnotherJob,
     canGoBack,
     goBack,
+    currentNavStep,
     currentNavStepIndex,
     showBackConfirmModal,
     setShowBackConfirmModal,
     confirmGoBack,
     showExpiryModal,
     setShowExpiryModal,
+    scanKioskMode,
+    setScanKioskMode,
+    handleScanKioskConnect,
   } = printState;
 
   // Can add another job: < 5 jobs AND not a guest
@@ -225,11 +325,11 @@ export function PrintInterface() {
     isGuest,
   };
 
-  // Show tab bar when there are 1+ jobs
-  const showTabBar = jobs.length >= 1;
+  // Show tab bar when there are 1+ jobs or scanKioskMode
+  const showTabBar = jobs.length >= 1 || scanKioskMode;
 
   // Show all-jobs summary when all jobs are done AND we have >0 jobs
-  const showSummary = allJobsDone && jobs.length > 0;
+  const showSummary = allJobsDone && jobs.length > 0 && !scanKioskMode;
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -244,7 +344,7 @@ export function PrintInterface() {
         </CardHeader>
 
         <CardContent className="pt-6 space-y-4">
-          {/* Tab bar — only when 1+ jobs */}
+          {/* Tab bar — only when 1+ jobs or scanning kiosk */}
           {showTabBar && !showSummary && (
             <JobTabBar
               jobs={jobs}
@@ -252,20 +352,33 @@ export function PrintInterface() {
               setActiveJobIndex={setActiveJobIndex}
               onAddJob={addAnotherJob}
               canAdd={canAddJob}
+              scanKioskMode={scanKioskMode}
+              setScanKioskMode={setScanKioskMode}
             />
           )}
 
-          {/* Navigation bar — back + step dots */}
-          {!showSummary && (
+          {/* Navigation bar — back + step dots (hidden during scan kiosk mode) */}
+          {!showSummary && !scanKioskMode && (
             <NavigationBar
               canGoBack={canGoBack}
               goBack={goBack}
+              currentNavStep={currentNavStep}
               currentNavStepIndex={currentNavStepIndex}
             />
           )}
 
-          {/* All-jobs Summary View */}
-          {showSummary ? (
+          {/* Scan Kiosk Mode — inline scanner */}
+          {scanKioskMode ? (
+            <KioskScannerInline
+              handleScanKioskConnect={handleScanKioskConnect}
+              scannerActive={printState.scannerActive}
+              setScannerActive={printState.setScannerActive}
+              cameraError={printState.cameraError}
+              setCameraError={printState.setCameraError}
+              handleScanError={printState.handleScanError}
+              addLog={printState.addLog}
+            />
+          ) : showSummary ? (
             <AllJobsSummaryView {...viewProps} />
           ) : (
             <>

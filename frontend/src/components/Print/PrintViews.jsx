@@ -653,7 +653,7 @@ export function CompletedView({ serviceType, printAnotherOnSameKiosk, resetFlow 
 }
 
 // ─── VIEW: Service Selector (Print / Scan / Xerox) ──────────
-export function ServiceSelectView({ selectService, resetFlow }) {
+export function ServiceSelectView({ selectService, setScanKioskMode }) {
     const services = [
         {
             type: 'print',
@@ -708,7 +708,7 @@ export function ServiceSelectView({ selectService, resetFlow }) {
             <Button
                 variant="ghost"
                 size="sm"
-                onClick={resetFlow}
+                onClick={() => setScanKioskMode(true)}
                 className="w-full text-muted-foreground hover:text-foreground hover:bg-white/5 mt-2"
             >
                 <ArrowLeft className="mr-1 w-4 h-4" /> Scan Different Kiosk

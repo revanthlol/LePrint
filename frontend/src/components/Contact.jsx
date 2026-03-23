@@ -222,14 +222,14 @@ export default function Contact() {
             <InfoCard
               icon={Phone}
               label="Phone"
-              value="+91 98765 43210"
-              href="tel:+919876543210"
+              value="+91 95388 01540"
+              href="tel:+919538801540"
               delay={0.1}
             />
             <InfoCard
               icon={MapPin}
               label="Address"
-              value="123 Business Street, Hyderabad, Telangana 500001, India"
+              value="J-04 J-Block Zonasha Elegance Apartments Phase-1 DAST Road Haralur Bangalore 560102"
               delay={0.15}
             />
             <InfoCard

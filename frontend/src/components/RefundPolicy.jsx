@@ -245,7 +245,7 @@ export default function RefundPolicy() {
                 </a>
               </p>
               <p>Response time: within 2 business days</p>
-              <p>Address: 123 Business Street, Hyderabad, Telangana 500001, India</p>
+              <p>Address: J-04 J-Block Zonasha Elegance Apartments Phase-1 DAST Road Haralur Bangalore 560102</p>
             </div>
           </Section>
         </div>

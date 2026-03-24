@@ -2,8 +2,10 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import FadeInSection from "./FadeInSection";
+import { useAuth } from "../AuthProvider";
 
 export default function CtaBanner() {
+  const { currentUser } = useAuth();
   return (
     <section className="py-20 md:py-28">
       <FadeInSection className="max-w-2xl mx-auto px-6 text-center">
@@ -15,7 +17,7 @@ export default function CtaBanner() {
           No downloads, no drivers — just your phone and a kiosk.
         </p>
         <Link
-          to="/"
+          to={currentUser ? '/app' : '/login'}
           className="inline-flex items-center gap-2 px-8 py-4 bg-foreground text-background font-semibold rounded-xl hover:bg-foreground/90 transition-colors text-sm"
         >
           Start Printing Now

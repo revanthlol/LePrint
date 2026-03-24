@@ -2,8 +2,10 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, QrCode, Upload, Printer } from "lucide-react";
+import { useAuth } from "../AuthProvider";
 
 export default function Hero() {
+  const { currentUser } = useAuth();
   return (
     <section className="max-w-6xl mx-auto px-6 pt-24 pb-16 md:pt-32 md:pb-24">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
@@ -27,7 +29,7 @@ export default function Hero() {
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <Link
-              to="/"
+              to={currentUser ? '/app' : '/login'}
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-colors"
             >
               Start Printing

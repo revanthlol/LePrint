@@ -42,7 +42,7 @@ export function Login() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
-    const redirectTo = searchParams.get('redirect') || '/';
+    const redirectTo = searchParams.get('redirect') || '/app';
 
     // Smart redirect: if already logged in, redirect away
     useEffect(() => {

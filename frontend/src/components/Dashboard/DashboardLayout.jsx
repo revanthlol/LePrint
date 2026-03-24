@@ -18,7 +18,7 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
     const jobsLeft = Math.max(0, 3 - jobsToday);
   
     const tabs = [
-      { id: 'print', label: 'Print', icon: Printer, path: '/' },
+      { id: 'print', label: 'Print', icon: Printer, path: '/app' },
       // Hide history for guests
       ...(!isGuest ? [{ id: 'history', label: 'History', icon: History, path: '/history' }] : []),
       // Only show admin tab if user is admin

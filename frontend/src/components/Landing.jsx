@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { useAuth } from "./AuthProvider";
 import PublicNavbar from "./PublicNavbar";
 import Footer from "./Footer";
 
@@ -18,6 +19,7 @@ import FadeInSection from "./landing/FadeInSection";
 
 /* ── Mid-page CTA (inline, small) ── */
 function MidCta() {
+  const { currentUser } = useAuth();
   return (
     <section className="py-14 md:py-20">
       <FadeInSection className="max-w-xl mx-auto px-6 text-center">
@@ -25,7 +27,7 @@ function MidCta() {
           Got a file ready?
         </p>
         <Link
-          to="/"
+          to={currentUser ? '/app' : '/login'}
           className="inline-flex items-center gap-2 px-6 py-3 border border-border text-foreground font-semibold text-sm rounded-xl hover:bg-card transition-colors"
         >
           Upload Your File

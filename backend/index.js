@@ -27,30 +27,40 @@ initializeFirebase();
 
 // ==================== CORS ====================
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
-    ? process.env.ALLOWED_ORIGINS.split(',')
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
     : [
         'https://qr-wifi-printer.vercel.app',
         'http://localhost:5173',
         'http://localhost:5174',
         'http://localhost:5175',
-        'https://justpri.duckdns.org'
+        'https://justpri.duckdns.org',
+        'https://leprint.in',
+        'https://www.leprint.in'
     ];
 
-app.use(cors({
+const corsConfig = {
     origin: function(origin, callback) {
-        if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-            return callback(null, origin);
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        const isAllowed = allowedOrigins.includes(origin) || (origin && origin.endsWith('.vercel.app'));
+        
+        if (isAllowed) {
+            callback(null, true);
         } else {
             log.warn('CORS blocked: ' + origin);
-            return callback(new Error("Not allowed by CORS"));
+            callback(null, false); // or callback(new Error('Not allowed by CORS'));
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400 // Cache preflight response for 24 hours
+};
 
-app.options('*', cors());
+app.use(cors(corsConfig));
+app.options('*', cors(corsConfig)); // Same config for preflight
+
 app.use(express.json());
 
 // ==================== SOCKET.IO ====================

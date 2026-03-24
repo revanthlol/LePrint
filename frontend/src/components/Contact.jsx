@@ -177,17 +177,33 @@ export default function Contact() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = () => {
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async () => {
     if (!form.name || !form.email || !form.message) return;
 
-    const subject = encodeURIComponent(
-      form.subject || `Contact from ${form.name} — ${BRAND}`
-    );
-    const body = encodeURIComponent(
-      `Name: ${form.name}\nEmail: ${form.email}\n\n${form.message}`
-    );
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
-    setSubmitted(true);
+    setSending(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          subject: form.subject || undefined,
+          message: form.message,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send message');
+
+      setSubmitted(true);
+    } catch (err) {
+      alert(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -280,11 +296,11 @@ export default function Contact() {
                     <CheckCircle className="w-7 h-7" />
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">
-                    Message prepared!
+                    Message sent!
                   </h3>
                   <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                    Your mail client should have opened with a pre-filled message.
-                    If not, email us directly at{" "}
+                    We've received your message and will get back to you within
+                    1–2 business days at{" "}
                     <a
                       href={`mailto:${SUPPORT_EMAIL}`}
                       className="text-foreground underline underline-offset-2"
@@ -356,14 +372,14 @@ export default function Contact() {
 
                     <button
                       onClick={handleSubmit}
-                      disabled={!form.name || !form.email || !form.message}
+                      disabled={!form.name || !form.email || !form.message || sending}
                       className="w-full py-3 px-4 bg-foreground text-background text-sm font-semibold rounded-xl hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150 flex items-center justify-center gap-2"
                     >
                       <Send className="w-4 h-4" />
-                      Send Message
+                      {sending ? 'Sending…' : 'Send Message'}
                     </button>
                     <p className="text-[11px] text-muted-foreground/40 text-center">
-                      This will open your email client with a pre-filled message.
+                      We'll reply to the email address you provide.
                     </p>
                   </div>
                 </>

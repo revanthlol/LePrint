@@ -15,7 +15,8 @@ const jobRoutes = require('./modules/job-routes');
 const adminRoutes = require('./modules/admin-routes');
 const { initSocketServer } = require('./modules/socket-manager');
 const { startScheduledTasks } = require('./modules/tasks');
-const kioskRoutes = require('./modules/kiosk-routes'); 
+const kioskRoutes = require('./modules/kiosk-routes');
+const contactRoutes = require('./modules/contact-routes');
 const app = express();
 const server = http.createServer(app);
 
@@ -70,6 +71,7 @@ initSocketServer(io);
 app.use('/api', jobRoutes);
 app.use('/api', adminRoutes);
 app.use('/api/kiosk', kioskRoutes);
+app.use('/api', contactRoutes);
 // Global Error Handler for Multer
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {

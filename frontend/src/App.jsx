@@ -1,7 +1,9 @@
 // frontend/src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 
 import { AuthProvider } from "./components/AuthProvider";
+import { useAuth } from "./components/AuthProvider";
 import { GuestProvider } from "./components/GuestContext";
 import { NotificationProvider } from "./components/NotificationProvider";
 import { Toaster } from 'sonner';
@@ -18,6 +20,52 @@ import Terms from "./components/Terms";
 import RefundPolicy from "./components/RefundPolicy";
 import Contact from "./components/Contact";
 import Landing from "./components/Landing";
+
+function RootRedirect() {
+  const { currentUser, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (loading) return;
+
+    // Priority 1: kiosk_id param — redirect to /app preserving params
+    const params = location.search;
+    if (new URLSearchParams(params).get('kiosk_id')) {
+      navigate('/app' + params, { replace: true });
+      return;
+    }
+
+    // Priority 2: logged-in user — send to app
+    if (currentUser) {
+      navigate('/app', { replace: true });
+      return;
+    }
+
+    // Priority 3: show landing
+  }, [currentUser, loading, navigate, location.search]);
+
+  // Show nothing while auth is resolving, then show Landing
+  if (loading) return null;
+  if (!new URLSearchParams(location.search).get('kiosk_id') && !currentUser) {
+    return <Landing />;
+  }
+  return null;
+}
+
+function LoginRoute() {
+  const { currentUser, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (loading) return;
+    if (currentUser) navigate('/app', { replace: true });
+  }, [currentUser, loading, navigate]);
+
+  if (loading) return null;
+  if (currentUser) return null;
+  return <Login />;
+}
 
 function App() {
   return (
@@ -37,18 +85,12 @@ function App() {
               }}
             />
           <Routes>
-            <Route path="/login" element={<Login />} />
+            {/* Root — smart redirect: kiosk QR → /app, logged in → /app, else Landing */}
+            <Route path="/" element={<RootRedirect />} />
 
-            {/* Public routes - no auth required */}
-            <Route path="/landing" element={<Landing />} />
-            <Route path="/faq" element={<FAQPage />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/refund-policy" element={<RefundPolicy />} />
-            <Route path="/contact" element={<Contact />} />
-
+            {/* App — the kiosk print interface */}
             <Route
-              path="/"
+              path="/app"
               element={
                 <ProtectedRoute>
                   <DashboardLayout activeTab="print">
@@ -58,6 +100,10 @@ function App() {
               }
             />
 
+            {/* Auth */}
+            <Route path="/login" element={<LoginRoute />} />
+
+            {/* Dashboard */}
             <Route
               path="/history"
               element={
@@ -69,7 +115,7 @@ function App() {
               }
             />
 
-            {/* Admin route */}
+            {/* Admin */}
             <Route
               path="/admin"
               element={
@@ -83,6 +129,15 @@ function App() {
               }
             />
 
+            {/* Public */}
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/contact" element={<Contact />} />
+
+            {/* /landing route removed — Landing is now at / */}
+            {/* Catch-all */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </NotificationProvider>

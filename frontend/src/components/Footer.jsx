@@ -12,7 +12,7 @@ const footerSections = [
     title: "Product",
     links: [
       { label: "Home", href: "/" },
-      { label: "Landing", href: "/landing" },
+      { label: "App", href: "/app" },
       { label: "FAQ", href: "/faq" },
       { label: "Contact Us", href: "/contact" },
     ],

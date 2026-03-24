@@ -73,10 +73,12 @@ router.post('/contact', async (req, res) => {
         </div>
     `;
 
-    // ── Send via Gmail SMTP ───────────────────────────────────────────────
+    // ── Send via Hostinger SMTP ───────────────────────────────────────────
     try {
         const transporter = nodemailer.createTransport({
-            service: 'gmail',
+            host: 'smtp.hostinger.com',
+            port: 465,
+            secure: true,
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS,

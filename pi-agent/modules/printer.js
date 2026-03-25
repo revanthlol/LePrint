@@ -7,6 +7,38 @@ const { PrinterError } = require('./errors');
 
 const SIMULATE = process.env.SIMULATE_PRINTER === 'true';
 
+// ==================== CAPABILITY PROFILE ====================
+function loadCapabilities() {
+  try {
+    const capPath = require('path').join(__dirname, '..', 'printer-capabilities.json');
+    const raw = require('fs').readFileSync(capPath, 'utf-8');
+    const caps = JSON.parse(raw);
+    // Validate it has at least a brand field to be considered populated
+    if (caps && caps.brand) {
+      return caps;
+    }
+    return {};
+  } catch {
+    // File missing, malformed, or unreadable — return empty (generic behavior)
+    return {};
+  }
+}
+
+const CAPABILITIES = loadCapabilities();
+
+function logCapabilities(logger) {
+  if (!CAPABILITIES.brand) {
+    logger.info('[PRINTER] No capability profile found — using generic defaults');
+    return;
+  }
+  logger.info(`[PRINTER] Capability profile loaded:`);
+  logger.info(`  Brand: ${CAPABILITIES.brand}`);
+  logger.info(`  Driver: ${CAPABILITIES.driver || 'generic'}`);
+  logger.info(`  Connection: ${CAPABILITIES.connectionType || 'unknown'}`);
+  logger.info(`  Advanced status: ${CAPABILITIES.advancedStatusAvailable ? 'yes' : 'no'}`);
+  logger.info(`  Scanner: ${CAPABILITIES.scannerAvailable ? 'yes' : 'no'}`);
+}
+
 // ==================== PRINTER DETECTION ====================
 async function detectPrinter(printerName, logger) {
   if (SIMULATE) {
@@ -14,12 +46,37 @@ async function detectPrinter(printerName, logger) {
     return 'VIRTUAL_PRINTER';
   }
 
-  return new Promise((resolve, reject) => {
-    if (printerName !== 'auto') {
-      logger.success(`Using configured printer: ${printerName}`);
-      return resolve(printerName);
-    }
+  if (printerName !== 'auto') {
+    logger.success(`Using configured printer: ${printerName}`);
+    return printerName;
+  }
 
+  // Capability-aware hint: if we know the brand, try to find a matching queue
+  if (CAPABILITIES.brand && CAPABILITIES.brand !== 'generic') {
+    try {
+      const lpOut = await new Promise((resolve, reject) => {
+        exec('lpstat -p 2>/dev/null', (err, stdout) => {
+          if (err) return reject(err);
+          resolve(stdout || '');
+        });
+      });
+      // Look for a queue name containing the brand (e.g. "EPSON" in "EPSON_L3250")
+      const lines = lpOut.split('\n');
+      for (const line of lines) {
+        const match = line.match(/printer\s+(\S+)/);
+        if (match && match[1].toLowerCase().includes(CAPABILITIES.brand.toLowerCase())) {
+          logger.success(`Auto-detected ${CAPABILITIES.brand} printer via capability hint: ${match[1]}`);
+          return match[1];
+        }
+      }
+      // No brand-matching queue found — fall through to default logic
+    } catch {
+      // lpstat failed — fall through to default logic
+    }
+  }
+
+  // Default detection logic
+  return new Promise((resolve, reject) => {
     exec('lpstat -p -d', (error, stdout, stderr) => {
       if (error) {
         logger.warn('No printers detected via CUPS');
@@ -62,11 +119,25 @@ async function checkPrinterStatus(printerName, logger) {
     return { status: 'healthy', detail: 'simulated' };
   }
 
-  return new Promise((resolve) => {
-    if (!printerName) {
-      return resolve({ status: 'unknown', detail: 'no_printer_configured' });
-    }
+  if (!printerName) {
+    return { status: 'unknown', detail: 'no_printer_configured' };
+  }
 
+  // Enhanced: IPP attribute query when advanced status is available
+  if (CAPABILITIES.advancedStatusAvailable === true) {
+    try {
+      const ippResult = await _queryIppStatus(printerName, logger);
+      if (ippResult) {
+        return ippResult; // { status, detail }
+      }
+      // null means IPP query returned nothing useful — fall through to lpstat
+    } catch {
+      // IPP query failed entirely — fall through to lpstat
+    }
+  }
+
+  // Existing lpstat path (unchanged)
+  return new Promise((resolve) => {
     exec(`lpstat -p ${printerName} 2>&1`, { timeout: 5000 }, (error, stdout) => {
       if (error && !stdout) {
         logger.warn(`lpstat failed: ${error.message}`);
@@ -99,6 +170,71 @@ async function checkPrinterStatus(printerName, logger) {
 
       // Unknown/unsupported
       return resolve({ status: 'unknown', detail: 'ipp_unsupported' });
+    });
+  });
+}
+
+/**
+ * Query CUPS IPP endpoint for printer-state-reasons.
+ * Returns { status, detail } or null if the query is not useful.
+ * Uses lpstat -l parsing.
+ */
+function _queryIppStatus(printerName, logger) {
+  return new Promise((resolve) => {
+    // Try getting printer-state-reasons via lpstat -l (long format, includes IPP reasons)
+    exec(`lpstat -l -p ${printerName} 2>&1`, { timeout: 5000 }, (error, stdout) => {
+      if (error || !stdout) {
+        return resolve(null); // Can't get info, let caller fall back
+      }
+
+      const output = stdout.toLowerCase();
+
+      // Look for printer-state-reasons style keywords in long output
+      // These are more specific than the basic lpstat output
+
+      // Hard errors
+      if (output.includes('media-empty') || output.includes('media-needed')) {
+        logger.debug('[IPP] Detected: media-empty');
+        return resolve({ status: 'error', detail: 'media-empty' });
+      }
+      if (output.includes('toner-empty') || output.includes('marker-supply-empty')) {
+        logger.debug('[IPP] Detected: toner-empty');
+        return resolve({ status: 'error', detail: 'toner-empty' });
+      }
+      if (output.includes('media-jam')) {
+        logger.debug('[IPP] Detected: media-jam');
+        return resolve({ status: 'error', detail: 'media-jam' });
+      }
+      if (output.includes('cover-open') || output.includes('door-open')) {
+        logger.debug('[IPP] Detected: cover-open');
+        return resolve({ status: 'error', detail: 'cover-open' });
+      }
+      if (output.includes('offline') || output.includes('shutdown') || output.includes('not-responding')) {
+        logger.debug('[IPP] Detected: offline');
+        return resolve({ status: 'error', detail: 'offline' });
+      }
+      if (output.includes('paused') || output.includes('hold-new-jobs')) {
+        logger.debug('[IPP] Detected: paused');
+        return resolve({ status: 'error', detail: 'stopped' });
+      }
+
+      // Warnings (non-blocking) - mapped to 'healthy' status per user instruction
+      if (output.includes('toner-low') || output.includes('marker-supply-low')) {
+        logger.debug('[IPP] Detected: toner-low');
+        return resolve({ status: 'healthy', detail: 'toner-low' });
+      }
+      if (output.includes('media-low')) {
+        logger.debug('[IPP] Detected: media-low');
+        return resolve({ status: 'healthy', detail: 'media-low' });
+      }
+      if (output.includes('cups-waiting-for-job-completed') || output.includes('connecting-to-device')) {
+        logger.debug('[IPP] Detected: connecting');
+        return resolve({ status: 'healthy', detail: 'connecting' });
+      }
+
+      // If we got output but didn't match anything specific, return null
+      // to let the existing lpstat parser handle it
+      return resolve(null);
     });
   });
 }
@@ -237,5 +373,7 @@ async function printDocument(printerName, filePath, pages, logger, settings = {}
 module.exports = {
   detectPrinter,
   checkPrinterStatus,
-  printDocument
+  printDocument,
+  logCapabilities,
+  CAPABILITIES
 };

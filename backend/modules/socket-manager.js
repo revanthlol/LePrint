@@ -28,19 +28,21 @@ function initSocketServer(io) {
         
         // ===== REGISTER: Initializes kiosk and printer_status =====
         socket.on('register', async (data) => {
-            const { kiosk_id, hostname, printer_name } = data;
+            const { kiosk_id, hostname, printer_name, printer_brand, printer_driver } = data;
             try {
                 // Using direct SQL upsert so we can initialize printer_status
                 await db.query(
-                    `INSERT INTO kiosks (id, hostname, printer_name, status, socket_id, last_seen, printer_status)
-                     VALUES ($1, $2, $3, 'online', $4, NOW(), 'unknown')
+                    `INSERT INTO kiosks (id, hostname, printer_name, status, socket_id, last_seen, printer_status, printer_brand, printer_driver)
+                     VALUES ($1, $2, $3, 'online', $4, NOW(), 'unknown', $5, $6)
                      ON CONFLICT (id) DO UPDATE SET
                         hostname = EXCLUDED.hostname,
                         printer_name = EXCLUDED.printer_name,
                         status = 'online',
                         socket_id = EXCLUDED.socket_id,
-                        last_seen = NOW()`,
-                    [kiosk_id, hostname, printer_name, socket.id]
+                        last_seen = NOW(),
+                        printer_brand = COALESCE(EXCLUDED.printer_brand, kiosks.printer_brand),
+                        printer_driver = COALESCE(EXCLUDED.printer_driver, kiosks.printer_driver)`,
+                    [kiosk_id, hostname, printer_name, socket.id, printer_brand || null, printer_driver || null]
                 );
 
                 kioskSockets.set(kiosk_id, socket);
@@ -241,14 +243,18 @@ function initSocketServer(io) {
                         socket_id = $2,
                         printer_status = $3,
                         printer_status_detail = $4,
-                        last_status_check = NOW()
+                        last_status_check = NOW(),
+                        printer_brand = COALESCE($6, printer_brand),
+                        printer_driver = COALESCE($7, printer_driver)
                      WHERE id = $5`,
                     [
                         data.uptime || 0,
                         socket.id,
                         data.printer_ipp_status || 'unknown',
                         data.printer_ipp_detail || null,
-                        data.kiosk_id
+                        data.kiosk_id,
+                        data.printer_brand || null,
+                        data.printer_driver || null
                     ]
                 );
 

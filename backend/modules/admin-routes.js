@@ -118,6 +118,8 @@ router.get('/admin/kiosks', verifyToken, requireAdmin, async (req, res) => {
                 k.last_seen,
                 k.uptime,
                 k.location_name,
+                k.printer_brand,
+                k.printer_driver,
                 -- Today's stats for this kiosk
                 COUNT(j.id) FILTER (WHERE j.created_at >= CURRENT_DATE) as jobs_today,
                 COALESCE(
@@ -138,7 +140,8 @@ router.get('/admin/kiosks', verifyToken, requireAdmin, async (req, res) => {
             LEFT JOIN jobs j ON k.id = j.kiosk_id
             GROUP BY k.id, k.hostname, k.printer_name, k.status, 
                      k.printer_status, k.printer_status_detail,
-                     k.current_paper_count, k.last_seen, k.uptime, k.location_name
+                     k.current_paper_count, k.last_seen, k.uptime, k.location_name,
+                     k.printer_brand, k.printer_driver
             ORDER BY k.id
         `);
 
@@ -158,7 +161,9 @@ router.get('/admin/kiosks', verifyToken, requireAdmin, async (req, res) => {
             isOnline: isKioskOnline(k.last_seen, k.status),
             jobsToday: parseInt(k.jobs_today || 0),
             revenueToday: parseFloat(k.revenue_today || 0),
-            currentJobId: k.current_job_id
+            currentJobId: k.current_job_id,
+            printerBrand: k.printer_brand || null,
+            printerDriver: k.printer_driver || null
         }));
 
         res.json({ kiosks });

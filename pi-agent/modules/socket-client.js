@@ -52,10 +52,15 @@ function setupEventHandlers(socket, kioskId, hostname, state, logger) {
     socket.emit('register', {
       kiosk_id: kioskId,
       hostname: hostname,
-      printer_name: state.printerName || 'unknown'
+      printer_name: state.printerName || 'unknown',
+      printer_brand: printer.CAPABILITIES.brand || null,
+      printer_driver: printer.CAPABILITIES.driver || null
     });
 
     logger.socket(`Registered with cloud — kiosk: ${kioskId}, printer: ${state.printerName || 'unknown'}`);
+
+    // Log printer capabilities for debugging
+    printer.logCapabilities(logger);
 
     // Flush queued events that were stored while disconnected
     if (state.pendingEvents && state.pendingEvents.length > 0) {
@@ -153,7 +158,9 @@ function startHeartbeat(socket, kioskId, heartbeatInterval, state, logger) {
       poll_count: state.pollCount,
       jobs_fetched_today: state.jobsFetchedToday,
       conversions_today: state.conversionsToday,
-      last_poll: state.lastPollTime
+      last_poll: state.lastPollTime,
+      printer_brand: printer.CAPABILITIES.brand || null,
+      printer_driver: printer.CAPABILITIES.driver || null
     });
   }, heartbeatInterval);
 

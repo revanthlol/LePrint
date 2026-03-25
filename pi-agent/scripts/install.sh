@@ -13,6 +13,7 @@ source "${LIB_DIR}/libreoffice.sh"
 source "${LIB_DIR}/imagetools.sh"
 source "${LIB_DIR}/piagent.sh"
 source "${LIB_DIR}/services.sh"
+source "${LIB_DIR}/printer-detect.sh"
 
 main() {
     print_header
@@ -25,9 +26,11 @@ main() {
     update_system
     install_nodejs
     install_cups
+    detect_and_configure_printer
     install_libreoffice
     install_image_tools
     setup_pi_agent
+    write_printer_capabilities
     create_systemd_service
     create_qr_service
     show_completion

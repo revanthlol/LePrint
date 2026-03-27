@@ -1,5 +1,6 @@
 // src/components/landing/Locations.jsx
-import { MapPin } from "lucide-react";
+import { MapPin, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import FadeInSection from "./FadeInSection";
 
 const cities = [
@@ -13,37 +14,42 @@ const cities = [
 
 export default function Locations() {
   return (
-    <section className="py-20 md:py-28">
-      <div className="max-w-3xl mx-auto px-6 text-center">
+    <section className="bg-card/30 border-y border-border py-24 md:py-32">
+      <div className="max-w-4xl mx-auto px-6 text-center">
         <FadeInSection>
-          <div className="w-12 h-12 mx-auto bg-foreground/10 text-foreground flex items-center justify-center rounded-xl mb-6">
-            <MapPin className="w-5 h-5" />
-          </div>
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight mb-3">
-            Available at Select Locations
+          <span className="block text-[10px] md:text-xs uppercase tracking-[0.3em] text-muted-foreground font-bold mb-4">
+            WHERE TO FIND US
+          </span>
+          <h2 className="text-3xl md:text-4xl font-light tracking-tight text-foreground mb-4">
+            Expanding across <span className="font-bold">India</span>
           </h2>
-          <p className="text-muted-foreground text-sm max-w-md mx-auto mb-8">
-            We're expanding across India. Find a kiosk near you.
+          <p className="text-sm text-muted-foreground max-w-md mx-auto mb-12">
+            Currently deploying kiosks in select cities. More locations every month.
           </p>
         </FadeInSection>
 
         <FadeInSection delay={0.15}>
-          <div className="flex flex-wrap justify-center gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap md:justify-center gap-3 mb-10">
             {cities.map((city) => (
-              <span
+              <div
                 key={city}
-                className="px-4 py-2 bg-card border border-border rounded-full text-sm text-muted-foreground font-medium"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-card border border-border rounded-full text-sm text-foreground font-medium"
               >
+                <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
                 {city}
-              </span>
+              </div>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground/50">
-            More cities coming soon — want LePrint in your area?{" "}
-            <a href="/contact" className="text-foreground/60 underline underline-offset-2 hover:text-foreground transition-colors">
-              Let us know
-            </a>
-          </p>
+        </FadeInSection>
+
+        <FadeInSection delay={0.25}>
+          <Link 
+            to="/contact"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+          >
+            Want LePrint in your city?
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+          </Link>
         </FadeInSection>
       </div>
     </section>

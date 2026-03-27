@@ -36,8 +36,8 @@ function FadeIn({ children, className = "", delay = 0 }) {
 /* ── Info card ── */
 function InfoCard({ icon: Icon, label, value, href, delay = 0 }) {
   const inner = (
-    <div className="flex items-start gap-4 p-5 bg-card rounded-xl border border-border hover:border-border/80 hover:bg-card/80 transition-colors duration-150">
-      <div className="flex-shrink-0 w-10 h-10 bg-foreground/10 rounded-lg flex items-center justify-center">
+    <div className="flex items-start gap-4 p-5 bg-white/[0.03] backdrop-blur-2xl rounded-xl border border-white/[0.08] hover:bg-white/[0.05] hover:border-white/[0.12] transition-all duration-200">
+      <div className="flex-shrink-0 w-10 h-10 bg-white/[0.06] border border-white/[0.08] rounded-lg flex items-center justify-center">
         <Icon className="w-4 h-4 text-foreground" />
       </div>
       <div className="min-w-0">
@@ -79,7 +79,7 @@ function InputField({ icon: Icon, label, required, children }) {
 }
 
 const inputClass =
-  "w-full px-3.5 py-2.5 text-sm bg-muted/20 border border-border rounded-lg text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground/30 transition-all duration-150";
+  "w-full px-3.5 py-2.5 text-sm bg-white/[0.02] border border-white/[0.08] rounded-lg text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-white/[0.05] focus:border-white/[0.15] focus:bg-white/[0.04] backdrop-blur-md transition-all duration-200";
 
 const subjectOptions = [
   { value: "", label: "Select a topic" },
@@ -129,7 +129,7 @@ function CustomSelect({ value, onChange, options }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.15 }}
-            className="absolute z-50 mt-1 w-full bg-card border border-border rounded-lg shadow-xl overflow-hidden"
+            className="absolute z-50 mt-1 w-full bg-[#1a1a1a]/95 backdrop-blur-2xl border border-white/[0.08] rounded-lg shadow-2xl shadow-black/40 overflow-hidden"
           >
             {options.map((opt) => (
               <li key={opt.value}>
@@ -141,8 +141,8 @@ function CustomSelect({ value, onChange, options }) {
                   }}
                   className={`w-full text-left px-3.5 py-2.5 text-sm transition-colors ${
                     opt.value === value
-                      ? "bg-foreground/10 text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-muted/30 hover:text-foreground"
+                      ? "bg-white/[0.08] text-foreground font-medium"
+                      : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
                   }`}
                 >
                   {opt.label}
@@ -209,17 +209,17 @@ export default function Contact() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
       <PublicNavbar />
-      <main className="flex-1 max-w-4xl mx-auto w-full px-6 pt-20 pb-14">
+      <main className="flex-1 max-w-4xl mx-auto w-full px-6 pt-32 pb-20">
         {/* Header */}
         <FadeIn>
-          <div className="mb-10">
-            <p className="text-xs text-muted-foreground/50 uppercase tracking-widest mb-2">
-              Support
-            </p>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Contact Us
+          <div className="mb-12 md:mb-16">
+            <span className="block text-[10px] md:text-xs uppercase tracking-[0.3em] text-muted-foreground font-bold mb-4">
+              SUPPORT
+            </span>
+            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-3">
+              Get in <span className="font-bold">Touch</span>
             </h1>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-base text-muted-foreground max-w-md">
               Have a question or need help? We'll get back within 24 hours.
             </p>
           </div>
@@ -257,7 +257,7 @@ export default function Contact() {
 
             {/* Quick links */}
             <FadeIn delay={0.25}>
-              <div className="p-5 bg-card rounded-xl border border-border mt-1">
+              <div className="p-5 bg-white/[0.03] backdrop-blur-2xl rounded-xl border border-white/[0.08] mt-1">
                 <p className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-semibold mb-3">
                   Quick Links
                 </p>
@@ -284,7 +284,7 @@ export default function Contact() {
 
           {/* Right: contact form */}
           <FadeIn delay={0.1} className="lg:col-span-3">
-            <div className="bg-card rounded-2xl border border-border p-8">
+            <div className="bg-white/[0.03] backdrop-blur-2xl rounded-2xl border border-white/[0.08] shadow-2xl shadow-black/30 p-8">
               {submitted ? (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -292,7 +292,7 @@ export default function Contact() {
                   transition={{ duration: 0.3 }}
                   className="text-center py-10"
                 >
-                  <div className="w-14 h-14 mx-auto bg-emerald-500/10 text-emerald-400 flex items-center justify-center rounded-2xl mb-5">
+                  <div className="w-14 h-14 mx-auto bg-white/[0.06] border border-white/[0.08] text-foreground flex items-center justify-center rounded-2xl mb-5">
                     <CheckCircle className="w-7 h-7" />
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -318,7 +318,7 @@ export default function Contact() {
                 </motion.div>
               ) : (
                 <>
-                  <h2 className="text-base font-semibold text-foreground mb-1">
+                  <h2 className="text-lg font-semibold text-foreground mb-1">
                     Send us a message
                   </h2>
                   <p className="text-xs text-muted-foreground/50 mb-6">
@@ -373,7 +373,7 @@ export default function Contact() {
                     <button
                       onClick={handleSubmit}
                       disabled={!form.name || !form.email || !form.message || sending}
-                      className="w-full py-3 px-4 bg-foreground text-background text-sm font-semibold rounded-xl hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150 flex items-center justify-center gap-2"
+                      className="w-full py-3 px-4 bg-white text-black text-sm font-semibold rounded-xl hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
                     >
                       <Send className="w-4 h-4" />
                       {sending ? 'Sending…' : 'Send Message'}

@@ -41,7 +41,7 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 
 ### Print
 - 📄 **Multi-format support** — PDF, DOCX, TXT, PNG, JPG (auto-converted to PDF)
-- 💳 **Pay per page** — PayU integration with configurable pricing
+- 💳 **Pay per page** — **Razorpay** integration with configurable pricing
 - 🔄 **Real-time status** — Live job tracking via WebSocket
 - 🔒 **Row locking** — `FOR UPDATE SKIP LOCKED` prevents duplicate dispatch
 - 🔁 **Auto-retry** — Failed jobs retry up to 3 times
@@ -106,9 +106,32 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
                                         └─────────────────┘
 ```
 
-### Data Flow
-- **Print:** Upload → Pay → Agent Claims (Row Locked) → Conversion → CUPS Print → Status via WebSocket
-- **Scan/Xerox:** Request → eSCL Scan → Cloud Upload (Scan) or CUPS Loop (Xerox) → Download/Completion
+### 🔄 Data Flow
+1. **Print Flow**: 
+   - User uploads file via Frontend.
+   - Backend stores metadata and provides a signed URL/stream.
+   - User pays via **Razorpay**.
+   - Backend marks job as `PAID`.
+   - Pi Agent polls `GET /api/jobs/poll` (using `FOR UPDATE SKIP LOCKED`).
+   - Agent downloads, converts (via LibreOffice/ImageMagick), and prints via CUPS.
+   - Real-time status updates are sent via Socket.io to the Frontend.
+
+2. **Scan/Xerox Flow**:
+   - Frontend requests a scan.
+   - Backend emits `SCAN_REQUEST` via WebSocket to the Agent.
+   - Agent triggers eSCL scan via network XML/HTTP.
+   - Agent uploads scanned PDF to Backend.
+   - (Xerox) Agent immediately queues the scanned PDF for printing.
+
+---
+
+## 🛡️ Resilience Features
+
+- **Row Locking**: Backend uses PostgreSQL `SKIP LOCKED` to ensure multiple agents never claim the same job.
+- **Heartbeat System**: Agents send heartbeats every 30s (idle) or 2s (during jobs). Backend detects "Offline" kiosks instantly.
+- **SafeEmit Queue**: If the agent loses internet during a job, it queues status updates locally and replays them once reconnected.
+- **Auto-Retry**: Jobs that fail during the "Printing" phase are automatically retried up to 3 times.
+- **Disk Protection**: `pi-agent` monitors its `temp/` directory and enforces a 500MB limit to prevent storage exhaustion.
 
 ---
 
@@ -117,7 +140,7 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 | Layer | Technologies |
 |-------|-------------|
 | **Frontend** | React 18, Vite, TailwindCSS, shadcn/ui, Framer Motion, Firebase Auth |
-| **Backend** | Node.js, Express, PostgreSQL, Socket.IO, Firebase Admin SDK, PayU |
+| **Backend** | Node.js, Express, PostgreSQL, Socket.IO, Firebase Admin SDK, **Razorpay** |
 | **Pi Agent** | Node.js, CUPS, LibreOffice, pdf-lib, eSCL/AirScan (xml2js, axios) |
 | **Database** | PostgreSQL with views, triggers, and JSONB capability storage |
 
@@ -125,44 +148,63 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 
 ## 📁 Project Structure
 
-```
+```bash
 LePrint/
 ├── backend/            # Express Hub + Socket Manager
+│   ├── modules/        # Business logic (Jobs, Kiosks, Payments)
+│   └── schema.sql      # Database definitions
 ├── frontend/           # React Dashboard + Public Pages
-├── pi-agent/           # Hardware Agent (Modules + Modular Installers)
-│   └── scripts/lib/    # Modular bash setup libraries
-└── docs/               # Integration plans and testing guides
+│   ├── src/components/ # Reusable UI components
+│   └── src/hooks/      # Shared logic (usePrint, useAuth)
+├── pi-agent/           # Hardware Agent
+│   ├── modules/        # Printing, Scanning, and Socket logic
+│   └── scripts/        # Installer and service scripts
+└── docs/               # Architecture and Integration guides
 ```
 
 ---
 
 ## 🚀 Installation
 
-### 1. Backend
+### 1. Prerequisites
+- **Node.js** v18+
+- **PostgreSQL** 14+
+- **Firebase Project** (Auth + Admin SDK)
+- **Razorpay Account** (API Keys)
+
+### 2. Quick Start
 ```bash
-cd backend && npm install
+# Clone and install dependencies
+git clone https://github.com/revanthlol/LePrint.git
+cd LePrint
+npm install # Install root workspace dependencies
+
+# Setup Backend
+cd backend && cp .env.example .env
+npm install
 sudo -u postgres psql -f setup-db.sql
 psql -U printuser -d printkiosk -f schema.sql
-cp .env.example .env && npm run dev
+
+# Setup Frontend
+cd ../frontend && cp .env.example .env
+npm install
+
+# Setup Pi Agent (on target device)
+cd ../pi-agent && ./setup.sh
 ```
 
-### 2. Frontend
-```bash
-cd frontend && npm install
-# Configure Firebase + VITE_API_URL in .env
-npm run dev
-```
+---
 
-### 3. Pi Agent
-```bash
-# Modular setup (recommended)
-cd pi-agent
-./setup.sh
+## 📖 Usage
 
-# Manual dependencies
-sudo apt install cups libreoffice-writer imagemagick
-node index.js
-```
+### Running Locally
+1. **Backend**: `cd backend && npm run dev`
+2. **Frontend**: `cd frontend && npm run dev`
+3. **Agent**: `cd pi-agent && node index.js`
+
+### Simulation Mode
+To test without a physical printer, set `SIMULATE_PRINTER=true` in `pi-agent/.env`.
+To test the full UI flow instantly, use `KIOSK_ID=kiosk_test` in the URL.
 
 ---
 

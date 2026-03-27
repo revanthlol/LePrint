@@ -53,7 +53,7 @@ function AccordionSection({ title, links, isTwoColumn }) {
           open ? "max-h-60 pb-4" : "max-h-0"
         }`}
       >
-        <ul className={`space-y-3 ${isTwoColumn ? "grid grid-cols-2 gap-x-4" : ""}`}>
+        <ul className={isTwoColumn ? "grid grid-cols-2 gap-x-6 gap-y-3" : "space-y-3"}>
           {links.map((link) => (
             <li key={link.label}>
               <Link
@@ -101,22 +101,17 @@ export default function Footer() {
               <h4 className="text-foreground text-xs font-bold mb-6 uppercase tracking-widest">
                 {section.title}
               </h4>
-              <ul className={`space-y-4 ${section.isTwoColumn ? "grid grid-cols-1 md:grid-cols-1 gap-y-3" : ""}`}>
-                {/* Wait, user wanted 6 links in 2 columns. If I use md:grid-cols-2 it might be too tight. 
-                    I'll use a single column but maybe allow it to wrap if needed. 
-                    Actually, let's follow instructions: "divide them into 2 columns" */}
-                <div className={section.isTwoColumn ? "grid grid-cols-2 gap-x-8 gap-y-2 w-max md:w-auto" : "space-y-3"}>
-                  {section.links.map((link) => (
-                    <li key={link.label}>
-                      <Link
-                        to={link.href}
-                        className="text-sm hover:text-emerald-400 transition-colors duration-150 whitespace-nowrap"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </div>
+              <ul className={section.isTwoColumn ? "grid grid-cols-2 gap-x-8 gap-y-3" : "space-y-4"}>
+                {section.links.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      to={link.href}
+                      className="text-sm hover:text-foreground transition-colors duration-150 whitespace-nowrap"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
           ))}

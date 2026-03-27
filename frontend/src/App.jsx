@@ -132,6 +132,18 @@ function App() {
 
             {/* Public */}
             <Route path="/faq" element={<FAQPage />} />
+
+            {/* App — FAQ inside DashboardLayout */}
+            <Route
+              path="/app/faq"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout activeTab="faq">
+                    <FAQPage inApp={true} />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />

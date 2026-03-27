@@ -338,10 +338,14 @@ function ContactModal({ isOpen, onClose }) {
   );
 }
 
-export function FAQPage() {
+export function FAQPage({ inApp = false }) {
   const navigate = useNavigate();
   const [openItems, setOpenItems] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+
+  const contentClasses = inApp 
+    ? "w-full" 
+    : "flex-1 max-w-3xl mx-auto px-6 pt-32 pb-20 w-full";
 
   // SEO Meta Tags
   useEffect(() => {
@@ -384,10 +388,10 @@ export function FAQPage() {
   const hasResults = filteredFaqs.length > 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
-      <PublicNavbar />
+    <div className={inApp ? "" : "min-h-screen flex flex-col bg-[#0a0a0a]"}>
+      {!inApp && <PublicNavbar />}
 
-      <div className="flex-1 max-w-3xl mx-auto px-6 pt-32 pb-20 w-full">
+      <div className={contentClasses}>
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -524,7 +528,7 @@ export function FAQPage() {
         </motion.div>
       </div>
 
-      <Footer />
+      {!inApp && <Footer />}
     </div>
   );
 }

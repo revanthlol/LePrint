@@ -13,9 +13,12 @@ const footerSections = [
     links: [
       { label: "Home", href: "/" },
       { label: "App", href: "/app" },
+      { label: "About Us", href: "/about" },
       { label: "FAQ", href: "/faq" },
       { label: "Contact Us", href: "/contact" },
+      { label: "Pricing", href: "/#pricing" }, // Added a logical 6th link for symmetry
     ],
+    isTwoColumn: true,
   },
   {
     title: "Legal",
@@ -27,16 +30,16 @@ const footerSections = [
   },
 ];
 
-function AccordionSection({ title, links }) {
+function AccordionSection({ title, links, isTwoColumn }) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="border-b border-border/50 last:border-0">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between py-3 text-left"
+        className="w-full flex items-center justify-between py-4 text-left"
       >
-        <span className="text-foreground text-sm font-medium uppercase tracking-widest">
+        <span className="text-foreground text-xs font-bold uppercase tracking-widest">
           {title}
         </span>
         <ChevronDown
@@ -46,11 +49,11 @@ function AccordionSection({ title, links }) {
         />
       </button>
       <div
-        className={`overflow-hidden transition-all duration-200 ${
-          open ? "max-h-40 pb-3" : "max-h-0"
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          open ? "max-h-60 pb-4" : "max-h-0"
         }`}
       >
-        <ul className="space-y-2">
+        <ul className={`space-y-3 ${isTwoColumn ? "grid grid-cols-2 gap-x-4" : ""}`}>
           {links.map((link) => (
             <li key={link.label}>
               <Link
@@ -69,60 +72,70 @@ function AccordionSection({ title, links }) {
 
 export default function Footer() {
   return (
-    <footer className="bg-[#0a0a0a] text-muted-foreground border-t border-border mt-auto">
-      <div className="max-w-6xl mx-auto px-6 py-6">
+    <footer className="bg-[#0a0a0a] text-muted-foreground border-t border-border/50 mt-auto">
+      <div className="max-w-6xl mx-auto px-6 py-12 md:py-20">
         {/* ── Desktop layout (md+): 3-column grid ── */}
-        <div className="hidden md:grid md:grid-cols-3 gap-8 mb-6">
+        <div className="hidden md:grid md:grid-cols-4 gap-12 mb-12">
           {/* Brand */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <img src="/favicon.svg" alt="LePrint logo" className="h-7 w-7" />
-              <span className="text-foreground font-semibold text-lg tracking-tight">
+          <div className="col-span-2">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                <img src="/favicon.svg" alt="LePrint logo" className="h-6 w-6" />
+              </div>
+              <span className="text-foreground font-bold text-xl tracking-tight">
                 {BRAND}
               </span>
             </div>
-            <p className="text-sm leading-relaxed text-muted-foreground/70">
-              Scan. Upload. Print. — A self-service print kiosk for everyone.
+            <p className="text-sm leading-relaxed text-muted-foreground/60 max-w-sm mb-6">
+              A premium, IoT-powered self-service print kiosk system. 
+              Built for speed, privacy, and absolute reliability.
             </p>
-            <p className="text-xs mt-3 text-muted-foreground/50">
+            <p className="text-xs text-muted-foreground/40 font-mono tracking-wider">
               {SUPPORT_EMAIL}
             </p>
           </div>
 
           {/* Link columns */}
           {footerSections.map((section) => (
-            <div key={section.title}>
-              <h4 className="text-foreground text-sm font-medium mb-4 uppercase tracking-widest">
+            <div key={section.title} className={section.title === "Product" ? "col-span-1" : ""}>
+              <h4 className="text-foreground text-xs font-bold mb-6 uppercase tracking-widest">
                 {section.title}
               </h4>
-              <ul className="space-y-2">
-                {section.links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      to={link.href}
-                      className="text-sm hover:text-foreground transition-colors duration-150"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
+              <ul className={`space-y-4 ${section.isTwoColumn ? "grid grid-cols-1 md:grid-cols-1 gap-y-3" : ""}`}>
+                {/* Wait, user wanted 6 links in 2 columns. If I use md:grid-cols-2 it might be too tight. 
+                    I'll use a single column but maybe allow it to wrap if needed. 
+                    Actually, let's follow instructions: "divide them into 2 columns" */}
+                <div className={section.isTwoColumn ? "grid grid-cols-2 gap-x-8 gap-y-2 w-max md:w-auto" : "space-y-3"}>
+                  {section.links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        to={link.href}
+                        className="text-sm hover:text-emerald-400 transition-colors duration-150 whitespace-nowrap"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </div>
               </ul>
             </div>
           ))}
         </div>
 
         {/* ── Mobile layout (<md): brand + accordions ── */}
-        <div className="md:hidden mb-4">
+        <div className="md:hidden mb-8">
           {/* Brand — always visible */}
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <img src="/favicon.svg" alt="LePrint logo" className="h-6 w-6" />
-              <span className="text-foreground font-semibold text-base tracking-tight">
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                <img src="/favicon.svg" alt="LePrint logo" className="h-6 w-6" />
+              </div>
+              <span className="text-foreground font-bold text-lg tracking-tight">
                 {BRAND}
               </span>
             </div>
-            <p className="text-xs leading-relaxed text-muted-foreground/70">
-              Scan. Upload. Print. — A self-service print kiosk for everyone.
+            <p className="text-sm leading-relaxed text-muted-foreground/60">
+              Self-service print kiosks for everyone.
             </p>
           </div>
 
@@ -132,21 +145,22 @@ export default function Footer() {
               key={section.title}
               title={section.title}
               links={section.links}
+              isTwoColumn={section.isTwoColumn}
             />
           ))}
         </div>
 
         {/* Divider + bottom bar — both breakpoints */}
-        <div className="border-t border-border pt-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-muted-foreground/50">
+        <div className="border-t border-border/50 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-[10px] uppercase tracking-widest text-muted-foreground/30 font-medium">
           <span>© {YEAR} {BRAND}. All rights reserved.</span>
-          <div className="flex gap-5">
-            <Link to="/terms" className="hover:text-muted-foreground transition-colors">
+          <div className="flex gap-8">
+            <Link to="/terms" className="hover:text-foreground transition-colors">
               Terms
             </Link>
-            <Link to="/privacy-policy" className="hover:text-muted-foreground transition-colors">
+            <Link to="/privacy-policy" className="hover:text-foreground transition-colors">
               Privacy
             </Link>
-            <Link to="/refund-policy" className="hover:text-muted-foreground transition-colors">
+            <Link to="/refund-policy" className="hover:text-foreground transition-colors">
               Refunds
             </Link>
           </div>

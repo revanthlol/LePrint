@@ -156,7 +156,7 @@ function JobDetailModal({ job, open, onClose }) {
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground">Transaction ID</span>
-                                <span className="text-muted-foreground/60 text-xs italic">PayU integration pending</span>
+                                <span className="text-muted-foreground/60 text-xs italic">Razorpay integration</span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground">Payment status</span>

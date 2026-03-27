@@ -57,7 +57,7 @@ export default function Hero() {
               {/* Status bar */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <div className="w-2 h-2 rounded-full bg-white/40" />
                   <span className="text-[10px] text-muted-foreground/60 font-medium">LePrint</span>
                 </div>
                 <span className="text-[10px] text-muted-foreground/40">Ready</span>
@@ -66,9 +66,9 @@ export default function Hero() {
               {/* Steps inside phone */}
               <div className="space-y-4">
                 {[
-                  { icon: QrCode, label: "Scan QR at kiosk", color: "bg-foreground text-background" },
-                  { icon: Upload, label: "Upload your file", color: "bg-purple-500/15 text-purple-400" },
-                  { icon: Printer, label: "Collect print", color: "bg-emerald-500/15 text-emerald-400" },
+                  { icon: QrCode, label: "Scan QR at kiosk", color: "bg-white text-black" },
+                  { icon: Upload, label: "Upload your file", color: "bg-white/5 text-white/70" },
+                  { icon: Printer, label: "Collect print", color: "bg-white/10 text-white" },
                 ].map((step, i) => (
                   <motion.div
                     key={step.label}

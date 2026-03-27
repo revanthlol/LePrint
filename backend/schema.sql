@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS kiosks (
     printer_status VARCHAR(50) DEFAULT 'unknown',
     printer_status_detail TEXT,
     last_status_check TIMESTAMP,
+    -- Printer Capability Profile
+    printer_brand VARCHAR(50),
+    printer_driver VARCHAR(100),
 
     -- Phase 3: Paper Tracking
     current_paper_count INTEGER DEFAULT 500,

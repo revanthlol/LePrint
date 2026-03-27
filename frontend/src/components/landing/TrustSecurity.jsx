@@ -6,7 +6,7 @@ const items = [
   {
     icon: ShieldCheck,
     title: "Secure Payments",
-    desc: "Powered by PayU — PCI-DSS compliant. Your payment data never touches our servers.",
+    desc: "Powered by Razorpay — PCI-DSS compliant. Your payment data never touches our servers.",
   },
   {
     icon: BadgeIndianRupee,
@@ -37,7 +37,7 @@ export default function TrustSecurity() {
           {items.map((item, i) => (
             <FadeInSection key={item.title} delay={i * 0.1}>
               <div className="bg-card border border-border rounded-2xl p-7 text-center h-full">
-                <div className="w-12 h-12 mx-auto bg-emerald-500/10 text-emerald-400 flex items-center justify-center rounded-xl mb-5">
+                <div className="w-12 h-12 mx-auto bg-white/5 text-white/70 flex items-center justify-center rounded-xl mb-5">
                   <item.icon className="w-5 h-5" />
                 </div>
                 <h3 className="text-base font-bold text-foreground mb-2">

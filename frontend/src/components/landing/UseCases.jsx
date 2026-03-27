@@ -7,19 +7,19 @@ const cases = [
     icon: GraduationCap,
     title: "Students",
     desc: "Print assignments, notes, and project reports between classes — no printer needed.",
-    accent: "bg-blue-500/10 text-blue-400",
+    accent: "bg-white/5 text-white/60",
   },
   {
     icon: Building2,
     title: "Offices",
     desc: "Quick prints without maintaining a dedicated printer. Walk in, print, walk out.",
-    accent: "bg-amber-500/10 text-amber-400",
+    accent: "bg-white/5 text-white/60",
   },
   {
     icon: Plane,
     title: "Travelers",
     desc: "Print boarding passes, itineraries, or documents on the go — available 24/7.",
-    accent: "bg-purple-500/10 text-purple-400",
+    accent: "bg-white/5 text-white/60",
   },
 ];
 

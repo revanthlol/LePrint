@@ -19,6 +19,7 @@ import PrivacyPolicy from "./components/PrivacyPolicy";
 import Terms from "./components/Terms";
 import RefundPolicy from "./components/RefundPolicy";
 import Contact from "./components/Contact";
+import About from "./components/About";
 import Landing from "./components/Landing";
 
 function RootRedirect() {
@@ -135,6 +136,7 @@ function App() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/about" element={<About />} />
 
             {/* /landing route removed — Landing is now at / */}
             {/* Catch-all */}

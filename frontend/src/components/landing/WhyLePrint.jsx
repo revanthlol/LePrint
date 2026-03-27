@@ -24,7 +24,7 @@ export default function WhyLePrint() {
         <FadeInSection delay={0.25} className="mt-8">
           <div className="flex items-center justify-center gap-6 p-3 rounded-xl bg-card border border-border">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-white/40 animate-pulse" />
               <span className="text-xs text-muted-foreground">All systems operational</span>
             </div>
             <div className="w-px h-4 bg-border" />

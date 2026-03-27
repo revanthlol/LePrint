@@ -33,12 +33,12 @@ print_menu() {
 
 run_install() {
   echo ""
-  exec bash "$SCRIPT_DIR/install-or-update-pi-agent.sh"
+  exec bash "$SCRIPT_DIR/scripts/install.sh"
 }
 
 run_uninstall() {
   echo ""
-  exec bash "$SCRIPT_DIR/uninstall-pi-agent.sh"
+  exec bash "$SCRIPT_DIR/scripts/uninstall.sh"
 }
 
 main() {

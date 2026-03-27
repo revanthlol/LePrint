@@ -10,33 +10,10 @@ import Hero from "./landing/Hero";
 import HowItWorks from "./landing/HowItWorks";
 import ServicesPricing from "./landing/ServicesPricing";
 import TrustSecurity from "./landing/TrustSecurity";
-import UseCases from "./landing/UseCases";
-import Testimonials from "./landing/Testimonials";
+import SocialProof from "./landing/SocialProof";
 import Locations from "./landing/Locations";
-import WhyLePrint from "./landing/WhyLePrint";
 import CtaBanner from "./landing/CtaBanner";
 import FadeInSection from "./landing/FadeInSection";
-
-/* ── Mid-page CTA (inline, small) ── */
-function MidCta() {
-  const { currentUser } = useAuth();
-  return (
-    <section className="py-14 md:py-20">
-      <FadeInSection className="max-w-xl mx-auto px-6 text-center">
-        <p className="text-muted-foreground text-sm mb-4">
-          Got a file ready?
-        </p>
-        <Link
-          to={currentUser ? '/app' : '/login'}
-          className="inline-flex items-center gap-2 px-6 py-3 border border-border text-foreground font-semibold text-sm rounded-xl hover:bg-card transition-colors"
-        >
-          Upload Your File
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-      </FadeInSection>
-    </section>
-  );
-}
 
 /* ── Page Root ── */
 export default function Landing() {
@@ -70,11 +47,8 @@ export default function Landing() {
         <HowItWorks />
         <ServicesPricing />
         <TrustSecurity />
-        <MidCta />
-        <UseCases />
-        <Testimonials />
+        <SocialProof />
         <Locations />
-        <WhyLePrint />
         <CtaBanner />
       </main>
       <Footer />

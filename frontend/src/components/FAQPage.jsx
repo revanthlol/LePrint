@@ -14,8 +14,8 @@ const faqs = [
   {
     category: 'Supported Formats',
     icon: FileText,
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
+    color: 'text-foreground',
+    bg: 'bg-white/[0.06]',
     questions: [
       {
         q: 'What file formats can I print?',
@@ -34,8 +34,8 @@ const faqs = [
   {
     category: 'Failed Prints & Refunds',
     icon: CreditCard,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10',
+    color: 'text-foreground',
+    bg: 'bg-white/[0.06]',
     questions: [
       {
         q: 'What happens if the printer jams or runs out of paper?',
@@ -54,8 +54,8 @@ const faqs = [
   {
     category: 'Privacy & Security',
     icon: Shield,
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10',
+    color: 'text-foreground',
+    bg: 'bg-white/[0.06]',
     questions: [
       {
         q: 'Are my documents stored on your servers?',
@@ -78,8 +78,8 @@ const faqs = [
   {
     category: 'General',
     icon: HelpCircle,
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/10',
+    color: 'text-foreground',
+    bg: 'bg-white/[0.06]',
     questions: [
       {
         q: 'How does LePrint work?',
@@ -135,7 +135,7 @@ function AccordionItem({ questionId, question, answer, isOpen, onToggle }) {
   };
 
   return (
-    <div className="border-b border-border last:border-0">
+    <div className="border-b border-white/[0.06] last:border-0">
       <button
         onClick={onToggle}
         onKeyDown={(e) => {
@@ -144,7 +144,7 @@ function AccordionItem({ questionId, question, answer, isOpen, onToggle }) {
             onToggle();
           }
         }}
-        className="w-full flex items-start justify-between gap-4 py-4 text-left group"
+        className="w-full flex items-start justify-between gap-4 py-5 text-left group"
         aria-expanded={isOpen}
       >
         <span className={`text-sm font-medium transition-colors ${isOpen ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>
@@ -168,26 +168,26 @@ function AccordionItem({ questionId, question, answer, isOpen, onToggle }) {
             transition={{ duration: 0.25, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="pb-4 pr-8">
+            <div className="pb-5 pr-8">
               {answer.split('\n').map((line, i) => (
-                <p key={i} className={`text-sm text-muted-foreground ${line === '' ? 'mt-2' : ''}`}>
+                <p key={i} className={`text-sm text-muted-foreground/80 leading-relaxed ${line === '' ? 'mt-2' : ''}`}>
                   {line}
                 </p>
               ))}
 
               {/* Was this helpful? */}
-              <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">Was this helpful?</span>
+              <div className="mt-5 pt-4 border-t border-white/[0.06] flex items-center gap-3">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50">Helpful?</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleVote(true)}
                     disabled={voted !== null}
-                    className={`p-1.5 rounded-md transition-colors ${
+                    className={`p-1.5 rounded-lg border border-white/[0.08] transition-colors ${
                       voted === true
-                        ? 'bg-emerald-500/20 text-emerald-400'
+                        ? 'bg-white text-black'
                         : voted === false
-                        ? 'opacity-40 cursor-not-allowed'
-                        : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+                        ? 'opacity-20 cursor-not-allowed'
+                        : 'bg-white/[0.03] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]'
                     }`}
                   >
                     <ThumbsUp className="w-3.5 h-3.5" />
@@ -195,12 +195,12 @@ function AccordionItem({ questionId, question, answer, isOpen, onToggle }) {
                   <button
                     onClick={() => handleVote(false)}
                     disabled={voted !== null}
-                    className={`p-1.5 rounded-md transition-colors ${
+                    className={`p-1.5 rounded-lg border border-white/[0.08] transition-colors ${
                       voted === false
-                        ? 'bg-red-500/20 text-red-400'
+                        ? 'bg-white text-black'
                         : voted === true
-                        ? 'opacity-40 cursor-not-allowed'
-                        : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+                        ? 'opacity-20 cursor-not-allowed'
+                        : 'bg-white/[0.03] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]'
                     }`}
                   >
                     <ThumbsDown className="w-3.5 h-3.5" />
@@ -210,7 +210,7 @@ function AccordionItem({ questionId, question, answer, isOpen, onToggle }) {
                   <motion.span
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="text-xs text-muted-foreground"
+                    className="text-[11px] text-muted-foreground/60 italic"
                   >
                     Thanks for your feedback!
                   </motion.span>
@@ -230,7 +230,6 @@ function ContactModal({ isOpen, onClose }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // In production, send to backend API
     console.log('Contact form:', formData);
     setSubmitted(true);
     setTimeout(() => {
@@ -248,25 +247,30 @@ function ContactModal({ isOpen, onClose }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         onClick={onClose}
       >
         <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
+          initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          transition={{ type: 'spring', duration: 0.3 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          transition={{ duration: 0.2 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-card border border-border rounded-2xl p-6 max-w-md w-full"
+          className="bg-[#1a1a1a]/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-8 max-w-md w-full shadow-2xl shadow-black/50"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Mail className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold text-foreground">Contact Support</h3>
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/[0.06] border border-white/[0.08] rounded-xl flex items-center justify-center">
+                <Mail className="w-5 h-5 text-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground text-lg leading-none">Contact Support</h3>
+                <p className="text-xs text-muted-foreground mt-1">We'll get back within 24 hours.</p>
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-accent rounded-lg transition-colors"
+              className="p-2 hover:bg-white/[0.06] rounded-xl transition-colors"
             >
               <X className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -274,54 +278,54 @@ function ContactModal({ isOpen, onClose }) {
 
           {submitted ? (
             <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="py-8 text-center"
+              className="py-12 text-center"
             >
-              <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ThumbsUp className="w-8 h-8 text-emerald-400" />
+              <div className="w-16 h-16 bg-white/[0.06] border border-white/[0.08] rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <ThumbsUp className="w-8 h-8 text-foreground" />
               </div>
-              <p className="text-foreground font-medium mb-2">Message sent!</p>
+              <p className="text-foreground font-semibold text-lg mb-2">Message sent!</p>
               <p className="text-sm text-muted-foreground">We'll get back to you soon.</p>
             </motion.div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Name</label>
+                <label className="block text-[10px] uppercase font-bold tracking-widest text-muted-foreground/60 mb-2 px-1">Name</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-muted/10 border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-white/[0.05] focus:border-white/[0.15] backdrop-blur-md transition-all"
                   placeholder="Your name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+                <label className="block text-[10px] uppercase font-bold tracking-widest text-muted-foreground/60 mb-2 px-1">Email</label>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-muted/10 border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-white/[0.05] focus:border-white/[0.15] backdrop-blur-md transition-all"
                   placeholder="your@email.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Message</label>
+                <label className="block text-[10px] uppercase font-bold tracking-widest text-muted-foreground/60 mb-2 px-1">Message</label>
                 <textarea
                   required
                   rows={4}
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  className="w-full px-3 py-2 bg-muted/10 border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-white/[0.05] focus:border-white/[0.15] backdrop-blur-md resize-none transition-all"
                   placeholder="How can we help?"
                 />
               </div>
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-white text-black rounded-xl font-bold text-sm hover:bg-white/90 shadow-xl shadow-white/5 transition-all"
               >
                 <Send className="w-4 h-4" />
                 Send Message
@@ -360,19 +364,13 @@ export function FAQPage() {
   const toggle = (catIdx, qIdx) => {
     const key = `${catIdx}-${qIdx}`;
     const questionId = `${catIdx}-${qIdx}`;
-    
-    // Track view if opening
-    if (!openItems[key]) {
-      trackFAQView(questionId);
-    }
-    
+    if (!openItems[key]) trackFAQView(questionId);
     setOpenItems(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   // Search filtering
   const filteredFaqs = useMemo(() => {
     if (!searchQuery.trim()) return faqs;
-
     const query = searchQuery.toLowerCase();
     return faqs.map(section => ({
       ...section,
@@ -389,16 +387,19 @@ export function FAQPage() {
     <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
       <PublicNavbar />
 
-      <div className="flex-1 max-w-3xl mx-auto px-4 pt-20 pb-20 w-full">
+      <div className="flex-1 max-w-3xl mx-auto px-6 pt-32 pb-20 w-full">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="mb-8"
+          transition={{ duration: 0.45 }}
+          className="mb-12"
         >
-          <h1 className="text-3xl font-bold text-foreground mb-3">FAQs & Support</h1>
-          <p className="text-muted-foreground">
+          <span className="block text-[10px] md:text-xs uppercase tracking-[0.3em] text-muted-foreground font-bold mb-4">SUPPORT</span>
+          <h1 className="text-4xl md:text-5xl font-light tracking-tight text-foreground mb-4">
+            FAQs <span className="font-bold">& Support</span>
+          </h1>
+          <p className="text-base text-muted-foreground max-w-md">
             Everything you need to know about printing with LePrint.
           </p>
         </motion.div>
@@ -408,36 +409,36 @@ export function FAQPage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
-          className="mb-8"
+          className="mb-12"
         >
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-foreground/70 transition-colors" />
             <input
               type="text"
-              placeholder="Search FAQs..."
+              placeholder="Search health, privacy, or job issues..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-10 py-3 bg-card/60 border border-border rounded-xl text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              className="w-full pl-12 pr-12 py-4 bg-white/[0.02] border border-white/[0.08] rounded-2xl text-foreground text-sm placeholder:text-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-white/[0.05] focus:border-white/[0.15] backdrop-blur-md transition-all shadow-2xl shadow-black/20"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-accent rounded-md transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-white/[0.06] rounded-xl transition-colors"
               >
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>
             )}
           </div>
           {searchQuery && (
-            <p className="text-xs text-muted-foreground mt-2">
-              {hasResults ? `Found ${filteredFaqs.reduce((acc, s) => acc + s.questions.length, 0)} result(s)` : 'No results found'}
+            <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground/40 mt-4 px-2">
+              {hasResults ? `Found ${filteredFaqs.reduce((acc, s) => acc + s.questions.length, 0)} result(s)` : 'No matches found'}
             </p>
           )}
         </motion.div>
 
         {/* FAQ sections */}
         {hasResults ? (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {filteredFaqs.map((section, catIdx) => {
               const Icon = section.icon;
               return (
@@ -445,19 +446,19 @@ export function FAQPage() {
                   key={catIdx}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, delay: catIdx * 0.07 }}
-                  className="bg-card/60 border border-border rounded-2xl overflow-hidden"
+                  transition={{ duration: 0.45, delay: catIdx * 0.1 }}
+                  className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl shadow-black/30"
                 >
                   {/* Section header */}
-                  <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-                    <div className={`w-8 h-8 rounded-lg ${section.bg} flex items-center justify-center`}>
+                  <div className="flex items-center gap-4 px-6 py-5 border-b border-white/[0.06] bg-white/[0.02]">
+                    <div className={`w-10 h-10 rounded-xl ${section.bg} border border-white/[0.08] flex items-center justify-center`}>
                       <Icon className={`w-4 h-4 ${section.color}`} />
                     </div>
-                    <h2 className="font-semibold text-foreground text-sm">{section.category}</h2>
+                    <h2 className="font-bold text-foreground text-sm tracking-tight">{section.category}</h2>
                   </div>
 
                   {/* Questions */}
-                  <div className="px-5">
+                  <div className="px-6">
                     {section.questions.map((item, qIdx) => (
                       <AccordionItem
                         key={qIdx}
@@ -477,16 +478,18 @@ export function FAQPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-12"
+            className="text-center py-20 bg-white/[0.03] border border-white/[0.08] rounded-3xl backdrop-blur-md"
           >
-            <HelpCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-foreground font-medium mb-2">No results found</p>
-            <p className="text-sm text-muted-foreground mb-6">
-              Try different keywords or contact us directly
+            <div className="w-16 h-16 bg-white/[0.06] border border-white/[0.08] rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <HelpCircle className="w-8 h-8 text-muted-foreground/50" />
+            </div>
+            <p className="text-foreground font-semibold text-lg mb-2">No results found</p>
+            <p className="text-sm text-muted-foreground/60 mb-8 max-w-xs mx-auto leading-relaxed">
+              We couldn't find an answer. Try different keywords or reach out to us.
             </p>
             <button
               onClick={() => navigate('/contact')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black rounded-xl text-sm font-bold hover:bg-white/90 shadow-xl shadow-white/5 transition-all"
             >
               <Mail className="w-4 h-4" />
               Contact Support
@@ -498,23 +501,26 @@ export function FAQPage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-12 pt-8 border-t border-border text-center"
+          transition={{ delay: 0.6 }}
+          className="mt-20 pt-12 border-t border-white/[0.08] text-center"
         >
-          <p className="text-sm text-muted-foreground mb-3">Still have questions?</p>
-          <button
-            onClick={() => navigate('/contact')}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 rounded-lg text-sm font-medium text-foreground transition-colors mb-4"
-          >
-            <Mail className="w-4 h-4" />
-            Contact Support
-          </button>
-          <p className="text-xs text-muted-foreground/60">
-            Or email{' '}
-            <a href="mailto:support@leprint.in" className="text-muted-foreground underline underline-offset-2">
-              support@leprint.in
+          <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-muted-foreground/50 mb-4">STILL HAVE QUESTIONS?</p>
+          <p className="text-sm text-muted-foreground mb-8">We're here to help you get your printing done.</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button
+              onClick={() => navigate('/contact')}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.1] rounded-xl text-sm font-bold text-foreground transition-all"
+            >
+              <Mail className="w-4 h-4" />
+              Open Support Ticket
+            </button>
+            <a 
+              href="mailto:support@leprint.in" 
+              className="text-sm text-foreground/70 hover:text-foreground underline underline-offset-4 transition-colors p-4"
+            >
+              Email support@leprint.in
             </a>
-          </p>
+          </div>
         </motion.div>
       </div>
 

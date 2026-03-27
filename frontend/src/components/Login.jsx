@@ -6,7 +6,7 @@ import { useGuest } from './GuestContext';
 import { Printer, AlertCircle, UserX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Footer from './Footer';
-import FeatureCards from './FeatureCards';
+import PublicNavbar from './PublicNavbar';
 
 // Animation variants for reusability
 const containerVariants = {
@@ -31,7 +31,6 @@ const itemVariants = {
         }
     }
 };
-
 
 export function Login() {
     const { signInWithGoogle, isAuthenticated, loading: authLoading, error: authError } = useAuth();
@@ -85,7 +84,8 @@ export function Login() {
 
     return (
         <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
-            <div className="flex-1 flex items-center justify-center px-4 py-8">
+            <PublicNavbar />
+            <div className="flex-1 flex items-center justify-center px-4 py-8 pt-24">
                 <motion.div
                     variants={containerVariants}
                     initial="hidden"
@@ -99,24 +99,19 @@ export function Login() {
                     >
                         {/* Logo/Header */}
                         <div className="text-center mb-6">
-                            {/* Floating Logo with pulse effect */}
+                            {/* Floating Logo — matches About page style */}
                             <motion.div
-                                animate={{
-                                    y: [0, -10, 0],
-                                }}
-                                transition={{
-                                    duration: 3,
-                                    repeat: Infinity,
-                                    ease: "easeInOut"
-                                }}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
                                 className="inline-block"
                             >
                                 <motion.div
-                                    whileHover={{ scale: 1.05, rotate: 5 }}
+                                    whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
-                                    className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl mb-4 shadow-lg cursor-pointer"
+                                    className="inline-flex items-center justify-center w-20 h-20 md:w-24 md:h-24 rounded-[2rem] bg-gradient-to-br from-white/10 to-transparent text-white border border-white/10 shadow-2xl shadow-white/5 mb-8 cursor-pointer"
                                 >
-                                    <Printer className="w-10 h-10 text-black" />
+                                    <Printer className="w-10 h-10 md:w-12 md:h-12" />
                                 </motion.div>
                             </motion.div>
 
@@ -301,8 +296,6 @@ export function Login() {
                             Limited to 3 prints per day
                         </p>
                     </motion.div>
-
-                    <FeatureCards />
                 </motion.div>
             </div>
             <Footer />

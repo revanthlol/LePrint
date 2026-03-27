@@ -1,15 +1,15 @@
-# PayU Integration Plan
+# Razorpay Integration Plan
 
 > **Status:** Planning — no code implemented yet.
-> This document outlines the technical design for integrating **PayU** as the payment gateway for LePrint.
+> This document outlines the technical design for integrating **Razorpay** as the payment gateway for LePrint.
 
 ---
 
 ## 1. Overview
 
-LePrint is a self-service cloud printing platform where users pay per page/copy before their print jobs are dispatched. PayU will handle all online payments, ensuring PCI-DSS compliance without LePrint needing to directly handle sensitive card data.
+LePrint is a self-service cloud printing platform where users pay per page/copy before their print jobs are dispatched. Razorpay will handle all online payments, ensuring PCI-DSS compliance without LePrint needing to directly handle sensitive card data.
 
-**Why PayU:**
+**Why Razorpay:**
 - PCI-DSS Level 1 compliant
 - Strong presence in India with UPI, cards, net banking, and wallets
 - Server-to-server hash verification (no client-side key exposure)
@@ -30,18 +30,18 @@ Frontend calls POST /api/jobs/create → Backend creates job (status: PENDING)
        │
        ▼
 Frontend calls POST /api/payments/initiate
-       │  ← Backend generates txnid, calculates hash, returns PayU form params
+       │  ← Backend generates txnid, calculates hash, returns Razorpay form params
        ▼
-Frontend auto-submits form to PayU checkout
+Frontend auto-submits form to Razorpay checkout
        │
        ▼
-User completes payment on PayU (UPI / card / net banking)
+User completes payment on Razorpay (UPI / card / net banking)
        │
-       ├── Success → PayU redirects to /api/payments/success
+       ├── Success → Razorpay redirects to /api/payments/success
        │                  Backend verifies hash → updates job status to PAID
        │                  Frontend shows success → job enters print queue
        │
-       └── Failure → PayU redirects to /api/payments/failure
+       └── Failure → Razorpay redirects to /api/payments/failure
                           Backend marks payment as failed
                           Frontend shows retry option
 ```
@@ -50,11 +50,11 @@ User completes payment on PayU (UPI / card / net banking)
 
 ## 3. Required Data
 
-### PayU Form Parameters
+### Razorpay Form Parameters
 
 | Parameter | Source | Description |
 |-----------|--------|-------------|
-| `key` | Backend env | PayU merchant key |
+| `key` | Backend env | Razorpay merchant key |
 | `txnid` | Backend | Unique transaction ID (e.g., `LP_{jobId}_{timestamp}`) |
 | `amount` | Backend | Total amount in INR (e.g., `9.00` for 3 pages) |
 | `productinfo` | Backend | Job description (e.g., `Print: 3 pages`) |
@@ -79,16 +79,16 @@ The hash **must** be generated server-side. The `salt` (merchant salt) is never 
 
 ### Initiate Payment
 1. After job creation, call `POST /api/payments/initiate` with `jobId`
-2. Receive PayU form params (key, txnid, hash, amount, etc.)
-3. Dynamically create and auto-submit a form to `https://secure.payu.in/_payment`
+2. Receive Razorpay form params (key, txnid, hash, amount, etc.)
+3. Dynamically create and auto-submit a form to `https://secure.razorpay.in/_payment`
 
 ```jsx
-// Pseudocode — PayU form submission
+// Pseudocode — Razorpay form submission
 const form = document.createElement('form');
 form.method = 'POST';
-form.action = PAYU_BASE_URL; // test or production
+form.action = RAZORPAY_BASE_URL; // test or production
 
-Object.entries(payuParams).forEach(([key, value]) => {
+Object.entries(razorpayParams).forEach(([key, value]) => {
   const input = document.createElement('input');
   input.type = 'hidden';
   input.name = key;
@@ -116,25 +116,25 @@ form.submit();
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/payments/initiate` | Generate PayU hash and form params |
-| `POST` | `/api/payments/success` | PayU success callback — verify hash, update job |
-| `POST` | `/api/payments/failure` | PayU failure callback — mark payment failed |
-| `POST` | `/api/payments/webhook` | PayU server-to-server webhook (optional, recommended) |
+| `POST` | `/api/payments/initiate` | Generate Razorpay hash and form params |
+| `POST` | `/api/payments/success` | Razorpay success callback — verify hash, update job |
+| `POST` | `/api/payments/failure` | Razorpay failure callback — mark payment failed |
+| `POST` | `/api/payments/webhook` | Razorpay server-to-server webhook (optional, recommended) |
 
 ### Initiate Payment Logic
 ```
 1. Validate jobId, check job belongs to user, status is PENDING
 2. Generate unique txnid
 3. Calculate hash using merchant key + salt
-4. Return all PayU form params to frontend
+4. Return all Razorpay form params to frontend
 5. Store txnid in job record for later verification
 ```
 
 ### Verify Payment Logic
 ```
-1. Receive PayU redirect with transaction data
+1. Receive Razorpay redirect with transaction data
 2. Recalculate reverse hash: sha512(salt|status||||||udf5|...|email|firstname|productinfo|amount|txnid|key)
-3. Compare with PayU's posted hash
+3. Compare with Razorpay's posted hash
 4. If match → update job status to PAID, trigger print queue
 5. If mismatch → log alert, do NOT update job
 ```
@@ -158,16 +158,16 @@ ALTER TABLE jobs ADD COLUMN payment_verified_at TIMESTAMPTZ;
 | Hash tampering | Hash generated server-side, verified on callback using reverse hash |
 | Replay attacks | Each `txnid` is unique and single-use |
 | Amount manipulation | Amount calculated server-side from job data, not from client input |
-| Webhook spoofing | Validate PayU webhook IP whitelist + hash verification |
+| Webhook spoofing | Validate Razorpay webhook IP whitelist + hash verification |
 | Failed payment exploitation | Job stays `PENDING` until hash-verified payment confirmation |
 
 ### Environment Variables (Backend)
 
 ```env
-PAYU_MERCHANT_KEY=your_merchant_key
-PAYU_MERCHANT_SALT=your_merchant_salt
-PAYU_BASE_URL=https://test.payu.in/_payment    # test
-# PAYU_BASE_URL=https://secure.payu.in/_payment  # production
+RAZORPAY_MERCHANT_KEY=your_merchant_key
+RAZORPAY_MERCHANT_SALT=your_merchant_salt
+RAZORPAY_BASE_URL=https://test.razorpay.in/_payment    # test
+# RAZORPAY_BASE_URL=https://secure.razorpay.in/_payment  # production
 ```
 
 ---
@@ -201,13 +201,13 @@ frontend/src/components/
 
 | | Test | Production |
 |---|------|-----------|
-| URL | `https://test.payu.in/_payment` | `https://secure.payu.in/_payment` |
-| Key/Salt | Test credentials from PayU dashboard | Production credentials |
-| Cards | PayU test cards (see PayU docs) | Real cards |
+| URL | `https://test.razorpay.in/_payment` | `https://secure.razorpay.in/_payment` |
+| Key/Salt | Test credentials from Razorpay dashboard | Production credentials |
+| Cards | Razorpay test cards (see Razorpay docs) | Real cards |
 
 ### Implementation Order
 1. Backend: payment routes + hash logic
 2. Database: add payment columns
 3. Frontend: payment initiation + redirect pages
-4. Integration testing with PayU test environment
+4. Integration testing with Razorpay test environment
 5. Go live with production credentials

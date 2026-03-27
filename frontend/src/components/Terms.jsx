@@ -4,24 +4,24 @@ import Footer from "./Footer";
 import PublicNavbar from "./PublicNavbar";
 
 const BRAND = "LePrint";
-const DOMAIN = "leprint.in";
-const SUPPORT_EMAIL = "support@leprint.in";
 const LAST_UPDATED = "March 21, 2026";
 
 function Section({ title, children }) {
   return (
-    <section className="mb-8">
-      <h2 className="text-lg font-semibold text-foreground mb-3 pb-2 border-b border-border">
+    <section className="mb-12 last:mb-0">
+      <h2 className="text-xl font-bold text-foreground mb-6 pb-4 border-b border-white/[0.05]">
         {title}
       </h2>
-      <div className="text-muted-foreground text-sm leading-7 space-y-3">{children}</div>
+      <div className="text-muted-foreground/90 text-sm md:text-base leading-8 space-y-6">
+        {children}
+      </div>
     </section>
   );
 }
 
 export default function Terms() {
   useEffect(() => {
-    document.title = "Terms & Conditions — LePrint";
+    document.title = "Terms of Service — LePrint";
     window.scrollTo(0, 0);
     return () => { document.title = "LePrint"; };
   }, []);
@@ -29,196 +29,177 @@ export default function Terms() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
       <PublicNavbar />
-      <main className="flex-1 max-w-3xl mx-auto w-full px-6 pt-20 pb-14">
-        <div className="mb-10">
-          <p className="text-xs text-muted-foreground/50 uppercase tracking-widest mb-2">Legal</p>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Terms &amp; Conditions
+      <main className="flex-1 max-w-5xl mx-auto w-full px-6 pt-32 pb-20">
+        <div className="mb-12">
+          <span className="block text-[10px] md:text-xs uppercase tracking-[0.3em] text-muted-foreground font-bold mb-4">LEGAL</span>
+          <h1 className="text-4xl md:text-6xl font-light tracking-tight text-foreground mb-4">
+            Terms <span className="font-bold">of Service</span>
           </h1>
-          <p className="text-sm text-muted-foreground/50">Last updated: {LAST_UPDATED}</p>
+          <p className="text-sm text-muted-foreground/40 font-medium">Last updated: {LAST_UPDATED}</p>
         </div>
 
-        <div className="bg-card rounded-2xl shadow-sm border border-border p-8 md:p-10">
-          <Section title="1. Acceptance of Terms">
+        <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.05] rounded-[2.5rem] shadow-2xl shadow-black/50 p-8 md:p-16">
+          <Section title="1. Agreement to Terms">
             <p>
-              By accessing or using {BRAND} (available at{" "}
-              <a href={`https://${DOMAIN}`} className="text-blue-400 hover:underline">
-                {DOMAIN}
+              By accessing or using the services provided by {BRAND} ("we", "us",
+              or "our"), including our kiosks and website (
+              <a href="https://leprint.in" className="text-blue-400/80 underline decoration-white/20 underline-offset-4 hover:text-white transition-colors">
+                leprint.in
               </a>
-              ), you agree to be bound by these Terms &amp; Conditions. If you
-              disagree with any part, you must not use the service.
+              ), you agree to be bound by these Terms of Service. If you do not
+              agree, do not use our services.
             </p>
           </Section>
 
           <Section title="2. Description of Service">
             <p>
-              {BRAND} provides a cloud-based self-service print, scan, and xerox
-              (photocopy) kiosk system. Users can:
+              {BRAND} provides self-service cloud printing, scanning, and
+              photocopy (xerox) solutions via automated kiosks. Users upload
+              documents via our web interface and execute jobs at physical kiosk
+              locations.
             </p>
-            <ul className="list-disc pl-5 space-y-2 mt-2">
-              <li>Upload documents from their phone by scanning a QR code at a physical kiosk</li>
-              <li>Pay online and receive printed documents at the kiosk</li>
-              <li>Scan physical documents and receive a digital PDF download</li>
-              <li>Photocopy documents by scanning and printing multiple copies</li>
+          </Section>
+
+          <Section title="3. User Accounts">
+            <p>
+              To use certain features, you must sign in via Google OAuth. You are
+              responsible for maintaining the security of your authentication
+              session and for all activities that occur under your account. We
+              reserve the right to suspend accounts that violate these terms.
+            </p>
+          </Section>
+
+          <Section title="4. File Uploads and Content">
+            <p>
+              You retain ownership of any documents you upload. However, by
+              uploading, you grant us a temporary, limited license to process,
+              store, and transmit the files solely for the purpose of fulfilling
+              your print/scan request.
+            </p>
+            <p className="font-bold text-white mt-4">Prohibited Content:</p>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {[
+                "Illegal or infringing materials",
+                "Pornographic or highly offensive content",
+                "Malicious software or code",
+                "Documents violating local laws"
+              ].map((item, i) => (
+                <li key={i} className="flex gap-3 items-center p-4 bg-white/[0.02] border border-white/[0.05] rounded-xl">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                  <span className="text-sm">{item}</span>
+                </li>
+              ))}
             </ul>
           </Section>
 
-          <Section title="3. User Accounts & Eligibility">
+          <Section title="5. Pricing and Payments">
             <p>
-              You must sign in with a valid Google account to use the service. You
-              must be at least 13 years of age. You are responsible for maintaining
-              the security of your account and for all activity that occurs under
-              your account.
+              Pricing for services is displayed at the time of job configuration.
+              All payments are processed via our partner gateway (Razorpay).
             </p>
-          </Section>
-
-          <Section title="4. Pricing">
-            <p>Current pricing (subject to change with notice):</p>
-            <div className="mt-3 overflow-hidden rounded-lg border border-border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30">
+            <div className="overflow-hidden rounded-2xl border border-white/[0.05] bg-[#0c0c0c]/50 my-8">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-white/[0.04] border-b border-white/[0.08]">
                   <tr>
-                    <th className="text-left px-4 py-2.5 font-medium text-foreground/80">Service</th>
-                    <th className="text-left px-4 py-2.5 font-medium text-foreground/80">Price</th>
+                    <th className="px-6 py-4 font-bold text-foreground">Service</th>
+                    <th className="px-6 py-4 font-bold text-foreground">Unit</th>
+                    <th className="px-6 py-4 font-bold text-foreground">Base Rate*</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-white/[0.05]">
                   <tr>
-                    <td className="px-4 py-2.5 text-muted-foreground">Print (B&W)</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">₹3 per page</td>
+                    <td className="px-6 py-4 text-muted-foreground">B&W Print</td>
+                    <td className="px-6 py-4 text-muted-foreground">Per Page (A4)</td>
+                    <td className="px-6 py-4 text-foreground font-medium">₹5.00</td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-2.5 text-muted-foreground">Scan</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">₹10 per document</td>
+                    <td className="px-6 py-4 text-muted-foreground">Color Print</td>
+                    <td className="px-6 py-4 text-muted-foreground">Per Page (A4)</td>
+                    <td className="px-6 py-4 text-foreground font-medium">₹20.00</td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-2.5 text-muted-foreground">Xerox / Photocopy</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">₹5 per copy</td>
+                    <td className="px-6 py-4 text-muted-foreground">Scanning</td>
+                    <td className="px-6 py-4 text-muted-foreground">Per Document</td>
+                    <td className="px-6 py-4 text-foreground font-medium">₹10.00</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p className="mt-3">
-              All prices are inclusive of applicable taxes. Prices are displayed
-              clearly before payment. We reserve the right to change pricing with
-              30 days' notice posted on the website.
+            <p className="text-xs text-muted-foreground/60 italic">
+              * Rates may vary by location and paper quality. Final price is
+              calculated and shown before payment.
             </p>
           </Section>
 
-          <Section title="5. Payments">
+          <Section title="6. Refund Policy">
             <p>
-              Payments are processed securely via Razorpay (PCI-DSS compliant).
-              LePrint does not store card or UPI details.
-            </p>
-            <p>
-              All services are prepaid. Jobs are processed only after successful
-              payment confirmation.
-            </p>
-            <p>
-              Payment must be completed before a print or xerox job is dispatched
-              to the kiosk. Scan jobs are initiated after payment confirmation.
-            </p>
-          </Section>
-
-          <Section title="5A. Service Delivery">
-            <p>
-              A service is considered successfully delivered once the document is
-              printed at the kiosk, or made available for download (scan jobs).
-            </p>
-          </Section>
-
-          <Section title="6. Acceptable Use">
-            <p>You agree NOT to use {BRAND} to print, scan, or reproduce:</p>
-            <ul className="list-disc pl-5 space-y-2 mt-2">
-              <li>Copyrighted material without authorization from the rights holder</li>
-              <li>Illegal, obscene, defamatory, or hateful content</li>
-              <li>Government-issued documents with intent to forge or misrepresent</li>
-              <li>Any content that violates applicable Indian law</li>
-            </ul>
-            <p>
-              Violations may result in immediate account suspension and reporting
-              to relevant authorities.
-            </p>
-          </Section>
-
-          <Section title="7. Uploaded Documents">
-            <p>
-              You retain full ownership of the files you upload. By uploading, you
-              grant {BRAND} a limited, temporary license to process and transmit
-              your files solely for the purpose of fulfilling your print/scan job.
-            </p>
-            <p>
-              Uploaded files are automatically and permanently deleted from our
-              servers within 2 hours of upload or 30 minutes after job completion.
-              We do not read, analyse, or share your document content.
-            </p>
-          </Section>
-
-          <Section title="8. Refunds & Cancellations">
-            <p>
-              Please refer to our{" "}
-              <a href="/refund-policy" className="text-blue-400 hover:underline">
-                Refund Policy
+              Refunds are issued only for technical failures (e.g., job failed to
+              print, kiosk paper jam). We do not issue refunds for user errors
+              (e.g., uploading wrong file). Please refer to our full{" "}
+              <a href="/refund-policy" className="text-blue-400/80 underline decoration-white/20 underline-offset-4 hover:text-white transition-colors">
+                Refund & Cancellation Policy
               </a>{" "}
-              for complete details. In summary: refunds are issued only when a job
-              fails to complete due to a technical error on our side. No refund is
-              issued once printing has started.
+              for details.
             </p>
           </Section>
 
-          <Section title="9. Service Availability">
+          <Section title="7. Data Privacy">
             <p>
-              {BRAND} is dependent on physical kiosk hardware, network
-              connectivity, printer availability, and paper stock. We do not
-              guarantee 100% uptime. Kiosk status is displayed in real time on
-              the service interface.
-            </p>
-            <p>
-              If a kiosk is offline or out of paper at the time of your job, we
-              will attempt to notify you and process a refund if the job cannot
-              be completed.
+              Your privacy is important to us. Our{" "}
+              <a href="/privacy-policy" className="text-blue-400/80 underline decoration-white/20 underline-offset-4 hover:text-white transition-colors">
+                Privacy Policy
+              </a>{" "}
+              explains how we handle your personal data and protect your privacy
+              when you use our Services.
             </p>
           </Section>
 
-          <Section title="10. Limitation of Liability">
+          <Section title="8. Intellectual Property">
             <p>
-              {BRAND} is provided "as is." To the fullest extent permitted by
-              applicable law, we disclaim all warranties and shall not be liable
-              for any indirect, incidental, or consequential damages arising from
-              your use of the service. Our total liability for any claim shall not
-              exceed the amount paid by you for the specific transaction giving
-              rise to the claim.
+              The {BRAND} name, logo, software, and kiosk hardware design are the
+              exclusive property of {BRAND}. You may not copy, modify, or reverse
+              engineer any part of our service.
             </p>
           </Section>
 
-          <Section title="11. Governing Law">
+          <Section title="9. Limitation of Liability">
             <p>
-              These Terms are governed by the laws of India. Any disputes shall
-              be subject to the exclusive jurisdiction of the courts of Hyderabad,
-              Telangana, India.
+              To the maximum extent permitted by law, {BRAND} shall not be liable
+              for any indirect, incidental, special, consequential, or punitive
+              damages, including loss of data or profits, arising from your use
+              of the service.
             </p>
           </Section>
 
-          <Section title="12. Changes to Terms">
+          <Section title="10. Disclaimer of Warranties">
             <p>
-              We may update these Terms at any time. Significant changes will be
-              communicated via email or a notice on the website. Continued use
-              after the effective date constitutes acceptance.
+              Services are provided "as is" and "as available" without any
+              warranties of any kind, whether express or implied, including
+              merchantability or fitness for a particular purpose.
             </p>
           </Section>
 
-          <Section title="13. Contact">
-            <p>Questions about these Terms? Contact us:</p>
-            <div className="mt-3 p-4 bg-muted/30 rounded-lg text-sm">
-              <p className="font-medium text-foreground/80">{BRAND}</p>
-              <p>
-                Email:{" "}
-                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-400 hover:underline">
-                  {SUPPORT_EMAIL}
-                </a>
-              </p>
-              <p>Address: J-04 J-Block Zonasha Elegance Apartments Phase-1 DAST Road Haralur Bangalore 560102</p>
-            </div>
+          <Section title="11. Indemnification">
+            <p>
+              You agree to indemnify and hold harmless {BRAND} and its employees
+              from any claims or damages resulting from your violation of these
+              terms or misuse of the service.
+            </p>
+          </Section>
+
+          <Section title="12. Governing Law">
+            <p>
+              These terms are governed by the laws of India. Any disputes shall
+              be subject to the exclusive jurisdiction of the courts in Bangalore,
+              Karnataka.
+            </p>
+          </Section>
+
+          <Section title="13. Changes to Terms">
+            <p>
+              We may update these terms from time to time. Your continued use of
+              the service after changes constitutes acceptance of the new terms.
+            </p>
           </Section>
         </div>
       </main>

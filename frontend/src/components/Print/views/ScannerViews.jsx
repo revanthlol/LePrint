@@ -164,6 +164,135 @@ export function StatusCheckView() {
     );
 }
 
+export function KioskProfileView({ config, printerStatusResult, connectPrinterAfterStatusCheck, resetFlow, isAdmin }) {
+  const kioskId = config?.kiosk_id;
+  const location = config?.location || printerStatusResult?.kiosk_location_name || 'Main Lobby';
+  const floor = config?.floor || printerStatusResult?.kiosk_floor;
+  const paperCount = printerStatusResult?.paper_count ?? 0;
+  const maxPaper = 500;
+  const paperPercent = Math.min(100, Math.max(0, (paperCount / maxPaper) * 100));
+  const isRestricted = printerStatusResult?.restricted === true;
+  const canProceed = !isRestricted || isAdmin;
+
+  // Determine paper status color
+  const getPaperColor = () => {
+    if (paperCount > 200) return 'bg-emerald-500/60';
+    if (paperCount > 50) return 'bg-amber-500/60';
+    return 'bg-red-500/60';
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center space-y-4">
+        <motion.div
+          initial={{ scale: 0, rotate: -10 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          className="w-20 h-20 mx-auto rounded-[2rem] bg-gradient-to-br from-white/10 to-transparent border border-white/10 flex items-center justify-center shadow-2xl shadow-white/5"
+        >
+          <Printer className="h-10 w-10 text-white" />
+        </motion.div>
+        
+        <div className="space-y-1">
+          <div className="flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight text-white">{location}</h2>
+            {isRestricted && (
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                Admin Only
+              </span>
+            )}
+          </div>
+          {floor && (
+            <p className="text-sm text-muted-foreground/60 uppercase tracking-[0.2em] font-bold">
+              Floor {floor}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {isRestricted && !isAdmin && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-amber-500">Test Printing Disabled</p>
+            <p className="text-xs text-amber-500/70 leading-relaxed">
+              This kiosk is reserved for system testing. Only administrators can connect to this environment.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {/* Connection Status Card */}
+        <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            </div>
+            <span className="text-sm font-medium text-foreground">Kiosk Online</span>
+          </div>
+          <span className="text-[10px] font-mono text-muted-foreground/40 px-2 py-1 rounded bg-white/[0.05] border border-white/[0.06]">
+            #{kioskId}
+          </span>
+        </div>
+
+        {/* Paper Level Card */}
+        <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-400" />
+              <span className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground/60 font-bold">Printer Health</span>
+            </div>
+            <span className="text-[13px] font-bold text-foreground tabular-nums">
+              {paperCount} / {maxPaper} <span className="text-[11px] font-normal text-muted-foreground/40 ml-1">pages</span>
+            </span>
+          </div>
+          
+          <div className="space-y-1.5">
+            <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${paperPercent}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+                className={`h-full rounded-full ${getPaperColor()}`}
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground/50 text-right italic font-medium">
+              {paperCount > 50 ? 'Ample paper available' : 'Low paper warning'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3 pt-2">
+        <motion.div whileHover={canProceed ? { scale: 1.01 } : {}} whileTap={canProceed ? { scale: 0.98 } : {}}>
+          <Button
+            onClick={() => canProceed && connectPrinterAfterStatusCheck(kioskId)}
+            disabled={!canProceed}
+            className={`w-full font-semibold py-7 transition-colors rounded-2xl text-lg shadow-xl shadow-white/5 ${
+              canProceed 
+                ? 'bg-white text-black hover:bg-neutral-200' 
+                : 'bg-white/5 text-white/20 border border-white/5 cursor-not-allowed'
+            }`}
+          >
+            {isRestricted && !isAdmin ? 'Restricted Access' : 'Get Started'}
+          </Button>
+        </motion.div>
+
+        <motion.div whileTap={{ scale: 0.97 }}>
+          <Button
+            variant="ghost"
+            onClick={resetFlow}
+            className="w-full text-muted-foreground hover:text-foreground hover:bg-white/[0.04] rounded-xl py-5"
+          >
+            ← Scan different kiosk
+          </Button>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
 export function ConnectView({ config, status, connectPrinter, resetFlow }) {
   return (
     <div className="space-y-5">

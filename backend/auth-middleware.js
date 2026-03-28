@@ -121,26 +121,39 @@ async function verifyToken(req, res, next) {
  */
 async function optionalAuth(req, res, next) {
     const authHeader = req.headers.authorization;
+    const guestId = req.headers['x-guest-id'];
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        req.user = null;
+    // 1. Try Firebase Auth
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+            const token = authHeader.split(' ')[1];
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            
+            req.user = {
+                uid: decodedToken.uid,
+                email: decodedToken.email,
+                name: decodedToken.name || decodedToken.email.split('@')[0],
+                isGuest: false
+            };
+            return next();
+        } catch (error) {
+            console.warn('Optional auth failed:', error.message);
+        }
+    }
+
+    // 2. Try Guest Auth
+    if (guestId) {
+        req.user = {
+            uid: null,
+            guestId: guestId,
+            isGuest: true,
+            email: null,
+            name: 'Guest'
+        };
         return next();
     }
     
-    try {
-        const token = authHeader.split(' ')[1];
-        const decodedToken = await admin.auth().verifyIdToken(token);
-        
-        req.user = {
-            uid: decodedToken.uid,
-            email: decodedToken.email,
-            name: decodedToken.name || decodedToken.email.split('@')[0]
-        };
-    } catch (error) {
-        console.warn('Optional auth failed:', error.message);
-        req.user = null;
-    }
-    
+    req.user = null;
     next();
 }
 

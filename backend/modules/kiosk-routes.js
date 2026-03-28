@@ -33,22 +33,35 @@ router.get('/status', async (req, res) => {
         // Test kiosk — always online, no DB lookup needed
         const testKioskId = process.env.TEST_KIOSK_ID || null;
         if (testKioskId && kiosk_id === testKioskId) {
-            // Upsert so it exists for poll calls
-            await db.query(`
-                INSERT INTO kiosks (id, hostname, printer_name, status, last_seen, printer_status)
-                VALUES ($1, 'mock', 'mock_printer', 'online', NOW(), 'healthy')
-                ON CONFLICT (id) DO UPDATE SET status = 'online', last_seen = NOW()
-            `, [testKioskId]);
-
-            return res.json({
-                kiosk_id,
-                kiosk_online: true,
-                printer_name: 'Mock Printer',
-                printer_status: 'ready',
-                printer_status_detail: null,
-                current_paper_count: 999,
-                message: 'Mock kiosk — always online.'
-            });
+            try {
+                const allowPublic = await db.getSetting('allow_public_test_kiosk', false);
+                
+                return res.json({
+                    kiosk_id: testKioskId,
+                    kiosk_online: true,
+                    kiosk_location_name: 'System Test Lab',
+                    kiosk_floor: 'M',
+                    printer_status: 'healthy',
+                    printer_status_detail: null,
+                    current_paper_count: 999,
+                    restricted: !allowPublic,  // Mock kiosk restricted if setting is false
+                    message: allowPublic ? 'Mock kiosk — Public access enabled.' : 'Mock kiosk — Admin access only.'
+                });
+            } catch (err) {
+                console.error('[KIOSK] Error fetching settings for test kiosk: ' + err.message);
+                // Default to restricted if setting fetch fails
+                return res.json({
+                    kiosk_id: testKioskId,
+                    kiosk_online: true,
+                    kiosk_location_name: 'System Test Lab',
+                    kiosk_floor: 'M',
+                    printer_status: 'healthy',
+                    printer_status_detail: null,
+                    current_paper_count: 999,
+                    restricted: true,
+                    message: 'Mock kiosk — Admin access only.'
+                });
+            }
         }
 
         // Fetch kiosk record from DB

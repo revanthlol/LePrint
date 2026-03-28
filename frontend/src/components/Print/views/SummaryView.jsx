@@ -16,7 +16,7 @@ function formatDuration(start, end) {
     return `${min}m ${sec}s`;
 }
 
-export function AllJobsSummaryView({ jobs, resetFlow, isGuest, navigate }) {
+export function AllJobsSummaryView({ jobs, resetFlow, printAnotherOnSameKiosk, isGuest, navigate }) {
     const succeeded = jobs.filter(j => j.success === true).length;
     const total = jobs.length;
 
@@ -87,7 +87,7 @@ export function AllJobsSummaryView({ jobs, resetFlow, isGuest, navigate }) {
             <div className="space-y-2">
                 <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
                     <Button
-                        onClick={resetFlow}
+                        onClick={printAnotherOnSameKiosk}
                         className="w-full bg-white text-black hover:bg-neutral-200 font-semibold py-5 rounded-xl transition-colors"
                     >
                         <Printer className="mr-2 h-5 w-5" />

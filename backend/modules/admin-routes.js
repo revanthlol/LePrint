@@ -364,6 +364,63 @@ router.get('/admin/recent-jobs', verifyToken, requireAdmin, async (req, res) => 
     }
 });
 
+// ==================== SYSTEM SETTINGS ====================
+
+/**
+ * GET /admin/settings
+ * Returns all system settings
+ */
+router.get('/admin/settings', verifyToken, requireAdmin, async (req, res) => {
+    try {
+        const result = await db.query('SELECT key, value FROM settings');
+        const settings = {};
+        result.rows.forEach(row => {
+            settings[row.key] = row.value;
+        });
+        res.json({ settings });
+    } catch (error) {
+        log.error('[ADMIN] ERROR | route: /api/admin/settings | reason: ' + error.message);
+        res.status(500).json({ error: 'Failed to fetch settings' });
+    }
+});
+
+/**
+ * POST /admin/settings
+ * Update a specific system setting
+ */
+router.post('/admin/settings', verifyToken, requireAdmin, async (req, res) => {
+    try {
+        const { key, value } = req.body;
+
+        if (!key) {
+            return res.status(400).json({ error: 'Setting key is required' });
+        }
+
+        // Get old value for logging
+        const oldValue = await db.getSetting(key);
+        
+        // Update setting
+        const newValue = await db.updateSetting(key, value);
+
+        // Log admin action
+        const adminId = req.user ? req.user.uid : 'system';
+        await logAdminAction(
+            adminId,
+            'UPDATE_SETTING',
+            'system',
+            key,
+            { oldValue, newValue }
+        );
+
+        log.info(`[ADMIN] ${adminId} | UPDATE_SETTING | key: ${key} (${JSON.stringify(oldValue)} → ${JSON.stringify(newValue)})`);
+
+        res.json({ success: true, key, value: newValue });
+    } catch (error) {
+        log.error('[ADMIN] ERROR | route: /api/admin/settings | reason: ' + error.message);
+        res.status(500).json({ error: 'Failed to update setting' });
+    }
+});
+
 // ==================== HELPERS ====================
 
 // Helper: Determine paper level category

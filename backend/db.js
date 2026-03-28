@@ -505,6 +505,41 @@ async function getStats() {
     }
 }
 
+// ==================== SYSTEM SETTINGS ====================
+/**
+ * Get a specific system setting
+ */
+async function getSetting(key, defaultValue = null) {
+    try {
+        const result = await pool.query('SELECT value FROM settings WHERE key = $1', [key]);
+        if (result.rows.length === 0) return defaultValue;
+        return result.rows[0].value;
+    } catch (error) {
+        console.error(`Error getting setting ${key}:`, error);
+        return defaultValue;
+    }
+}
+
+/**
+ * Update or create a system setting
+ */
+async function updateSetting(key, value) {
+    try {
+        const result = await pool.query(`
+            INSERT INTO settings (key, value, updated_at) 
+            VALUES ($1, $2::jsonb, NOW())
+            ON CONFLICT (key) DO UPDATE SET 
+                value = EXCLUDED.value,
+                updated_at = NOW()
+            RETURNING *
+        `, [key, JSON.stringify(value)]);
+        return result.rows[0].value;
+    } catch (error) {
+        console.error(`Error updating setting ${key}:`, error);
+        throw error;
+    }
+}
+
 // ==================== UTILITY ====================
 
 /**
@@ -554,6 +589,10 @@ module.exports = {
     
     // Stats
     getStats,
+
+    // Settings
+    getSetting,
+    updateSetting,
     
     // Utility
     testConnection,

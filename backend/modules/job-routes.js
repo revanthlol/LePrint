@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
-const { verifyToken, ensureUserExists } = require('../auth-middleware');
+const { verifyToken, optionalAuth, ensureUserExists } = require('../auth-middleware');
 const { upload, generateJobId, generatePrintToken, countPDFPages, PRICE_PER_PAGE } = require('./utils');
 const socketManager = require('./socket-manager');
 const log = require('./logger');
@@ -74,11 +74,37 @@ router.get('/user/profile', verifyToken, async (req, res) => {
 // ===============================
 // Kiosk Connect
 // ===============================
-router.post('/connect', async (req, res) => {
+router.post('/connect', optionalAuth, async (req, res) => {
     const { kiosk_id } = req.body;
     log.info('[JOB] Connect request for kiosk: ' + kiosk_id);
 
     try {
+        const TEST_KIOSK_ID = process.env.TEST_KIOSK_ID || null;
+
+        // Restriction Check: Test kiosk is admin-only (unless public access is enabled)
+        if (TEST_KIOSK_ID && kiosk_id === TEST_KIOSK_ID) {
+            const allowPublic = await db.getSetting('allow_public_test_kiosk', false);
+            
+            if (!allowPublic) {
+                // Must be logged in
+                if (!req.user || req.user.isGuest) {
+                    return res.status(403).json({ 
+                        status: 'error', 
+                        message: 'Admin access required to use the test kiosk. Please login as an admin.' 
+                    });
+                }
+
+                // Must have admin role in DB
+                const user = await db.getUser(req.user.uid);
+                if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) {
+                    return res.status(403).json({ 
+                        status: 'error', 
+                        message: 'Access Denied: Test kiosk is reserved for administrators.' 
+                    });
+                }
+            }
+        }
+
         const kiosk = await db.getKiosk(kiosk_id);
 
         if (kiosk && kiosk.status === 'online') {
@@ -139,6 +165,23 @@ router.post('/jobs/create', verifyToken, upload.single('file'), async (req, res)
         if (!kiosk) {
             fs.unlinkSync(req.file.path);
             return res.status(404).json({ error: 'Kiosk not found' });
+        }
+
+        // Restriction Check: Test kiosk is admin-only for job submission
+        if (TEST_KIOSK_ID && kiosk_id === TEST_KIOSK_ID) {
+            const allowPublic = await db.getSetting('allow_public_test_kiosk', false);
+            
+            if (!allowPublic) {
+                if (req.user.isGuest) {
+                    fs.unlinkSync(req.file.path);
+                    return res.status(403).json({ error: 'FORBIDDEN_TEST_KIOSK', message: 'Guests cannot print to the test kiosk when public access is disabled.' });
+                }
+                const dbUser = await db.getUser(req.user.uid);
+                if (!dbUser || (dbUser.role !== 'admin' && dbUser.role !== 'superadmin')) {
+                    fs.unlinkSync(req.file.path);
+                    return res.status(403).json({ error: 'FORBIDDEN_TEST_KIOSK', message: 'Admin access required for test kiosk.' });
+                }
+            }
         }
 
         const paperAvailable = kiosk.current_paper_count || 0;

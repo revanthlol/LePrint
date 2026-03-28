@@ -76,24 +76,57 @@ export function ServiceSelectView({ selectService, setScanKioskMode }) {
 }
 
 export function FileUploadView({ file, status, handleFileSelect }) {
+  const [isDragging, setIsDragging] = React.useState(false);
+
+  const onDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  };
+
   return (
     <div className="space-y-5">
-      <label className="block w-full cursor-pointer group">
+      <label 
+        className="block w-full cursor-pointer group"
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
         <div className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all duration-300 ${
           file 
           ? 'border-white/[0.20] bg-white/[0.04]' 
+          : isDragging
+          ? 'border-white/40 bg-white/[0.06] scale-[1.01]'
           : 'border-white/[0.08] hover:border-white/[0.15] bg-white/[0.02] hover:bg-white/[0.04]'
         }`}>
           <div className={`mx-auto h-16 w-16 mb-4 rounded-2xl flex items-center justify-center transition-all duration-300 ${
             file 
             ? 'bg-white/[0.08] border border-white/[0.12]' 
+            : isDragging
+            ? 'bg-white/[0.12] border border-white/20'
             : 'bg-white/[0.05] border border-white/[0.08] group-hover:scale-105 group-hover:bg-white/[0.08]'
           }`}>
-            <FileUp className={`h-8 w-8 ${file ? 'text-white' : 'text-muted-foreground group-hover:text-white'}`} />
+            <FileUp className={`h-8 w-8 ${file || isDragging ? 'text-white' : 'text-muted-foreground group-hover:text-white'}`} />
           </div>
         
           <p className="text-base font-semibold tracking-tight mb-1 text-foreground">
-            {file ? `${getFileIcon(file.name)} ${file.name}` : "Drop file here"}
+            {file ? `${getFileIcon(file.name)} ${file.name}` : isDragging ? "Ready to drop" : "Drop file here"}
           </p>
         
           {file && (
@@ -109,7 +142,9 @@ export function FileUploadView({ file, status, handleFileSelect }) {
         
           {!file && (
             <>
-              <p className="text-xs text-muted-foreground/70 mt-2">or click to browse</p>
+              <p className="text-xs text-muted-foreground/70 mt-2">
+                {isDragging ? "Drop your file to upload" : "or click to browse"}
+              </p>
               <p className="text-[11px] text-muted-foreground/50 mt-1.5">
                 PDF · Word · Text · Images
               </p>

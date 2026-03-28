@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import * as pdfjsLib from 'pdfjs-dist';
-import { FileText, ArrowUp, ArrowRight, Minus, Plus } from 'lucide-react';
+import { FileText, ArrowUp, ArrowRight, Minus, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getFileExt } from '../printUtils';
 
 // PDF Worker setup
@@ -36,6 +36,11 @@ function countPagesInRangeLocal(rangeStr, maxPages) {
 
 export function PrintSettingsView({ file, pages, pricing, printSettings, updatePrintSettings, onProceed }) {
     const canvasRef = useRef(null);
+    const pdfDocRef = useRef(null);   // cached parsed PDF — avoids re-parsing on every page turn
+    const renderTaskRef = useRef(null); // track in-flight render so we can cancel it
+    const [currentPage, setCurrentPage] = useState(1);
+    const [isRendering, setIsRendering] = useState(false);
+    const totalPages = pages || 1;
     const [customRange, setCustomRange] = useState('');
     const [rangeError, setRangeError] = useState(false);
 
@@ -48,27 +53,53 @@ export function PrintSettingsView({ file, pages, pricing, printSettings, updateP
     const effectivePages = pageRange === 'all' ? (pages || 1) : countPagesInRangeLocal(customRange || pageRange, pages || 1);
     const totalPrice = effectivePages * copies * pricePerPage;
 
-    // PDF preview renderer — scales to fit container width
+    // Parse PDF once and cache it
     useEffect(() => {
-        if (!isPdf || !file || !canvasRef.current) return;
-        let cancelled = false;
+        if (!isPdf || !file) return;
+        pdfDocRef.current = null;
+        setCurrentPage(1);
         (async () => {
             try {
                 const data = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data }).promise;
-                const page = await pdf.getPage(1);
+                pdfDocRef.current = await pdfjsLib.getDocument({ data }).promise;
+            } catch (err) {
+                console.error('PDF load error:', err);
+            }
+        })();
+    }, [file, isPdf]);
 
-                // Get the canvas container width to calculate scale
-                const canvas = canvasRef.current;
-                if (!canvas || cancelled) return;
+    // Render the current page whenever page or orientation changes
+    useEffect(() => {
+        if (!isPdf || !canvasRef.current) return;
 
-                // Use container width — fallback to 300 if not measurable
-                const containerWidth = canvas.parentElement?.offsetWidth || 300;
+        const renderPage = async () => {
+            // Cancel any previous in-flight render
+            if (renderTaskRef.current) {
+                try { renderTaskRef.current.cancel(); } catch {}
+                renderTaskRef.current = null;
+            }
 
-                // Get natural viewport at scale 1.0 to know the PDF dimensions
+            // Wait up to 2s for the PDF to parse if it's not ready yet
+            let pdf = pdfDocRef.current;
+            if (!pdf) {
+                for (let i = 0; i < 20; i++) {
+                    await new Promise(r => setTimeout(r, 100));
+                    pdf = pdfDocRef.current;
+                    if (pdf) break;
+                }
+            }
+            if (!pdf) return;
+
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+
+            setIsRendering(true);
+            try {
+                const pageNum = Math.min(currentPage, pdf.numPages);
+                const page = await pdf.getPage(pageNum);
+
+                const containerWidth = canvas.parentElement?.offsetWidth || 280;
                 const naturalViewport = page.getViewport({ scale: 1.0 });
-
-                // Scale to fit container width
                 const scale = containerWidth / naturalViewport.width;
                 const viewport = page.getViewport({ scale });
 
@@ -76,15 +107,31 @@ export function PrintSettingsView({ file, pages, pricing, printSettings, updateP
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
 
-                if (!cancelled) {
-                    await page.render({ canvasContext: ctx, viewport }).promise;
-                }
+                const task = page.render({ canvasContext: ctx, viewport });
+                renderTaskRef.current = task;
+                await task.promise;
+                renderTaskRef.current = null;
             } catch (err) {
-                console.error('PDF preview error:', err);
+                if (err?.name !== 'RenderingCancelledException') {
+                    console.error('PDF render error:', err);
+                }
+            } finally {
+                setIsRendering(false);
             }
-        })();
-        return () => { cancelled = true; };
-    }, [file, isPdf, orientation]); // re-render when orientation changes
+        };
+
+        renderPage();
+    }, [isPdf, currentPage, orientation]); // re-render when page or orientation changes
+
+    // Looping navigation helpers
+    const goPrev = useCallback(() => {
+        setCurrentPage(p => p <= 1 ? totalPages : p - 1);
+    }, [totalPages]);
+
+    const goNext = useCallback(() => {
+        setCurrentPage(p => p >= totalPages ? 1 : p + 1);
+    }, [totalPages]);
+
 
     // Image preview URL
     const [imgUrl, setImgUrl] = useState(null);
@@ -128,39 +175,89 @@ export function PrintSettingsView({ file, pages, pricing, printSettings, updateP
             {/* ─── Preview Section ─── */}
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
                 <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">Live Preview</span>
-                <div className="bg-[#111] rounded-xl p-6 flex items-center justify-center mt-3">
-                    <div
-                        className="relative w-full mx-auto shadow-2xl shadow-black/30 rounded-md"
-                        style={{
-                            maxWidth: orientation === 'landscape' ? '100%' : '75%',
-                            paddingBottom: orientation === 'portrait' ? '141.4%' : '70.7%',
-                            backgroundColor: '#ffffff',
-                            overflow: 'hidden',
-                        }}
-                    >
-                        <div
-                            className="absolute inset-0 flex items-center justify-center overflow-hidden"
-                            style={colorMode === 'bw' ? { filter: 'grayscale(1)' } : {}}
-                        >
-                            {isPdf ? (
-                                <canvas ref={canvasRef} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                            ) : isImage ? (
-                                imgUrl && <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="Preview" />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center text-center">
-                                    <FileText className="w-10 h-10 text-muted-foreground mb-2" />
-                                    <p className="text-sm text-muted-foreground">Preview not available for this file type</p>
-                                    <p className="text-xs text-muted-foreground/60 mt-1">Your document will print as-is</p>
+                <div className="bg-[#111] rounded-xl p-4 mt-3">
+                    {/* Paper + Nav row */}
+                    <div className="flex items-center gap-2">
+                        {/* Left Nav Button */}
+                        {isPdf && (
+                            <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={goPrev}
+                                className="shrink-0 w-8 h-8 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.12] transition-all"
+                                aria-label="Previous page"
+                            >
+                                <ChevronLeft className="w-4 h-4 text-white" />
+                            </motion.button>
+                        )}
+
+                        {/* A4 Paper — stable, not remounted */}
+                        <div className="flex-1 flex justify-center">
+                            <div
+                                className="relative shadow-2xl shadow-black/40 rounded-sm overflow-hidden bg-white"
+                                style={{
+                                    width: orientation === 'landscape' ? '100%' : '70%',
+                                    // True A4 aspect ratio: 210:297 portrait, 297:210 landscape
+                                    aspectRatio: orientation === 'portrait' ? '210 / 297' : '297 / 210',
+                                }}
+                            >
+                                <div
+                                    className="absolute inset-0 flex items-center justify-center"
+                                    style={colorMode === 'bw' ? { filter: 'grayscale(1)' } : {}}
+                                >
+                                    {isPdf ? (
+                                        <>
+                                            <canvas
+                                                ref={canvasRef}
+                                                className="w-full h-full object-contain"
+                                            />
+                                            {isRendering && (
+                                                <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                                                    <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : isImage ? (
+                                        imgUrl && <img src={imgUrl} className="w-full h-full object-contain" alt="Preview" />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center text-center p-4">
+                                            <FileText className="w-10 h-10 text-muted-foreground mb-2" />
+                                            <p className="text-xs text-muted-foreground">Preview not available</p>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </div>
+
+                        {/* Right Nav Button */}
+                        {isPdf && (
+                            <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={goNext}
+                                className="shrink-0 w-8 h-8 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.12] transition-all"
+                                aria-label="Next page"
+                            >
+                                <ChevronRight className="w-4 h-4 text-white" />
+                            </motion.button>
+                        )}
                     </div>
+
+                    {/* Page indicator */}
+                    {isPdf && (
+                        <div className="flex items-center justify-center gap-3 mt-3">
+                            <button onClick={goPrev} className="text-muted-foreground hover:text-foreground transition-colors text-base leading-none">
+                                ‹
+                            </button>
+                            <span className="bg-white/[0.05] px-3 py-1 rounded-full text-[11px] text-muted-foreground tabular-nums">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <button onClick={goNext} className="text-muted-foreground hover:text-foreground transition-colors text-base leading-none">
+                                ›
+                            </button>
+                        </div>
+                    )}
                 </div>
-                {isPdf && (
-                    <div className="bg-white/[0.05] px-3 py-1 rounded-full text-[11px] text-muted-foreground mx-auto mt-3 w-fit">
-                        Page 1 of {pages}
-                    </div>
-                )}
             </div>
 
             {/* ─── Settings ─── */}

@@ -10,129 +10,20 @@ import {
     getFileExt
 } from './printUtils';
 
-// ─── Constants ──────────────────────────────────────────────
-// Matches backend JOB_TIMEOUT_MS in tasks.js (15 * 60 * 1000)
-export const PENDING_JOB_EXPIRY_MINUTES = 15;
+// ─── Logic Modules ──────────────────────────────────────────
+import {
+    PENDING_JOB_EXPIRY_MINUTES,
+    NAV_STEPS,
+    VIEW_TO_NAV_STEP,
+    MAX_JOBS,
+    saveSession,
+    loadSession,
+    clearSession
+} from './logic/printConstants';
 
-// Navigation step flow for the step indicator
-export const NAV_STEPS = [
-    { id: 'SERVICE_SELECT', label: 'Select' },
-    { id: 'UPLOAD',         label: 'Upload' },
-    { id: 'CONFIRM',        label: 'Confirm' },
-    { id: 'PAYMENT',        label: 'Pay' },
-    { id: 'STATUS',         label: 'Status' },
-];
-
-// Map viewStatus values → canonical nav step id
-const VIEW_TO_NAV_STEP = {
-    'SERVICE_SELECT':    'SERVICE_SELECT',
-    'CONNECTED':         'UPLOAD',
-    'SCAN_OPTIONS':      'UPLOAD',
-    'XEROX_OPTIONS':     'UPLOAD',
-    'CALCULATING':       'CONFIRM',
-    'SETTINGS_PREVIEW':  'CONFIRM',
-    'PAYMENT':           'PAYMENT',
-    'PRINTING':          'STATUS',
-    'SCANNING':          'STATUS',
-    'XEROXING':          'STATUS',
-    'COMPLETED':         'STATUS',
-    'SCAN_COMPLETE':     'STATUS',
-    'ERROR':             'STATUS',
-    'FAILED':            'STATUS',
-};
-
-// Session storage key for active job recovery
-const SESSION_KEY = 'juspri_active_jobs';
-const MAX_JOBS = 5;
-
-function saveSession(data) {
-    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch {}
-}
-
-function loadSession() {
-    try {
-        const raw = sessionStorage.getItem(SESSION_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-}
-
-function clearSession() {
-    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
-}
-
-// ─── Helpers ────────────────────────────────────────────────
-
-// Parse a page range string like "1-3" or "1,3,5" into a count
-function countPagesInRange(rangeStr, maxPages) {
-    if (!rangeStr || rangeStr === 'all') return maxPages;
-    try {
-        const pages = new Set();
-        const parts = rangeStr.split(',');
-        for (const part of parts) {
-            const trimmed = part.trim();
-            if (trimmed.includes('-')) {
-                const [startStr, endStr] = trimmed.split('-');
-                const start = Math.max(1, parseInt(startStr) || 1);
-                const end = Math.min(maxPages, parseInt(endStr) || maxPages);
-                for (let i = start; i <= end; i++) pages.add(i);
-            } else {
-                const p = parseInt(trimmed);
-                if (p >= 1 && p <= maxPages) pages.add(p);
-            }
-        }
-        return Math.max(1, pages.size);
-    } catch {
-        return maxPages;
-    }
-}
-
-// Recalculate pricing based on print settings
-function recalcPricing(job) {
-    if (!job?.printSettings || !job?.pages) return job?.pricing;
-    const effectivePages = job.printSettings.pageRange === 'all'
-        ? job.pages
-        : countPagesInRange(job.printSettings.pageRange, job.pages);
-    const pricePerPage = job.printSettings.colorMode === 'color' ? 10 : 3;
-    const totalPrice = effectivePages * (job.printSettings.copies || 1) * pricePerPage;
-    return { ...job.pricing, totalPrice, effectivePages, pricePerPage };
-}
-
-// ─── Job entry factory ──────────────────────────────────────
-function createJobEntry(overrides = {}) {
-    return {
-        jobId: null,
-        jobType: 'print',   // 'print' | 'scan' | 'xerox'
-        status: 'IDLE',
-        statusMessage: null,
-        filename: null,
-        pages: null,
-        createdAt: new Date(),
-        completedAt: null,
-        success: null,
-        downloadUrl: null,
-        // Internal state per job
-        pricing: null,
-        jobPhase: null,
-        scanResult: null,
-        serviceType: 'print',
-        file: null,
-        kiosk_id: null,
-        // Print settings
-        printSettings: {
-            colorMode: 'bw',
-            orientation: 'portrait',
-            copies: 1,
-            pageRange: 'all',
-            scaling: 'fit',
-        },
-        // Navigation stack
-        navStack: [],
-        // Expiry tracking
-        expiresAt: null,
-        locallyExpired: false,
-        ...overrides
-    };
-}
+import { recalcPricing } from './logic/printHelpers';
+import { createJobEntry } from './logic/jobFactory';
+import { useJobPoller } from './logic/useJobPoller';
 
 export function usePrint() {
     const { signOut, getAuthHeader, getGuestHeaders } = useAuth();
@@ -188,6 +79,9 @@ export function usePrint() {
     const sessionKioskId = useRef(null);
     const [newKioskId, setNewKioskId] = useState(null);
     const initialUrlProcessed = useRef(false);
+
+    // Kiosk Choice Modal (Refactor Part 2)
+    const [showKioskChoiceModal, setShowKioskChoiceModal] = useState(false);
 
     // Derived: current active job (or null)
     const activeJob = useMemo(() => jobs[activeJobIndex] || null, [jobs, activeJobIndex]);
@@ -349,313 +243,35 @@ export function usePrint() {
     // 3. Core Helper Functions
     // ==========================================
 
+    // ─── Polling & Session Logic (Refactor Part 1) ─────────────
+    const { checkKioskStatus, connectPrinterAfterStatusCheck } = useJobPoller({
+        jobs,
+        setJobs,
+        activeJobIndex,
+        setActiveJobIndex,
+        config,
+        addLog,
+        buildHeaders,
+        API_URL,
+        notifyJobStatus,
+        notifyAllComplete,
+        signOut,
+        isGuest,
+        setPrinterStatusResult,
+        setShowExpiryModal,
+        setConfig,
+        setScannerActive,
+        setViewStatus,
+        sessionKioskIdRef: sessionKioskId,
+        initialUrlProcessedRef: initialUrlProcessed,
+        recoveryAttemptedRef: recoveryAttempted,
+        updateJob,
+    });
+
     // Helper: get the current effective kiosk_id
     const getCurrentKioskId = useCallback(() => {
         return newKioskId || sessionKioskId.current || config?.kiosk_id;
     }, [newKioskId, config]);
-
-    // Helper: Connect to printer (used by status check and manual connect)
-    const connectPrinterAfterStatusCheck = useCallback(async (kioskId) => {
-        try {
-            setViewStatus('CONNECTING');
-            addLog(`Connecting to kiosk ${kioskId}...`);
-
-            const response = await axios.post(`${API_URL}/api/connect`, {
-                kiosk_id: kioskId
-            }, { timeout: 5000 });
-
-            if (response.data.status === 'connected') {
-                setViewStatus('SERVICE_SELECT');
-                addLog(`✓ Connected to "${response.data.kiosk_name || kioskId}"`);
-                addLog(`Printer: ${response.data.printer || 'Unknown'}`);
-            }
-        } catch (e) {
-            setViewStatus('ERROR');
-            addLog('✗ Kiosk offline or not found');
-        }
-    }, [API_URL, addLog]);
-
-    // Helper: Check Kiosk Status
-    const checkKioskStatus = useCallback(async (kioskId) => {
-        try {
-            setViewStatus('CHECKING_STATUS');
-            addLog(`Checking kiosk status...`);
-
-            const response = await axios.get(
-                `${API_URL}/api/kiosk/status`,
-                {
-                    params: { kiosk_id: kioskId },
-                    timeout: 8000
-                }
-            );
-
-            const result = response.data;
-            setPrinterStatusResult(result);
-
-            const printerStatus = result.printer_status;
-
-            addLog(`Kiosk: ${result.kiosk_online ? 'Online' : 'Offline'}`);
-            addLog(`Printer: ${printerStatus}`);
-
-            if (!result.kiosk_online) {
-                setViewStatus('SCANNED');
-                addLog('✗ Kiosk is offline');
-                return;
-            }
-
-            if (printerStatus === 'healthy') {
-                addLog('✓ Printer ready');
-                await connectPrinterAfterStatusCheck(kioskId);
-                return;
-            }
-
-            if (printerStatus === 'error') {
-                setViewStatus('PRINTER_ERROR');
-                addLog(`✗ Printer error: ${result.printer_status_detail || 'unknown'}`);
-                return;
-            }
-
-            setViewStatus('PRINTER_WARNING');
-            addLog('⚠ Printer status unverified');
-
-        } catch (err) {
-            addLog('⚠ Could not reach status check, proceeding with warning');
-            setPrinterStatusResult({ printer_status: 'unknown', kiosk_online: true });
-            setViewStatus('PRINTER_WARNING');
-        }
-    }, [API_URL, addLog, connectPrinterAfterStatusCheck]);
-
-    // ==========================================
-    // 4. Effects
-    // ==========================================
-
-    // Save active jobs to sessionStorage for refresh recovery
-    useEffect(() => {
-        const activeJobs = jobs.filter(j =>
-            ['PRINTING', 'SCANNING', 'XEROXING'].includes(j.status) && j.jobId
-        );
-        if (activeJobs.length > 0 && config?.kiosk_id) {
-            saveSession({
-                jobs: activeJobs.map(j => ({
-                    jobId: j.jobId,
-                    serviceType: j.serviceType,
-                    jobType: j.jobType,
-                    status: j.status,
-                    createdAt: j.createdAt,
-                    filename: j.filename,
-                    pages: j.pages,
-                })),
-                kiosk_id: config.kiosk_id,
-                activeJobIndex
-            });
-        }
-    }, [jobs, config?.kiosk_id, activeJobIndex]);
-
-    // Recover active jobs from sessionStorage on mount
-    useEffect(() => {
-        if (recoveryAttempted.current) return;
-        recoveryAttempted.current = true;
-
-        const saved = loadSession();
-        if (!saved?.jobs?.length) return;
-
-        // Restore state
-        setConfig({ kiosk_id: saved.kiosk_id });
-        sessionKioskId.current = saved.kiosk_id;
-        setScannerActive(false);
-
-        const recoveredJobs = saved.jobs.map(j => createJobEntry({
-            jobId: j.jobId,
-            jobType: j.jobType,
-            serviceType: j.serviceType,
-            status: j.status,
-            filename: j.filename,
-            pages: j.pages,
-            createdAt: new Date(j.createdAt),
-            pricing: { job_id: j.jobId },
-            kiosk_id: saved.kiosk_id,
-        }));
-
-        setJobs(recoveredJobs);
-        setActiveJobIndex(saved.activeJobIndex || 0);
-        addLog('Reconnecting to active job(s)...');
-    }, [addLog]);
-
-    // Auto-connect if kiosk_id is in the URL (skip if recovering active job)
-    // Also handles kiosk decoupling (Task 5)
-    useEffect(() => {
-        const saved = loadSession();
-        if (saved?.jobs?.length) return;
-
-        const params = new URLSearchParams(window.location.search);
-        const kioskIdFromUrl = params.get('kiosk_id');
-        const location = params.get('location');
-        const floor = params.get('floor');
-
-        if (!kioskIdFromUrl) return;
-
-        // First time processing URL
-        if (!initialUrlProcessed.current) {
-            initialUrlProcessed.current = true;
-            sessionKioskId.current = kioskIdFromUrl;
-
-            setConfig({
-                kiosk_id: kioskIdFromUrl,
-                location: location,
-                floor: floor
-            });
-            setViewStatus('SCANNED');
-            setScannerActive(false);
-
-            addLog(`Auto-scanned: ${kioskIdFromUrl}`);
-            if (location) addLog(`Location: ${location}, Floor: ${floor || 'N/A'}`);
-
-            checkKioskStatus(kioskIdFromUrl);
-            return;
-        }
-
-        // Subsequent URL changes — kiosk switch detection
-        if (kioskIdFromUrl !== sessionKioskId.current) {
-            if (jobs.length === 0) {
-                // No active jobs — update session kiosk
-                sessionKioskId.current = kioskIdFromUrl;
-                setConfig({
-                    kiosk_id: kioskIdFromUrl,
-                    location: location,
-                    floor: floor
-                });
-                setViewStatus('SCANNED');
-                addLog(`Auto-scanned: ${kioskIdFromUrl}`);
-                checkKioskStatus(kioskIdFromUrl);
-            } else {
-                // Active jobs exist — store new kiosk for next "+" job
-                setNewKioskId(kioskIdFromUrl);
-                addLog(`[Session] New kiosk detected: ${kioskIdFromUrl} — will apply to next job`);
-            }
-        }
-    }, [addLog, checkKioskStatus, jobs.length]);
-
-    // Status polling for all in-flight jobs
-    useEffect(() => {
-        const pollableJobs = jobs.filter(j =>
-            ['PRINTING', 'SCANNING', 'XEROXING'].includes(j.status) && j.jobId
-        );
-
-        if (pollableJobs.length === 0) return;
-
-        const pollInterval = setInterval(async () => {
-            for (const job of pollableJobs) {
-                try {
-                    const headers = await buildHeaders();
-                    const response = await axios.get(`${API_URL}/api/jobs/${job.jobId}/status`, {
-                        headers
-                    });
-                    const jobStatus = response.data.status;
-
-                    // Notify on transitions
-                    if (job.jobPhase !== jobStatus) {
-                        notifyJobStatus(jobStatus, job.jobId, job.jobType);
-                    }
-
-                    if (jobStatus === 'COMPLETED') {
-                        const updates = {
-                            status: job.jobType === 'scan' ? 'SCAN_COMPLETE' : 'COMPLETED',
-                            jobPhase: jobStatus,
-                            completedAt: new Date(),
-                            success: true,
-                        };
-                        if (job.jobType === 'scan') {
-                            updates.scanResult = {
-                                downloadUrl: `${API_URL}/api/jobs/${job.jobId}/download`
-                            };
-                            updates.downloadUrl = `${API_URL}/api/jobs/${job.jobId}/download`;
-                        }
-                        updateJob(job.jobId, updates);
-                    } else if (jobStatus === 'FAILED' || jobStatus === 'CANCELLED') {
-                        updateJob(job.jobId, {
-                            status: 'ERROR',
-                            jobPhase: jobStatus,
-                            completedAt: new Date(),
-                            success: false,
-                        });
-                        addLog(`Job failed: ${response.data.error_message || 'Unknown error'}`);
-                    } else {
-                        // Update phase for progress display
-                        updateJob(job.jobId, { jobPhase: jobStatus });
-                    }
-                } catch (e) {
-                    // Poll error — silent retry
-                }
-            }
-        }, 3000);
-
-        return () => clearInterval(pollInterval);
-    }, [jobs, API_URL, addLog, buildHeaders, notifyJobStatus, updateJob]);
-
-    // Clear session when all jobs complete
-    useEffect(() => {
-        if (allJobsDone && jobs.length > 0) {
-            clearSession();
-            // Fire summary notification
-            const succeeded = jobs.filter(j => j.success === true).length;
-            const failed = jobs.filter(j => j.success === false).length;
-            if (jobs.length > 1) {
-                notifyAllComplete(jobs.length, succeeded, failed);
-            }
-        }
-    }, [allJobsDone, jobs, notifyAllComplete]);
-
-    // ─── Job Expiry Tracking (Task 4) ───────────────────────────
-    useEffect(() => {
-        const interval = setInterval(() => {
-            const now = Date.now();
-            setJobs(prev => {
-                let changed = false;
-                const updated = prev.map(j => {
-                    if (j.expiresAt && !j.locallyExpired && now > j.expiresAt) {
-                        // Only expire if still in a pre-payment state
-                        const prePaid = ['IDLE', 'PAYMENT', 'CALCULATING', 'ERROR'].includes(j.status);
-                        if (prePaid) {
-                            changed = true;
-                            return { ...j, locallyExpired: true };
-                        }
-                    }
-                    return j;
-                });
-                return changed ? updated : prev;
-            });
-        }, 30000); // every 30 seconds
-
-        return () => clearInterval(interval);
-    }, []);
-
-    // Show expiry modal when a job becomes locally expired
-    useEffect(() => {
-        const expiredJob = jobs.find(j => j.locallyExpired && !showExpiryModal);
-        if (expiredJob) {
-            setShowExpiryModal(expiredJob.jobId);
-        }
-    }, [jobs, showExpiryModal]);
-
-    // Remove locally expired jobs after 30s
-    useEffect(() => {
-        const expiredJobs = jobs.filter(j => j.locallyExpired);
-        if (expiredJobs.length === 0) return;
-
-        const timers = expiredJobs.map(j => {
-            return setTimeout(() => {
-                setJobs(prev => prev.filter(pj => pj.jobId !== j.jobId));
-                // If this was the active job, reset index
-                setActiveJobIndex(prev => {
-                    const remaining = jobs.filter(pj => pj.jobId !== j.jobId);
-                    if (prev >= remaining.length) return Math.max(0, remaining.length - 1);
-                    return prev;
-                });
-            }, 30000);
-        });
-
-        return () => timers.forEach(t => clearTimeout(t));
-    }, [jobs]);
 
     // ==========================================
     // 5. Handlers
@@ -729,11 +345,11 @@ export function usePrint() {
 
             sessionKioskId.current = printerData.kiosk_id;
             setConfig(printerData);
-            setViewStatus('SCANNED');
+            
+            // For URLs or manual strings, trigger the status check view
             checkKioskStatus(printerData.kiosk_id);
-
         } catch (err) {
-            addLog('Invalid QR format');
+            addLog('Invalid input or QR format');
             setScannerActive(true);
         }
     }, [addLog, setConfig, checkKioskStatus, jobs.length]);
@@ -1073,12 +689,46 @@ export function usePrint() {
     }, [addLog]);
 
     const printAnotherOnSameKiosk = useCallback(() => {
-        clearSession();
+        setShowKioskChoiceModal(true);
+    }, []);
+
+    const continueOnSameKiosk = useCallback(() => {
+        const kioskId = getCurrentKioskId();
+        setShowKioskChoiceModal(false);
+
+        // If all current jobs are done, we are effectively starting a fresh session on this kiosk
+        if (allJobsDone) {
+            clearSession();
+            setJobs([]);
+            setActiveJobIndex(0);
+        }
+
+        // Add a new IDLE job entry for the same kiosk
+        const newJob = createJobEntry({
+            status: 'IDLE',
+            kiosk_id: kioskId,
+        });
+
+        setJobs(prev => [...prev, newJob]);
+        setActiveJobIndex(prev => jobs.length); // point to new job
         setViewStatus('SERVICE_SELECT');
         setScanOptions({ resolution: 300, colorMode: 'RGB24' });
         setXeroxCopies(1);
-        addLog('Ready for next job');
-    }, [addLog]);
+
+        addLog(`Continuing on kiosk ${kioskId}`);
+    }, [addLog, getCurrentKioskId, allJobsDone, jobs.length]);
+
+    const switchToNewKiosk = useCallback(() => {
+        setShowKioskChoiceModal(false);
+        // If we have active jobs, we just want to scan a new kiosk for the NEXT job
+        // If no jobs, we reset everything
+        if (jobs.length > 0 && !allJobsDone) {
+            setScanKioskMode(true);
+            addLog('Please scan the new kiosk QR code');
+        } else {
+            resetFlow();
+        }
+    }, [resetFlow, jobs.length, allJobsDone, addLog]);
 
     const backToServiceSelect = useCallback(() => {
         clearSession();
@@ -1096,33 +746,16 @@ export function usePrint() {
         // Guests capped at 1
         if (isGuest === true) return;
 
-        // Use newKioskId if available (Task 5), otherwise sessionKioskId
-        const kioskForNewJob = newKioskId || sessionKioskId.current || config?.kiosk_id;
-
-        // If no kiosk is known, activate scan kiosk mode instead
-        if (!kioskForNewJob) {
-            setScanKioskMode(true);
+        // NEW: If a kiosk is already connected, show the choice modal
+        const hasKiosk = sessionKioskId.current || config?.kiosk_id;
+        if (hasKiosk) {
+            setShowKioskChoiceModal(true);
             return;
         }
 
-        // Create new job entry and switch to it
-        const newJob = createJobEntry({
-            status: 'IDLE',
-            kiosk_id: kioskForNewJob,
-        });
-        setJobs(prev => [...prev, newJob]);
-        setActiveJobIndex(jobs.length); // point to the new entry (0-based)
-        setViewStatus('SERVICE_SELECT');
-        setScanOptions({ resolution: 300, colorMode: 'RGB24' });
-        setXeroxCopies(1);
-
-        if (newKioskId) {
-            addLog(`Adding another job on kiosk ${newKioskId}...`);
-            setNewKioskId(null); // consumed
-        } else {
-            addLog('Adding another job...');
-        }
-    }, [jobs.length, isGuest, addLog, newKioskId, config]);
+        // OLD: If no kiosk, activate scan mode
+        setScanKioskMode(true);
+    }, [jobs.length, isGuest, config, addLog]);
 
     // ---- Scan Kiosk Mode: connect to scanned kiosk ----
     const handleScanKioskConnect = useCallback(async (kioskId) => {
@@ -1256,6 +889,7 @@ export function usePrint() {
         resetFlow,
         printAnotherOnSameKiosk,
         checkKioskStatus,
+        connectPrinterAfterStatusCheck,
         proceedDespiteWarning,
         rescanQR,
         selectService,
@@ -1265,6 +899,12 @@ export function usePrint() {
         addAnotherJob,
         cancelJob,
         addLog,
+
+        // Kiosk Choice flow
+        showKioskChoiceModal,
+        setShowKioskChoiceModal,
+        continueOnSameKiosk,
+        switchToNewKiosk,
 
         // Setters (backward compat)
         setStatus: setViewStatus,

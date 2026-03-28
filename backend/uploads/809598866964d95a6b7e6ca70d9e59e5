@@ -1,0 +1,48 @@
+# Walkthrough — Print Settings + Live Preview
+
+## Overview
+
+New flow: `UPLOAD → SETTINGS_PREVIEW → PAYMENT` (was `UPLOAD → PAYMENT`)
+
+## Changes by File
+
+### Frontend
+
+| File | Changes |
+|------|---------|
+| [usePrint.js](file:///home/rev/Documents/projects/leprint/frontend/src/components/Print/usePrint.js) | `printSettings` in [createJobEntry](file:///home/rev/Documents/projects/leprint/frontend/src/components/Print/usePrint.js#100-136), [countPagesInRange](file:///home/rev/Documents/projects/leprint/frontend/src/components/Print/usePrint.js#65-88)/[recalcPricing](file:///home/rev/Documents/projects/leprint/frontend/src/components/Print/usePrint.js#89-99) helpers, `updatePrintSettings`/`handleProceedToPayment`, `SETTINGS_PREVIEW` in `VIEW_TO_NAV_STEP`, `handleFileSelect` → IDLE status + navigates to SETTINGS_PREVIEW, `handlePayment` sends `print_settings`+`copies` |
+| [PrintViews.jsx](file:///home/rev/Documents/projects/leprint/frontend/src/components/Print/PrintViews.jsx) | New [PrintSettingsView](file:///home/rev/Documents/projects/leprint/frontend/src/components/Print/PrintViews.jsx#461-682) component: PDF preview (pdfjs-dist canvas), image preview, grayscale/landscape transforms, 5 setting controls (Color Mode, Orientation, Copies 1-20, Page Range with custom input, Scaling), live price summary |
+| [PrintInterface.jsx](file:///home/rev/Documents/projects/leprint/frontend/src/components/Print/PrintInterface.jsx) | Import + render [PrintSettingsView](file:///home/rev/Documents/projects/leprint/frontend/src/components/Print/PrintViews.jsx#461-682) for `SETTINGS_PREVIEW` status, destructure `updatePrintSettings`/`handleProceedToPayment` |
+
+### Backend
+
+| File | Changes |
+|------|---------|
+| [job-routes.js](file:///home/rev/Documents/projects/leprint/backend/modules/job-routes.js) | Verify-payment reads `print_settings`/`copies` from body, merges into metadata with `total_pages_to_print` |
+
+### Pi-Agent
+
+| File | Changes |
+|------|---------|
+| [printer.js](file:///home/rev/Documents/projects/leprint/pi-agent/modules/printer.js) | [printDocument](file:///home/rev/Documents/projects/leprint/pi-agent/modules/printer.js#165-236) accepts `settings` param, builds CUPS opts (`-o ColorModel=KGray`, `-o landscape`, `-n copies`, `-o page-ranges`, `-o fit-to-page`). Empty settings = original command |
+| [job-handler.js](file:///home/rev/Documents/projects/leprint/pi-agent/modules/job-handler.js) | [processJob](file:///home/rev/Documents/projects/leprint/pi-agent/modules/job-handler.js#102-231) and [processXeroxJob](file:///home/rev/Documents/projects/leprint/pi-agent/modules/job-handler.js#310-396) pass `job.metadata?.print_settings` to [printDocument](file:///home/rev/Documents/projects/leprint/pi-agent/modules/printer.js#165-236) |
+
+### Dependency
+
+Installed `pdfjs-dist@4.4.168` in frontend. Worker loaded via `import.meta.url` (Vite-compatible).
+
+## Verification
+
+| Check | Result |
+|-------|--------|
+| `npm run build` | ✅ 0 errors, exit code 0 |
+| `node --check printer.js` | ✅ OK |
+| `node --check job-handler.js` | ✅ OK |
+| `node --check job-routes.js` | ✅ OK |
+
+## Key Design Decisions
+
+- **Job created as IDLE, not PAYMENT**: The `status` useMemo overrides `viewStatus` when `activeJob.status` is `'PAYMENT'`. Creating the job as `IDLE` prevents this override, allowing `SETTINGS_PREVIEW` to render.
+- **Pricing defaults to ₹3/page B&W**: Matches `PRICE_PER_PAGE: 3` in backend [utils.js](file:///home/rev/Documents/projects/leprint/backend/modules/utils.js). Color is ₹10/page.
+- **Pi-agent fallback**: Empty `settings = {}` produces an empty `opts` array, resulting in the original `lp -d printer "file"` command — zero regression.
+- **Page range sanitized**: Only passed to CUPS if it matches `/^[\d,\-]+$/`.

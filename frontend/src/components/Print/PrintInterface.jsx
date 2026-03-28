@@ -5,21 +5,22 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { Printer, ChevronLeft, Check, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../AuthProvider';
 import { useGuest } from '../GuestContext';
 
 import { usePrint } from './usePrint';
-import { NAV_STEPS } from './usePrint';
+import { NAV_STEPS } from './logic/printConstants';
 import { getFileExt, getFileIcon } from './printUtils';
 import ZXingScanner from './ZXingScanner';
 
-import { QRScannerView, StatusCheckView, ConnectView } from './views/ScannerViews';
+import { QRScannerView, StatusCheckView, ConnectView, KioskProfileView } from './views/ScannerViews';
 import { PrinterErrorView, PrinterWarningView, JobErrorView } from './views/ErrorViews';
 import { ServiceSelectView, FileUploadView } from './views/ServiceViews';
 import { PrintSettingsView } from './views/SettingsView';
 import { ScanOptionsView, ScanningView, ScanCompleteView, XeroxOptionsView, XeroxingView } from './views/ScanXeroxViews';
 import { PaymentView, JobProgressView, CompletedView } from './views/ProgressViews';
 import { AllJobsSummaryView } from './views/SummaryView';
-import { BackConfirmModal, ExpiryModal } from './views/Modals';
+import { BackConfirmModal, ExpiryModal, KioskChoiceModal } from './views/Modals';
 
 // ─── Job Tab Bar ───────────────────────────────────────────
 const JOB_ICONS = { print: '🖨️', scan: '📄', xerox: '📋' };
@@ -326,6 +327,7 @@ const viewTransition = {
 
 export function PrintInterface() {
   const printState = usePrint();
+  const { user, isAdmin, isGuest: isAuthGuest } = useAuth();
   const { isGuest } = useGuest();
   const navigate = useNavigate();
 
@@ -352,6 +354,12 @@ export function PrintInterface() {
     cancelJob,
     updatePrintSettings,
     handleProceedToPayment,
+
+    // Kiosk Choice
+    showKioskChoiceModal,
+    setShowKioskChoiceModal,
+    continueOnSameKiosk,
+    switchToNewKiosk,
   } = printState;
 
   const isConnected = ['SERVICE_SELECT', 'CONNECTED', 'SCAN_OPTIONS',
@@ -367,6 +375,7 @@ export function PrintInterface() {
     getFileIcon,
     navigate,
     isGuest,
+    isAdmin, // <--- ADDED: Access to admin status in views
   };
 
   const showTabBar = jobs.length >= 1
@@ -440,6 +449,9 @@ export function PrintInterface() {
 
                 {/* VIEW: Checking kiosk / printer status */}
                 {status === 'CHECKING_STATUS' && <StatusCheckView {...viewProps} />}
+                
+                {/* VIEW: Kiosk Status/Profile summary */}
+                {status === 'KIOSK_READY' && <KioskProfileView {...viewProps} />}
 
                 {/* VIEW: Hard printer error (block) */}
                 {status === 'PRINTER_ERROR' && (
@@ -531,6 +543,13 @@ export function PrintInterface() {
         open={!!showExpiryModal}
         onOpenChange={(open) => { if (!open) setShowExpiryModal(null); }}
         jobType={expiredJob?.jobType || 'print'}
+      />
+
+      <KioskChoiceModal
+        open={showKioskChoiceModal}
+        onOpenChange={setShowKioskChoiceModal}
+        onContinue={continueOnSameKiosk}
+        onSwitch={switchToNewKiosk}
       />
     </div>
   );

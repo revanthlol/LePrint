@@ -169,7 +169,13 @@ router.post(
   upload.single('file'),
   async (req, res) => {
       console.log("🔥 FULL ROUTE HIT (Bypassing Auth)");
-      res.json({ ok: true });
+      res.json({
+        job_id: 'mock_job_' + Date.now(),
+        pages: 1,
+        price_per_page: 5,
+        total_cost: 5,
+        currency: 'INR'
+      });
   }
 );
 
@@ -179,74 +185,11 @@ router.post(
 // Verify Payment
 // ===============================
 router.post('/jobs/:job_id/verify-payment', async (req, res) => {
-
     const { job_id } = req.params;
-
-    try {
-
-        const job = await db.getJob(job_id);
-
-        if (!job) {
-            return res.status(404).json({ error: 'Job not found' });
-        }
-
-        // Access check: user_id match OR guest match via metadata
-        if (req.user.isGuest) {
-            const meta = job.metadata || {};
-            if (meta.guestId !== req.user.guestId) {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
-        } else if (job.user_id !== req.user.uid) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-
-        const { token, timestamp } = generatePrintToken(job_id, job.kiosk_id);
-
-        const printSettings = req.body.print_settings || {};
-        const copies = req.body.copies || 1;
-        const existingMetadata = job.metadata || {};
-
-        await db.updateJob(job_id, {
-            status: 'PAID',
-            payment_status: 'paid',
-            payment_id: req.body.payment_id,
-            paid_at: new Date(),
-            print_token: token,
-            token_timestamp: timestamp,
-            metadata: {
-                ...existingMetadata,
-                print_settings: printSettings,
-                copies,
-                total_pages_to_print: (
-                    printSettings.pageRange && printSettings.pageRange !== 'all'
-                        ? Math.max(1, copies)
-                        : (job.pages || 1) * copies
-                )
-            }
-        });
-
-        const payerId = req.user.isGuest ? 'guest:' + req.user.guestId : req.user.uid;
-        log.job(`${job_id} | payment verified | amount: ${job.total_cost} | by: ${payerId}`);
-
-        res.json({ status: 'success', job_status: 'PAID' });
-
-        // Trigger mock simulation immediately for test kiosk
-        if (TEST_KIOSK_ID && job.kiosk_id === TEST_KIOSK_ID) {
-            log.info(`[MOCK] ${job_id} | simulation triggered from payment verify`);
-            // Re-fetch job to get updated PAID status
-            const paidJob = await db.getJob(job_id);
-            if (paidJob) {
-                // Mark as SENT_TO_PI (same as poll would do)
-                await db.updateJob(job_id, { status: 'SENT_TO_PI', queued_at: new Date(), last_status_update: new Date() });
-                startMockSimulation(paidJob, Date.now());
-            }
-        }
-
-    } catch (error) {
-        log.error(`[JOB] ${job_id} | ERROR | route: /api/jobs/${job_id}/verify-payment | reason: ${error.message}`);
-        res.status(500).json({ error: 'Payment verification failed' });
-    }
+    console.log(`🔥 MOCK PAYMENT VERIFIED for: ${job_id}`);
+    res.json({ status: 'success', job_status: 'PAID' });
 });
+
 
 
 // ===============================
@@ -254,37 +197,16 @@ router.post('/jobs/:job_id/verify-payment', async (req, res) => {
 // ===============================
 router.get('/jobs/:job_id/status', async (req, res) => {
     const { job_id } = req.params;
-
-    try {
-        const job = await db.getJob(job_id);
-
-        if (!job) {
-            return res.status(404).json({ error: 'Job not found' });
-        }
-
-        // Access check: user_id match OR guest match via metadata
-        if (req.user.isGuest) {
-            const meta = job.metadata || {};
-            if (meta.guestId !== req.user.guestId) {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
-        } else if (job.user_id !== req.user.uid) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-
-        res.json({
-            status: job.status,
-            job_type: job.job_type || 'print',
-            error_message: job.error_message || null,
-            status_message: job.status_message || null,
-            output_file_url: job.output_file_url || null
-        });
-
-    } catch (error) {
-        log.error(`[JOB] ${job_id} | ERROR | route: /api/jobs/${job_id}/status | reason: ${error.message}`);
-        res.status(500).json({ error: 'Failed to get job status' });
-    }
+    console.log(`🔥 MOCK STATUS POLL for: ${job_id}`);
+    res.json({
+        status: 'COMPLETED',
+        job_type: 'print',
+        error_message: null,
+        status_message: 'Mock simulation complete',
+        output_file_url: null
+    });
 });
+
 
 
 // Mock kiosk configuration (read from env)

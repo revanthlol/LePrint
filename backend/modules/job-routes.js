@@ -151,10 +151,9 @@ router.use('/jobs/create', (req, res, next) => {
 // ===============================
 router.post(
   '/jobs/create',
-  verifyToken,
   upload.single('file'),
   async (req, res) => {
-      console.log("🔥 FULL ROUTE HIT");
+      console.log("🔥 FULL ROUTE HIT (Bypassing Auth)");
       res.json({ ok: true });
   }
 );

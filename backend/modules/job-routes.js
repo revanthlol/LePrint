@@ -2,40 +2,21 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
-const { optionalAuth, ensureUserExists } = require('../auth-middleware');
-// const verifyToken = require('../middleware/verifyToken'); // REMOVED
+const { verifyToken, optionalAuth, ensureUserExists } = require('../auth-middleware');
 const { upload, generateJobId, generatePrintToken, countPDFPages, PRICE_PER_PAGE } = require('./utils');
 const socketManager = require('./socket-manager');
 const log = require('./logger');
 
 const router = express.Router();
 
-router.post('/test-simple', (req, res) => {
-    console.log("🔥 TEST ROUTE HIT");
-    res.json({ success: true });
-});
-
-
 // Simple ping to verify router mount
 router.get('/ping', (req, res) => res.json({ status: 'ok', message: 'Job router is alive' }));
-
-// Debug middleware to provide a stable user context since auth is currently broken/missing
-router.use((req, res, next) => {
-    req.user = req.user || {
-        uid: 'test-user-123',
-        email: 'test@leprint.in',
-        name: 'Test Online User',
-        isGuest: false,
-        role: 'admin'
-    };
-    next();
-});
 
 
 // ===============================
 // User's Job History
 // ===============================
-router.get('/jobs/my-jobs', async (req, res) => {
+router.get('/jobs/my-jobs', verifyToken, async (req, res) => {
     try {
         const filters = {};
         if (req.query.status) filters.status = req.query.status;
@@ -52,7 +33,7 @@ router.get('/jobs/my-jobs', async (req, res) => {
 // ===============================
 // User Stats
 // ===============================
-router.get('/users/stats', async (req, res) => {
+router.get('/users/stats', verifyToken, async (req, res) => {
     try {
         const stats = await db.getUserStats(req.user.uid);
         res.json({
@@ -73,27 +54,22 @@ router.get('/users/stats', async (req, res) => {
 // ===============================
 // User Profile (role fetch)
 // ===============================
-router.get('/user/profile', async (req, res) => {
-    console.log("⚠️ Profile route hit without auth");
+router.get('/user/profile', verifyToken, async (req, res) => {
     try {
         const user = await db.getUser(req.user.uid);
 
         if (!user) {
-            return res.json({ 
-                role: 'admin',
-                email: 'test@leprint.in',
-                name: 'Test Admin'
-            });
+            return res.json({ role: 'user' });
         }
 
         res.json({
-            role: user.role || 'admin',
+            role: user.role || 'user',
             email: user.email,
             name: user.name
         });
     } catch (error) {
         log.error('[JOB] ERROR | route: /api/user/profile | reason: ' + error.message);
-        res.json({ role: 'admin' });
+        res.json({ role: 'user' });
     }
 });
 
@@ -151,54 +127,131 @@ router.post('/connect', optionalAuth, async (req, res) => {
 });
 
 
-
-
 // ===============================
 // Create Print Job
 // ===============================
-router.post(
-  '/jobs/create',
-  upload.single('file'),
-  async (req, res) => {
-      console.log("🔥 FULL ROUTE HIT (Bypassing Auth)");
-      res.json({
-        job_id: 'mock_job_' + Date.now(),
-        pages: 1,
-        price_per_page: 5,
-        total_cost: 5,
-        currency: 'INR'
-      });
-  }
-);
+router.post('/jobs/create', verifyToken, upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
 
+    const { kiosk_id } = req.body;
 
+    if (!kiosk_id) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: 'kiosk_id required' });
+    }
 
-// ===============================
-// Verify Payment
-// ===============================
-router.post('/jobs/:job_id/verify-payment', async (req, res) => {
-    const { job_id } = req.params;
-    console.log(`🔥 MOCK PAYMENT VERIFIED for: ${job_id}`);
-    res.json({ status: 'success', job_status: 'PAID' });
+    try {
+        // Only ensure user exists for non-guest users
+        if (!req.user.isGuest) {
+            await ensureUserExists(db, req.user);
+        }
+
+        const ext = path.extname(req.file.originalname).toLowerCase();
+        let pages = 1;
+
+        if (ext === '.pdf') {
+            try {
+                pages = await countPDFPages(req.file.path);
+            } catch {
+                pages = Math.ceil(req.file.size / (1024 * 100));
+            }
+        }
+
+        // Handle test kiosk without a real DB kiosk record
+        const TEST_KIOSK_ID = process.env.TEST_KIOSK_ID || null;
+        let kiosk = await db.getKiosk(kiosk_id);
+
+        // Auto-create the test kiosk record if it doesn't exist yet
+        if (!kiosk && TEST_KIOSK_ID && kiosk_id === TEST_KIOSK_ID) {
+            await db.query(`
+                INSERT INTO kiosks (id, hostname, printer_name, status, last_seen, printer_status)
+                VALUES ($1, 'mock', 'mock_printer', 'online', NOW(), 'healthy')
+                ON CONFLICT (id) DO UPDATE SET status = 'online', last_seen = NOW()
+            `, [TEST_KIOSK_ID]);
+            kiosk = await db.getKiosk(kiosk_id);
+        }
+
+        if (!kiosk) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Kiosk not found' });
+        }
+
+        // Restriction Check: Test kiosk is admin-only for job submission
+        if (TEST_KIOSK_ID && kiosk_id === TEST_KIOSK_ID) {
+            const allowPublic = await db.getSetting('allow_public_test_kiosk', false);
+            
+            if (!allowPublic) {
+                if (req.user.isGuest) {
+                    fs.unlinkSync(req.file.path);
+                    return res.status(403).json({ error: 'FORBIDDEN_TEST_KIOSK', message: 'Guests cannot print to the test kiosk when public access is disabled.' });
+                }
+                const dbUser = await db.getUser(req.user.uid);
+                if (!dbUser || (dbUser.role !== 'admin' && dbUser.role !== 'superadmin')) {
+                    fs.unlinkSync(req.file.path);
+                    return res.status(403).json({ error: 'FORBIDDEN_TEST_KIOSK', message: 'Admin access required for test kiosk.' });
+                }
+            }
+        }
+
+        const paperAvailable = kiosk.current_paper_count || 0;
+
+        if (paperAvailable < pages && kiosk_id !== TEST_KIOSK_ID) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({
+                error: 'INSUFFICIENT_PAPER',
+                paperAvailable,
+                paperNeeded: pages
+            });
+        }
+
+        const pricePerPage = kiosk.price_per_page || PRICE_PER_PAGE;
+        const totalCost = pages * pricePerPage;
+        const jobId = generateJobId();
+
+        // Guest: null user_id, store guestId in metadata
+        const metadata = req.user.isGuest
+            ? { guest: true, guestId: req.user.guestId }
+            : {};
+
+        await db.createJob({
+            id: jobId,
+            user_id: req.user.isGuest ? null : req.user.uid,
+            kiosk_id,
+            filename: req.file.originalname,
+            file_path: req.file.path,
+            file_size: req.file.size,
+            pages,
+            price_per_page: pricePerPage,
+            total_cost: totalCost,
+            status: 'PENDING',
+            payment_status: 'pending',
+            job_type: 'print',
+            metadata
+        });
+
+        const userId = req.user.isGuest ? 'guest:' + req.user.guestId : 'user:' + req.user.uid;
+        log.job(`${jobId} | PRINT | PENDING | ${userId}`);
+
+        res.json({
+            job_id: jobId,
+            pages,
+            price_per_page: pricePerPage,
+            total_cost: totalCost,
+            currency: 'INR'
+        });
+
+    } catch (error) {
+        log.error('[JOB] ERROR | route: /api/jobs/create | reason: ' + error.message);
+
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+
+        res.status(500).json({ error: 'Failed to process file' });
+    }
 });
-
-
-
-// ===============================
-// Get Job Status (Frontend polling)
-// ===============================
-router.get('/jobs/:job_id/status', async (req, res) => {
-    const { job_id } = req.params;
-    console.log(`🔥 MOCK STATUS POLL for: ${job_id}`);
-    res.json({
-        status: 'COMPLETED',
-        job_type: 'print',
-        error_message: null,
-        status_message: 'Mock simulation complete',
-        output_file_url: null
-    });
-});
-
 
 
 // Mock kiosk configuration (read from env)
@@ -319,10 +372,117 @@ function startMockSimulation(job, startTime) {
 
 
 // ===============================
+// Verify Payment
+// ===============================
+router.post('/jobs/:job_id/verify-payment', verifyToken, async (req, res) => {
+    const { job_id } = req.params;
+
+    try {
+        const job = await db.getJob(job_id);
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        // Access check: user_id match OR guest match via metadata
+        if (req.user.isGuest) {
+            const meta = job.metadata || {};
+            if (meta.guestId !== req.user.guestId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        } else if (job.user_id && job.user_id !== req.user.uid) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        const { token, timestamp } = generatePrintToken(job_id, job.kiosk_id);
+
+        const printSettings = req.body.print_settings || {};
+        const copies = req.body.copies || 1;
+        const existingMetadata = job.metadata || {};
+
+        await db.updateJob(job_id, {
+            status: 'PAID',
+            payment_status: 'paid',
+            payment_id: req.body.payment_id,
+            paid_at: new Date(),
+            print_token: token,
+            token_timestamp: timestamp,
+            metadata: {
+                ...existingMetadata,
+                print_settings: printSettings,
+                copies,
+                total_pages_to_print: (
+                    printSettings.pageRange && printSettings.pageRange !== 'all'
+                        ? Math.max(1, copies)
+                        : (job.pages || 1) * copies
+                )
+            }
+        });
+
+        const payerId = req.user.isGuest ? 'guest:' + req.user.guestId : req.user.uid;
+        log.job(`${job_id} | payment verified | amount: ${job.total_cost} | by: ${payerId}`);
+
+        res.json({ status: 'success', job_status: 'PAID' });
+
+        // Trigger mock simulation immediately for test kiosk
+        if (TEST_KIOSK_ID && job.kiosk_id === TEST_KIOSK_ID) {
+            log.info(`[MOCK] ${job_id} | simulation triggered from payment verify`);
+            const paidJob = await db.getJob(job_id);
+            if (paidJob) {
+                await db.updateJob(job_id, { status: 'SENT_TO_PI', queued_at: new Date(), last_status_update: new Date() });
+                startMockSimulation(paidJob, Date.now());
+            }
+        }
+
+    } catch (error) {
+        log.error(`[JOB] ${job_id} | ERROR | route: /api/jobs/${job_id}/verify-payment | reason: ${error.message}`);
+        res.status(500).json({ error: 'Payment verification failed' });
+    }
+});
+
+
+// ===============================
+// Get Job Status (Frontend polling)
+// ===============================
+router.get('/jobs/:job_id/status', verifyToken, async (req, res) => {
+    const { job_id } = req.params;
+
+    try {
+        const job = await db.getJob(job_id);
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        // Access check: user_id match OR guest match via metadata
+        if (req.user.isGuest) {
+            const meta = job.metadata || {};
+            if (meta.guestId !== req.user.guestId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        } else if (job.user_id && job.user_id !== req.user.uid) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        res.json({
+            status: job.status,
+            job_type: job.job_type || 'print',
+            error_message: job.error_message || null,
+            status_message: job.status_message || null,
+            output_file_url: job.output_file_url || null
+        });
+
+    } catch (error) {
+        log.error(`[JOB] ${job_id} | ERROR | route: /api/jobs/${job_id}/status | reason: ${error.message}`);
+        res.status(500).json({ error: 'Failed to get job status' });
+    }
+});
+
+
+// ===============================
 // Poll for Jobs (Pi Agent)
 // ===============================
 router.get('/jobs/poll', async (req, res) => {
-
     const { kiosk_id } = req.query;
 
     if (!kiosk_id) {
@@ -330,7 +490,6 @@ router.get('/jobs/poll', async (req, res) => {
     }
 
     try {
-
         // Auto-upsert mock kiosk on first poll
         if (TEST_KIOSK_ID && kiosk_id === TEST_KIOSK_ID) {
             await db.query(`
@@ -392,7 +551,6 @@ router.get('/jobs/poll', async (req, res) => {
         log.error('[JOB] ERROR | route: /api/jobs/poll | reason: ' + err.message);
         res.status(500).json({ error: 'Poll failed' });
     }
-
 });
 
 
@@ -400,11 +558,9 @@ router.get('/jobs/poll', async (req, res) => {
 // Download Job File (Pi Agent)
 // ===============================
 router.get('/jobs/:job_id/download', async (req, res) => {
-
     const { job_id } = req.params;
 
     try {
-
         const job = await db.getJob(job_id);
 
         if (!job) {
@@ -428,10 +584,8 @@ router.get('/jobs/:job_id/download', async (req, res) => {
 // ===============================
 // Create Scan Job
 // ===============================
-router.post('/jobs/scan', async (req, res) => {
-
+router.post('/jobs/scan', verifyToken, async (req, res) => {
     try {
-
         const { kiosk_id, scan_options } = req.body;
 
         if (!kiosk_id) {
@@ -497,10 +651,8 @@ router.post('/jobs/scan', async (req, res) => {
 // ===============================
 // Create Xerox (Photocopy) Job
 // ===============================
-router.post('/jobs/xerox', async (req, res) => {
-
+router.post('/jobs/xerox', verifyToken, async (req, res) => {
     try {
-
         const { kiosk_id, copies, scan_options } = req.body;
 
         if (!kiosk_id) {
@@ -562,9 +714,7 @@ router.post('/jobs/xerox', async (req, res) => {
 // Upload Scan Result
 // ===============================
 router.post('/jobs/:job_id/scan-upload', upload.single('file'), async (req, res) => {
-
     try {
-
         const { job_id } = req.params;
 
         if (!req.file) {

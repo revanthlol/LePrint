@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LePrint PrintInterface Revamp — Checklist</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #0a0a0a;
+            color: #e5e5e5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            padding: 3rem 2rem;
+            margin-bottom: 2rem;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 1.5rem;
+        }
+        .header h1 { font-size: 2.5rem; font-weight: 300; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
+        .header h1 strong { font-weight: 700; font-style: italic; font-family: Georgia, serif; }
+        .header p { color: #666; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.3em; font-weight: 700; }
+        .header .branch {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.3rem 0.8rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 0.5rem;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #888;
+        }
+        .progress-bar-container {
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 1rem;
+        }
+        .progress-bar-container .label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #888;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .progress-track {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: white;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+
+        .phase {
+            margin-bottom: 1.5rem;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 1.5rem;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        .phase:hover { border-color: rgba(255,255,255,0.15); }
+        .phase-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem 1.5rem;
+            cursor: pointer;
+            user-select: none;
+            border-bottom: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        .phase.open .phase-header { border-bottom-color: rgba(255,255,255,0.06); }
+        .phase-number {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.75rem;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .phase.completed .phase-number { background: white; color: #0a0a0a; }
+        .phase-title { flex: 1; font-weight: 600; font-size: 1rem; }
+        .phase-model {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: #555;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 0.3rem;
+        }
+        .phase-model.sonnet { color: #c084fc; border-color: rgba(192,132,252,0.2); }
+        .phase-model.flash { color: #60a5fa; border-color: rgba(96,165,250,0.2); }
+        .phase-model.opus { color: #f97316; border-color: rgba(249,115,22,0.2); }
+        .phase-count {
+            font-size: 0.7rem;
+            color: #555;
+            font-weight: 600;
+        }
+        .phase-chevron {
+            color: #555;
+            transition: transform 0.2s;
+            font-size: 0.8rem;
+        }
+        .phase.open .phase-chevron { transform: rotate(90deg); }
+
+        .phase-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .phase.open .phase-body { max-height: 1000px; }
+        .phase-content { padding: 1rem 1.5rem 1.5rem; }
+
+        .task {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .task:last-child { border-bottom: none; }
+        .task input[type="checkbox"] {
+            width: 1.1rem;
+            height: 1.1rem;
+            margin-top: 0.15rem;
+            accent-color: white;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .task-text { font-size: 0.9rem; color: #ccc; }
+        .task input:checked + .task-text { text-decoration: line-through; color: #444; }
+        .task-meta {
+            font-size: 0.7rem;
+            color: #555;
+            margin-top: 0.15rem;
+        }
+        .task-meta code {
+            background: rgba(255,255,255,0.05);
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.2rem;
+            font-size: 0.65rem;
+        }
+
+        .files-affected {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 0.75rem;
+        }
+        .files-affected .label-small {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: #444;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+        .files-affected code {
+            display: inline-block;
+            font-size: 0.7rem;
+            color: #888;
+            background: rgba(255,255,255,0.04);
+            padding: 0.15rem 0.4rem;
+            border-radius: 0.25rem;
+            margin: 0.15rem 0.25rem 0.15rem 0;
+        }
+
+        .legend {
+            margin-top: 2rem;
+            padding: 1rem 1.5rem;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 1rem;
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; color: #666; }
+        .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>PrintInterface <strong>Revamp</strong></h1>
+            <p>Premium Monochrome UI Overhaul</p>
+            <div class="branch">branch: feat/print-ui-revamp</div>
+        </div>
+
+        <div class="progress-bar-container">
+            <div class="label">
+                <span>Overall Progress</span>
+                <span id="progress-text">0 / 0 tasks</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+        </div>
+
+        <div id="phases">
+
+            <!-- PHASE 0 -->
+            <div class="phase open" data-phase="0">
+                <div class="phase-header" onclick="togglePhase(this)">
+                    <div class="phase-number">0</div>
+                    <div class="phase-title">File Restructuring</div>
+                    <span class="phase-model flash">Gemini 3 Flash</span>
+                    <span class="phase-count" data-count></span>
+                    <span class="phase-chevron">›</span>
+                </div>
+                <div class="phase-body">
+                    <div class="phase-content">
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Create <code>views/</code> directory structure</div>
+                                <div class="task-meta">mkdir <code>frontend/src/components/Print/views/</code></div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Extract scanner views → <code>views/ScannerViews.jsx</code></div>
+                                <div class="task-meta">QRScannerView, StatusCheckView, ConnectView, KioskScannerInline</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Extract error views → <code>views/ErrorViews.jsx</code></div>
+                                <div class="task-meta">PrinterErrorView, PrinterWarningView, JobErrorView</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Extract service views → <code>views/ServiceViews.jsx</code></div>
+                                <div class="task-meta">ServiceSelectView, FileUploadView</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Extract settings view → <code>views/SettingsView.jsx</code></div>
+                                <div class="task-meta">PrintSettingsView (standalone — most complex component)</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Extract scan/xerox views → <code>views/ScanXeroxViews.jsx</code></div>
+                                <div class="task-meta">ScanOptionsView, XeroxOptionsView, ScanCompleteView, ScanningView, XeroxingView</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Extract progress views → <code>views/ProgressViews.jsx</code></div>
+                                <div class="task-meta">PaymentView, JobProgressView, FunFactsTicker, CompletedView</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Extract summary view → <code>views/SummaryView.jsx</code></div>
+                                <div class="task-meta">AllJobsSummaryView</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Extract modals → <code>views/Modals.jsx</code></div>
+                                <div class="task-meta">BackConfirmModal, ExpiryModal</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Update <code>PrintInterface.jsx</code> imports</div>
+                                <div class="task-meta">Replace single PrintViews import with new file paths</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Delete old <code>PrintViews.jsx</code></div>
+                                <div class="task-meta">Only after verifying all imports work</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Verify: App builds with zero errors</div>
+                                <div class="task-meta"><code>npm run build</code> — clean output</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Verify: Full flow works (scan → upload → settings → pay → complete)</div>
+                                <div class="task-meta">Manual smoke test — visually identical to before</div>
+                            </div>
+                        </div>
+                        <div class="files-affected">
+                            <div class="label-small">Files affected</div>
+                            <code>PrintViews.jsx</code> <code>PrintInterface.jsx</code> <code>views/*.jsx (new)</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PHASE 1 -->
+            <div class="phase" data-phase="1">
+                <div class="phase-header" onclick="togglePhase(this)">
+                    <div class="phase-number">1</div>
+                    <div class="phase-title">Shell, TabBar & View Transitions</div>
+                    <span class="phase-model sonnet">Sonnet 4.6</span>
+                    <span class="phase-count" data-count></span>
+                    <span class="phase-chevron">›</span>
+                </div>
+                <div class="phase-body">
+                    <div class="phase-content">
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Replace Shadcn Card wrapper with glassmorphism container</div>
+                                <div class="task-meta">Keep Shadcn primitives, style with <code>bg-white/[0.03] backdrop-blur-2xl border-white/[0.08] rounded-3xl</code></div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign JobTabBar with Framer Motion layoutId</div>
+                                <div class="task-meta">Sliding active indicator pill, better status dots, premium spacing</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign NavigationBar step indicator</div>
+                                <div class="task-meta">Larger dots, better typography, subtle connecting lines</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Add AnimatePresence wrapper for all view transitions</div>
+                                <div class="task-meta">Unified fade+slide between every status change in the render block</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Verify: Tab switching animates smoothly</div>
+                            </div>
+                        </div>
+                        <div class="files-affected">
+                            <div class="label-small">Files affected</div>
+                            <code>PrintInterface.jsx</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PHASE 2 -->
+            <div class="phase" data-phase="2">
+                <div class="phase-header" onclick="togglePhase(this)">
+                    <div class="phase-number">2</div>
+                    <div class="phase-title">Scanner & Connection Views</div>
+                    <span class="phase-model flash">Gemini 3 Flash</span>
+                    <span class="phase-count" data-count></span>
+                    <span class="phase-chevron">›</span>
+                </div>
+                <div class="phase-body">
+                    <div class="phase-content">
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign QRScannerView with premium layout</div>
+                                <div class="task-meta">Glassmorphism scanner frame, larger instruction text, refined manual entry</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Upgrade StatusCheckView animation</div>
+                                <div class="task-meta">Refined loading spinner matching dashboard aesthetic</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign ConnectView kiosk info card</div>
+                                <div class="task-meta">Glass card with location info, better button hierarchy</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Update KioskScannerInline styling</div>
+                                <div class="task-meta">Match scanner view aesthetic</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Verify: QR scan → status check → connect flow works</div>
+                            </div>
+                        </div>
+                        <div class="files-affected">
+                            <div class="label-small">Files affected</div>
+                            <code>views/ScannerViews.jsx</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PHASE 3 -->
+            <div class="phase" data-phase="3">
+                <div class="phase-header" onclick="togglePhase(this)">
+                    <div class="phase-number">3</div>
+                    <div class="phase-title">Service Selection & File Upload</div>
+                    <span class="phase-model flash">Gemini 3 Flash</span>
+                    <span class="phase-count" data-count></span>
+                    <span class="phase-chevron">›</span>
+                </div>
+                <div class="phase-body">
+                    <div class="phase-content">
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign ServiceSelectView cards</div>
+                                <div class="task-meta">Glass cards with icon boxes matching About.jsx feature cards style</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign FileUploadView drop zone</div>
+                                <div class="task-meta">Premium dashed border, glass background, better file info display</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Verify: Service select → file upload → calculating flow</div>
+                            </div>
+                        </div>
+                        <div class="files-affected">
+                            <div class="label-small">Files affected</div>
+                            <code>views/ServiceViews.jsx</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PHASE 4 -->
+            <div class="phase" data-phase="4">
+                <div class="phase-header" onclick="togglePhase(this)">
+                    <div class="phase-number">4</div>
+                    <div class="phase-title">Print Settings (Major Improvement)</div>
+                    <span class="phase-model sonnet">Sonnet 4.6</span>
+                    <span class="phase-count" data-count></span>
+                    <span class="phase-chevron">›</span>
+                </div>
+                <div class="phase-body">
+                    <div class="phase-content">
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign A4 preview container</div>
+                                <div class="task-meta">Paper shadow, proper aspect ratio, grayscale filter for B&W preview</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Premium segmented controls (Color, Orientation, Scaling)</div>
+                                <div class="task-meta">Glass toggle buttons with smooth active state transitions</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign copies counter with tactile +/- buttons</div>
+                                <div class="task-meta">Larger touch targets, number animation on change</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign page range selector</div>
+                                <div class="task-meta">Cleaner toggle, better input field, validation feedback</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Premium price summary card</div>
+                                <div class="task-meta">Glass card with clear breakdown, animated total</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Verify: All settings changes reflect in preview and price</div>
+                            </div>
+                        </div>
+                        <div class="files-affected">
+                            <div class="label-small">Files affected</div>
+                            <code>views/SettingsView.jsx</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PHASE 5 -->
+            <div class="phase" data-phase="5">
+                <div class="phase-header" onclick="togglePhase(this)">
+                    <div class="phase-number">5</div>
+                    <div class="phase-title">Payment (Major Improvement) & Progress</div>
+                    <span class="phase-model sonnet">Sonnet 4.6</span>
+                    <span class="phase-count" data-count></span>
+                    <span class="phase-chevron">›</span>
+                </div>
+                <div class="phase-body">
+                    <div class="phase-content">
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign PaymentView with full order summary</div>
+                                <div class="task-meta">File name, settings summary, trust badges, clear price breakdown</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Add trust signals to payment screen</div>
+                                <div class="task-meta">Secure payment indicator, Razorpay badge, refund policy link</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign JobProgressView stepper</div>
+                                <div class="task-meta">Premium step dots with pulse animation, better typography</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign FunFactsTicker</div>
+                                <div class="task-meta">Glass card, smoother text transitions</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Verify: Payment → progress → completion flow</div>
+                            </div>
+                        </div>
+                        <div class="files-affected">
+                            <div class="label-small">Files affected</div>
+                            <code>views/ProgressViews.jsx</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PHASE 6 -->
+            <div class="phase" data-phase="6">
+                <div class="phase-header" onclick="togglePhase(this)">
+                    <div class="phase-number">6</div>
+                    <div class="phase-title">Completion & Summary (Major Improvement)</div>
+                    <span class="phase-model flash">Gemini 3 Flash</span>
+                    <span class="phase-count" data-count></span>
+                    <span class="phase-chevron">›</span>
+                </div>
+                <div class="phase-body">
+                    <div class="phase-content">
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign CompletedView with celebration feel</div>
+                                <div class="task-meta">Animated checkmark, confetti-subtle effect, clear next actions</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign ScanCompleteView with download prominence</div>
+                                <div class="task-meta">Large download button, file info card</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign AllJobsSummaryView</div>
+                                <div class="task-meta">Per-job glass cards, status badges, duration display</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Verify: Multi-job summary displays correctly</div>
+                            </div>
+                        </div>
+                        <div class="files-affected">
+                            <div class="label-small">Files affected</div>
+                            <code>views/ProgressViews.jsx</code> <code>views/SummaryView.jsx</code> <code>views/ScanXeroxViews.jsx</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PHASE 7 -->
+            <div class="phase" data-phase="7">
+                <div class="phase-header" onclick="togglePhase(this)">
+                    <div class="phase-number">7</div>
+                    <div class="phase-title">Error Views, Modals & Polish</div>
+                    <span class="phase-model flash">Gemini 3 Flash</span>
+                    <span class="phase-count" data-count></span>
+                    <span class="phase-chevron">›</span>
+                </div>
+                <div class="phase-body">
+                    <div class="phase-content">
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign PrinterErrorView & PrinterWarningView</div>
+                                <div class="task-meta">Premium error/warning cards with better visual hierarchy</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign JobErrorView with refund CTA</div>
+                                <div class="task-meta">Glass error card, prominent retry + refund buttons</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign ScanOptionsView & XeroxOptionsView</div>
+                                <div class="task-meta">Glass controls matching SettingsView style</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Redesign BackConfirmModal & ExpiryModal</div>
+                                <div class="task-meta">Premium dialog styling with glassmorphism</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Final polish pass: spacing, color consistency, hover states</div>
+                            </div>
+                        </div>
+                        <div class="task">
+                            <input type="checkbox" onchange="updateProgress()">
+                            <div>
+                                <div class="task-text">Full end-to-end smoke test on mobile and desktop</div>
+                            </div>
+                        </div>
+                        <div class="files-affected">
+                            <div class="label-small">Files affected</div>
+                            <code>views/ErrorViews.jsx</code> <code>views/ScanXeroxViews.jsx</code> <code>views/Modals.jsx</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div> Gemini 3 Flash</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div> Sonnet 4.6</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> Opus 4.6 (reserved)</div>
+        </div>
+    </div>
+
+    <script>
+        function togglePhase(header) {
+            const phase = header.parentElement;
+            phase.classList.toggle('open');
+        }
+
+        function updateProgress() {
+            const allCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+            const checked = document.querySelectorAll('input[type="checkbox"]:checked');
+            const total = allCheckboxes.length;
+            const done = checked.length;
+            const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+
+            document.getElementById('progress-text').textContent = `${done} / ${total} tasks (${pct}%)`;
+            document.getElementById('progress-fill').style.width = pct + '%';
+
+            // Update per-phase counts
+            document.querySelectorAll('.phase').forEach(phase => {
+                const phaseBoxes = phase.querySelectorAll('input[type="checkbox"]');
+                const phaseChecked = phase.querySelectorAll('input[type="checkbox"]:checked');
+                const countEl = phase.querySelector('[data-count]');
+                if (countEl) {
+                    countEl.textContent = `${phaseChecked.length}/${phaseBoxes.length}`;
+                }
+                if (phaseChecked.length === phaseBoxes.length && phaseBoxes.length > 0) {
+                    phase.classList.add('completed');
+                } else {
+                    phase.classList.remove('completed');
+                }
+            });
+
+            // Persist to localStorage
+            const state = {};
+            allCheckboxes.forEach((cb, i) => { state[i] = cb.checked; });
+            localStorage.setItem('leprint_revamp_checklist', JSON.stringify(state));
+        }
+
+        // Restore from localStorage
+        (function restore() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('leprint_revamp_checklist') || '{}');
+                const allCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+                allCheckboxes.forEach((cb, i) => { if (saved[i]) cb.checked = true; });
+                updateProgress();
+            } catch {}
+        })();
+    </script>
+</body>
+</html>

@@ -156,7 +156,7 @@ function CustomSelect({ value, onChange, options }) {
   );
 }
 
-export default function Contact() {
+export default function Contact({ inApp = false }) {
   const [submitted, setSubmitted] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -167,11 +167,11 @@ export default function Contact() {
 
   useEffect(() => {
     document.title = "Contact Us — LePrint";
-    window.scrollTo(0, 0);
+    if (!inApp) window.scrollTo(0, 0);
     return () => {
       document.title = "LePrint";
     };
-  }, []);
+  }, [inApp]);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -206,10 +206,18 @@ export default function Contact() {
     }
   };
 
+  const containerClasses = inApp 
+    ? "w-full" 
+    : "min-h-screen flex flex-col bg-[#0a0a0a]";
+
+  const mainClasses = inApp
+    ? "w-full pt-4 pb-12"
+    : "flex-1 max-w-4xl mx-auto w-full px-6 pt-32 pb-20";
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
-      <PublicNavbar />
-      <main className="flex-1 max-w-4xl mx-auto w-full px-6 pt-32 pb-20">
+    <div className={containerClasses}>
+      {!inApp && <PublicNavbar />}
+      <main className={mainClasses}>
         {/* Header */}
         <FadeIn>
           <div className="mb-12 md:mb-16">
@@ -388,7 +396,7 @@ export default function Contact() {
           </FadeIn>
         </div>
       </main>
-      <Footer />
+      {!inApp && <Footer />}
     </div>
   );
 }

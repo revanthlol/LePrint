@@ -168,6 +168,9 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                         <div className="flex items-center gap-2">
                           <h3 className="font-bold text-lg leading-none tracking-tight">
                             {kiosk.locationName || kiosk.hostname || kiosk.id}
+                            <span className="ml-2 text-xs font-mono font-normal text-muted-foreground/60">
+                              #{kiosk.id}
+                            </span>
                           </h3>
                           <Button
                             variant="ghost"
@@ -181,10 +184,7 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                             <Edit className="w-3 h-3" />
                           </Button>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-                          <MapPin className="w-3 h-3" />
-                          {kiosk.id}
-                        </div>
+                        {/* ID hidden here since it's now in the header */}
                       </div>
                       <div>
                         {getStatusBadge(kiosk)}

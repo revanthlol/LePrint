@@ -4,36 +4,22 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { Printer, ChevronLeft, Check, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useGuest } from '../GuestContext';
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePrint } from './usePrint';
 import { NAV_STEPS } from './usePrint';
 import { getFileExt, getFileIcon } from './printUtils';
 import ZXingScanner from './ZXingScanner';
 
-import {
-  QRScannerView,
-  ConnectView,
-  FileUploadView,
-  PrintSettingsView,
-  PaymentView,
-  JobProgressView,
-  CompletedView,
-  StatusCheckView,
-  PrinterErrorView,
-  PrinterWarningView,
-  ServiceSelectView,
-  ScanOptionsView,
-  ScanningView,
-  ScanCompleteView,
-  XeroxOptionsView,
-  XeroxingView,
-  JobErrorView,
-  AllJobsSummaryView,
-  BackConfirmModal,
-  ExpiryModal,
-} from './PrintViews';
+import { QRScannerView, StatusCheckView, ConnectView } from './views/ScannerViews';
+import { PrinterErrorView, PrinterWarningView, JobErrorView } from './views/ErrorViews';
+import { ServiceSelectView, FileUploadView } from './views/ServiceViews';
+import { PrintSettingsView } from './views/SettingsView';
+import { ScanOptionsView, ScanningView, ScanCompleteView, XeroxOptionsView, XeroxingView } from './views/ScanXeroxViews';
+import { PaymentView, JobProgressView, CompletedView } from './views/ProgressViews';
+import { AllJobsSummaryView } from './views/SummaryView';
+import { BackConfirmModal, ExpiryModal } from './views/Modals';
 
 // ─── Job Tab Bar ───────────────────────────────────────────
 const JOB_ICONS = { print: '🖨️', scan: '📄', xerox: '📋' };
@@ -79,10 +65,10 @@ function CountdownTimer({ expiresAt }) {
 
 function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, scanKioskMode, setScanKioskMode, cancelJob }) {
   return (
-    <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-1 py-2 border-b border-border -mx-6 px-6">
+    <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-1 py-2 border-b border-white/[0.06] -mx-6 px-6">
       {/* Placeholder tab when no jobs exist yet */}
       {jobs.length === 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground border border-dashed border-border/50 shrink-0 whitespace-nowrap">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground border border-dashed border-white/[0.08] shrink-0 whitespace-nowrap">
           <span>🖨️</span>
           <span>New job</span>
         </div>
@@ -94,60 +80,81 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
         const isCancellable = ['IDLE', 'PAYMENT', 'CALCULATING', 'ERROR'].includes(job.status) && !isExpired;
 
         return (
-          <button
+          <motion.button
             key={job.jobId || i}
             onClick={() => { setActiveJobIndex(i); setScanKioskMode(false); }}
-            className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-all ${
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            className={`relative flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-colors ${
               isExpired
                 ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                 : isActive
-                ? 'bg-white/15 text-foreground border border-white/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
+                ? 'text-white border border-white/[0.08]'
+                : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground border border-transparent'
             }`}
           >
-            <div className="flex items-center gap-2">
+            {/* Sliding active pill background */}
+            {isActive && !isExpired && (
+              <motion.div
+                layoutId="active-job-tab"
+                className="absolute inset-0 rounded-lg bg-white/[0.06]"
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              />
+            )}
+
+            <div className="relative flex items-center gap-2">
               <span>{isExpired ? '⚠' : (JOB_ICONS[job.jobType] || '🖨️')}</span>
               <span>{isExpired ? 'Expired' : (JOB_LABELS[job.jobType] || 'Job')}</span>
               {!isExpired && <StatusDot status={job.status} />}
               {isCancellable && (
-                <span
+                <motion.span
                   role="button"
                   onClick={(e) => { e.stopPropagation(); cancelJob(i); }}
+                  whileHover={{ scale: 1.1 }}
                   className="ml-0.5 w-5 h-5 flex items-center justify-center rounded-full text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors text-xs leading-none cursor-pointer"
                   title="Cancel job"
                 >
                   ✕
-                </span>
+                </motion.span>
               )}
             </div>
             {/* Countdown timer for pending jobs with expiry */}
             {job.expiresAt && !isExpired && (
               <CountdownTimer expiresAt={job.expiresAt} />
             )}
-          </button>
+          </motion.button>
         );
       })}
 
       {/* Scan kiosk tab — shown when scanKioskMode is active */}
       {scanKioskMode && (
-        <button
+        <motion.button
           onClick={() => setScanKioskMode(true)}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-all bg-white/15 text-foreground border border-white/20"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-colors text-white border border-white/[0.08]"
         >
-          <span>📡</span>
-          <span>New Kiosk</span>
-        </button>
+          <motion.div
+            layoutId="active-job-tab"
+            className="absolute inset-0 rounded-lg bg-white/[0.06]"
+            transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+          />
+          <span className="relative">📡</span>
+          <span className="relative">New Kiosk</span>
+        </motion.button>
       )}
 
       {/* Add another job "+" tab */}
       {canAdd && (
-        <button
+        <motion.button
           onClick={onAddJob}
-          className="flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 border border-dashed border-border shrink-0 transition-all text-xl leading-none"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          className="flex items-center justify-center w-10 h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/[0.04] border border-dashed border-white/[0.08] hover:border-white/20 shrink-0 transition-colors text-xl leading-none"
           title="Add another job"
         >
           +
-        </button>
+        </motion.button>
       )}
     </div>
   );
@@ -155,30 +162,28 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
 
 // ─── Navigation Bar (Back + Step Indicator) ─────────────────
 function NavigationBar({ canGoBack, goBack, currentNavStep, currentNavStepIndex }) {
-  // Hide entirely when on SERVICE_SELECT or when no step is active
   const isServiceSelect = !currentNavStep || currentNavStep === 'SERVICE_SELECT';
   if (isServiceSelect) return null;
 
-  // Steps to show (skip SERVICE_SELECT since it's the starting point)
-  const stepsToShow = NAV_STEPS.slice(1); // Upload, Confirm, Pay, Status
-  const adjustedIndex = currentNavStepIndex - 1; // adjust for sliced array
+  const stepsToShow = NAV_STEPS.slice(1);
+  const adjustedIndex = currentNavStepIndex - 1;
 
   return (
     <div className="flex items-center gap-3 py-2 -mx-1">
-      {/* Back arrow — left side: show whenever canGoBack is true */}
       {canGoBack ? (
-        <button
+        <motion.button
           onClick={goBack}
+          whileHover={{ x: -2 }}
+          whileTap={{ scale: 0.95 }}
           className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors shrink-0 pr-2"
         >
           <ChevronLeft className="w-4 h-4" />
           <span className="text-xs">Back</span>
-        </button>
+        </motion.button>
       ) : (
-        <div className="w-[52px] shrink-0" /> /* spacer to keep dots centered */
+        <div className="w-[52px] shrink-0" />
       )}
 
-      {/* Step dots — centered */}
       <div className="flex items-center gap-1.5 flex-1 justify-center">
         {stepsToShow.map((step, i) => {
           const isCompleted = i < adjustedIndex;
@@ -187,21 +192,31 @@ function NavigationBar({ canGoBack, goBack, currentNavStep, currentNavStepIndex 
           return (
             <React.Fragment key={step.id}>
               {i > 0 && (
-                <div className={`h-px w-4 transition-colors ${
+                <div className={`h-px w-6 transition-colors ${
                   isCompleted || isActive ? 'bg-white/40' : 'bg-white/10'
                 }`} />
               )}
               <div className="flex flex-col items-center gap-0.5">
-                <div className={`w-2 h-2 rounded-full transition-all ${
-                  isCompleted ? 'bg-white' :
-                  isActive ? 'bg-white' :
-                  'bg-white/15'
-                }`}>
-                  {isCompleted && (
-                    <Check className="w-2 h-2 text-black" />
+                <div className="relative flex items-center justify-center">
+                  {/* Pulse ring for active step */}
+                  {isActive && (
+                    <motion.div
+                      className="absolute w-2.5 h-2.5 rounded-full bg-white/30"
+                      animate={{ scale: [1, 1.4, 1], opacity: [0.5, 0, 0.5] }}
+                      transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                    />
                   )}
+                  <div className={`w-2.5 h-2.5 rounded-full transition-all flex items-center justify-center ${
+                    isCompleted ? 'bg-white' :
+                    isActive ? 'bg-white' :
+                    'bg-white/15'
+                  }`}>
+                    {isCompleted && (
+                      <Check className="w-2.5 h-2.5 text-black" />
+                    )}
+                  </div>
                 </div>
-                <span className={`text-[9px] leading-none transition-colors ${
+                <span className={`text-[10px] leading-none transition-colors ${
                   isCompleted ? 'text-white/60' :
                   isActive ? 'text-white font-medium' :
                   'text-white/20'
@@ -214,7 +229,6 @@ function NavigationBar({ canGoBack, goBack, currentNavStep, currentNavStepIndex 
         })}
       </div>
 
-      {/* Right spacer for balance */}
       <div className="w-[52px] shrink-0" />
     </div>
   );
@@ -249,7 +263,7 @@ function KioskScannerInline({ handleScanKioskConnect, scannerActive, setScannerA
         <p className="text-sm text-muted-foreground mb-3">Scan a new kiosk QR code</p>
       </div>
 
-      <div className="relative rounded-2xl overflow-hidden border border-border shadow-inner">
+      <div className="relative rounded-2xl overflow-hidden border border-white/[0.08] shadow-inner">
         <Suspense fallback={
           <div className="aspect-square bg-muted/20 flex items-center justify-center">
             <Loader2 className="animate-spin h-8 w-8 text-white"/>
@@ -263,13 +277,12 @@ function KioskScannerInline({ handleScanKioskConnect, scannerActive, setScannerA
         </Suspense>
       </div>
 
-      {/* Manual entry */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border"></div>
+          <div className="w-full border-t border-white/[0.06]"></div>
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">Or enter manually</span>
+          <span className="bg-[#0a0a0a] px-2 text-muted-foreground">Or enter manually</span>
         </div>
       </div>
 
@@ -279,7 +292,7 @@ function KioskScannerInline({ handleScanKioskConnect, scannerActive, setScannerA
           placeholder="Kiosk ID (e.g., kiosk_001)"
           value={manualKioskId}
           onChange={(e) => setManualKioskId(e.target.value)}
-          className="w-full px-4 py-3 bg-muted/10 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30 text-sm transition-all"
+          className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-white/20 focus:border-white/20 text-sm transition-all"
           onKeyPress={(e) => {
             if (e.key === 'Enter' && manualKioskId.trim()) {
               handleScanKioskConnect(manualKioskId.trim());
@@ -294,7 +307,7 @@ function KioskScannerInline({ handleScanKioskConnect, scannerActive, setScannerA
               setManualKioskId('');
             }
           }}
-          className="w-full bg-white text-black hover:bg-neutral-200 py-3 rounded-md text-sm font-medium transition-colors"
+          className="w-full bg-white text-black hover:bg-neutral-200 py-3 rounded-xl text-sm font-medium transition-colors"
         >
           Connect to Kiosk
         </button>
@@ -302,6 +315,14 @@ function KioskScannerInline({ handleScanKioskConnect, scannerActive, setScannerA
     </div>
   );
 }
+
+// ─── Shared view transition props ───────────────────────────
+const viewTransition = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+  transition: { duration: 0.2, ease: 'easeInOut' },
+};
 
 export function PrintInterface() {
   const printState = usePrint();
@@ -333,16 +354,13 @@ export function PrintInterface() {
     handleProceedToPayment,
   } = printState;
 
-  // Can add another job: < 5 jobs AND not a guest AND kiosk connected
   const isConnected = ['SERVICE_SELECT', 'CONNECTED', 'SCAN_OPTIONS',
     'XEROX_OPTIONS', 'CALCULATING', 'SETTINGS_PREVIEW', 'PAYMENT', 'PRINTING', 'SCANNING',
     'XEROXING', 'COMPLETED', 'SCAN_COMPLETE', 'ERROR'].includes(status);
   const canAddJob = jobs.length < 5 && !isGuest && isConnected;
 
-  // Get the expired job for the expiry modal
   const expiredJob = showExpiryModal ? jobs.find(j => j.jobId === showExpiryModal) : null;
 
-  // Pass hook state + helpers down to child views
   const viewProps = {
     ...printState,
     getFileExt,
@@ -351,28 +369,28 @@ export function PrintInterface() {
     isGuest,
   };
 
-  // Show tab bar when there are 1+ jobs, scanning kiosk, or kiosk connected
   const showTabBar = jobs.length >= 1
     || scanKioskMode
     || ['SERVICE_SELECT', 'CONNECTED', 'SCAN_OPTIONS', 'XEROX_OPTIONS',
         'CALCULATING', 'SETTINGS_PREVIEW', 'PAYMENT'].includes(status);
 
-  // Show all-jobs summary when all jobs are done AND we have >0 jobs
   const showSummary = allJobsDone && jobs.length > 0 && !scanKioskMode;
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <Card className="bg-card/90 backdrop-blur-xl border border-border shadow-2xl rounded-3xl">
-        <CardHeader className="space-y-1 pb-4 border-b border-border">
-          <CardTitle className="flex items-center gap-3 text-2xl">
-            <div className="w-10 h-10 bg-white text-black rounded-xl flex items-center justify-center shadow-lg">
-              <Printer className="h-6 w-6" />
-            </div>
-            <span className="text-foreground">LePrint</span>
-          </CardTitle>
-        </CardHeader>
+      {/* ─── Glassmorphism container ──────────────────────────── */}
+      <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] rounded-3xl shadow-2xl shadow-black/20">
 
-        <CardContent className="pt-6 space-y-4">
+        {/* ─── Header ──────────────────────────────────────────── */}
+        <div className="flex items-center gap-3 px-6 py-5 border-b border-white/[0.06]">
+          <div className="w-10 h-10 rounded-[1rem] bg-gradient-to-br from-white/10 to-transparent border border-white/10 flex items-center justify-center shadow-lg shrink-0">
+            <Printer className="h-5 w-5 text-white" />
+          </div>
+          <span className="text-foreground text-2xl font-semibold tracking-tight">LePrint</span>
+        </div>
+
+        {/* ─── Content ─────────────────────────────────────────── */}
+        <div className="p-6 space-y-5">
           {/* Tab bar — only when 1+ jobs or scanning kiosk */}
           {showTabBar && !showSummary && (
             <JobTabBar
@@ -397,104 +415,110 @@ export function PrintInterface() {
             />
           )}
 
-          {/* Scan Kiosk Mode — inline scanner */}
-          {scanKioskMode ? (
-            <KioskScannerInline
-              handleScanKioskConnect={handleScanKioskConnect}
-              scannerActive={printState.scannerActive}
-              setScannerActive={printState.setScannerActive}
-              cameraError={printState.cameraError}
-              setCameraError={printState.setCameraError}
-              handleScanError={printState.handleScanError}
-              addLog={printState.addLog}
-            />
-          ) : showSummary ? (
-            <AllJobsSummaryView {...viewProps} />
-          ) : (
-            <>
-              {/* VIEW: QR Scanner */}
-              {status === 'IDLE' && <QRScannerView {...viewProps} />}
-
-              {/* VIEW: Checking kiosk / printer status */}
-              {status === 'CHECKING_STATUS' && <StatusCheckView {...viewProps} />}
-
-              {/* VIEW: Hard printer error (block) */}
-              {status === 'PRINTER_ERROR' && (
-                <PrinterErrorView
-                  printerStatusResult={printState.printerStatusResult}
-                  resetFlow={printState.resetFlow}
+          {/* ─── Views with AnimatePresence transitions ─────────── */}
+          <AnimatePresence mode="wait">
+            {scanKioskMode ? (
+              <motion.div key="kiosk-scanner" {...viewTransition}>
+                <KioskScannerInline
+                  handleScanKioskConnect={handleScanKioskConnect}
+                  scannerActive={printState.scannerActive}
+                  setScannerActive={printState.setScannerActive}
+                  cameraError={printState.cameraError}
+                  setCameraError={printState.setCameraError}
+                  handleScanError={printState.handleScanError}
+                  addLog={printState.addLog}
                 />
-              )}
+              </motion.div>
+            ) : showSummary ? (
+              <motion.div key="summary" {...viewTransition}>
+                <AllJobsSummaryView {...viewProps} />
+              </motion.div>
+            ) : (
+              <motion.div key={status} {...viewTransition}>
+                {/* VIEW: QR Scanner */}
+                {status === 'IDLE' && <QRScannerView {...viewProps} />}
 
-              {/* VIEW: Soft printer warning (user can proceed or rescan) */}
-              {status === 'PRINTER_WARNING' && (
-                <PrinterWarningView
-                  proceedDespiteWarning={printState.proceedDespiteWarning}
-                  resetFlow={printState.rescanQR}
-                  printerStatusResult={printState.printerStatusResult}
-                />
-              )}
+                {/* VIEW: Checking kiosk / printer status */}
+                {status === 'CHECKING_STATUS' && <StatusCheckView {...viewProps} />}
 
-              {/* VIEW: Manual / fallback connect */}
-              {(status === 'SCANNED' || status === 'CONNECTING') && (
-                <ConnectView {...viewProps} />
-              )}
+                {/* VIEW: Hard printer error (block) */}
+                {status === 'PRINTER_ERROR' && (
+                  <PrinterErrorView
+                    printerStatusResult={printState.printerStatusResult}
+                    resetFlow={printState.resetFlow}
+                  />
+                )}
 
-              {/* VIEW: Generic error — context-aware */}
-              {status === 'ERROR' && (activeJob?.serviceType || 'print') === 'print' && (
-                <ConnectView {...viewProps} />
-              )}
-              {status === 'ERROR' && (activeJob?.serviceType || 'print') !== 'print' && (
-                <JobErrorView {...viewProps} />
-              )}
+                {/* VIEW: Soft printer warning (user can proceed or rescan) */}
+                {status === 'PRINTER_WARNING' && (
+                  <PrinterWarningView
+                    proceedDespiteWarning={printState.proceedDespiteWarning}
+                    resetFlow={printState.rescanQR}
+                    printerStatusResult={printState.printerStatusResult}
+                  />
+                )}
 
-              {/* VIEW: Service selector (Print / Scan / Xerox) */}
-              {status === 'SERVICE_SELECT' && <ServiceSelectView {...viewProps} />}
+                {/* VIEW: Manual / fallback connect */}
+                {(status === 'SCANNED' || status === 'CONNECTING') && (
+                  <ConnectView {...viewProps} />
+                )}
 
-              {/* VIEW: File upload / calculation (Print flow) */}
-              {(status === 'CONNECTED' || status === 'CALCULATING') && (
-                <FileUploadView {...viewProps} />
-              )}
+                {/* VIEW: Generic error — context-aware */}
+                {status === 'ERROR' && (activeJob?.serviceType || 'print') === 'print' && (
+                  <ConnectView {...viewProps} />
+                )}
+                {status === 'ERROR' && (activeJob?.serviceType || 'print') !== 'print' && (
+                  <JobErrorView {...viewProps} />
+                )}
 
-              {/* VIEW: Print Settings + Preview (Print flow) */}
-              {status === 'SETTINGS_PREVIEW' && (
-                <PrintSettingsView
-                  file={activeJob?.file}
-                  pages={activeJob?.pages}
-                  pricing={activeJob?.pricing}
-                  printSettings={activeJob?.printSettings}
-                  updatePrintSettings={updatePrintSettings}
-                  onProceed={handleProceedToPayment}
-                />
-              )}
+                {/* VIEW: Service selector (Print / Scan / Xerox) */}
+                {status === 'SERVICE_SELECT' && <ServiceSelectView {...viewProps} />}
 
-              {/* VIEW: Payment (Print flow) */}
-              {status === 'PAYMENT' && <PaymentView {...viewProps} />}
+                {/* VIEW: File upload / calculation (Print flow) */}
+                {(status === 'CONNECTED' || status === 'CALCULATING') && (
+                  <FileUploadView {...viewProps} />
+                )}
 
-              {/* VIEW: Printing progress */}
-              {status === 'PRINTING' && <JobProgressView serviceType={activeJob?.jobType || 'print'} jobPhase={activeJob?.jobPhase} resetFlow={viewProps.resetFlow} backToServiceSelect={viewProps.backToServiceSelect} />}
+                {/* VIEW: Print Settings + Preview (Print flow) */}
+                {status === 'SETTINGS_PREVIEW' && (
+                  <PrintSettingsView
+                    file={activeJob?.file}
+                    pages={activeJob?.pages}
+                    pricing={activeJob?.pricing}
+                    printSettings={activeJob?.printSettings}
+                    updatePrintSettings={updatePrintSettings}
+                    onProceed={handleProceedToPayment}
+                  />
+                )}
 
-              {/* VIEW: Completed / success */}
-              {status === 'COMPLETED' && <CompletedView {...viewProps} />}
+                {/* VIEW: Payment (Print flow) */}
+                {status === 'PAYMENT' && <PaymentView {...viewProps} />}
 
-              {/* VIEW: Scan options */}
-              {status === 'SCAN_OPTIONS' && <ScanOptionsView {...viewProps} />}
+                {/* VIEW: Printing progress */}
+                {status === 'PRINTING' && <JobProgressView serviceType={activeJob?.jobType || 'print'} jobPhase={activeJob?.jobPhase} resetFlow={viewProps.resetFlow} backToServiceSelect={viewProps.backToServiceSelect} />}
 
-              {/* VIEW: Scanning in progress */}
-              {status === 'SCANNING' && <ScanningView {...viewProps} />}
+                {/* VIEW: Completed / success */}
+                {status === 'COMPLETED' && <CompletedView {...viewProps} />}
 
-              {/* VIEW: Scan complete with download */}
-              {status === 'SCAN_COMPLETE' && <ScanCompleteView {...viewProps} />}
+                {/* VIEW: Scan options */}
+                {status === 'SCAN_OPTIONS' && <ScanOptionsView {...viewProps} />}
 
-              {/* VIEW: Xerox options */}
-              {status === 'XEROX_OPTIONS' && <XeroxOptionsView {...viewProps} />}
+                {/* VIEW: Scanning in progress */}
+                {status === 'SCANNING' && <ScanningView {...viewProps} />}
 
-              {/* VIEW: Xeroxing in progress */}
-              {status === 'XEROXING' && <XeroxingView {...viewProps} />}
-            </>
-          )}
-        </CardContent>
-      </Card>
+                {/* VIEW: Scan complete with download */}
+                {status === 'SCAN_COMPLETE' && <ScanCompleteView {...viewProps} />}
+
+                {/* VIEW: Xerox options */}
+                {status === 'XEROX_OPTIONS' && <XeroxOptionsView {...viewProps} />}
+
+                {/* VIEW: Xeroxing in progress */}
+                {status === 'XEROXING' && <XeroxingView {...viewProps} />}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
 
       {/* ─── Modals ────────────────────────────────────────────── */}
       <BackConfirmModal

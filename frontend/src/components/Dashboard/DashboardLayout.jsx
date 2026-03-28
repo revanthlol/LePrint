@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthProvider';
 import { useGuest } from '../GuestContext';
-import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield, LogIn } from 'lucide-react';
+import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield, LogIn, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Footer from '../Footer';
 
@@ -211,10 +211,33 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                             whileHover={{ scale: 1.02, x: 4 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => navigate('/app/faq')}
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left text-muted-foreground hover:bg-white/[0.04] hover:text-foreground border border-transparent"
+                            className={`
+                                w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left relative
+                                ${activeTab === 'faq'
+                                    ? 'bg-white/[0.06] text-white border border-white/[0.08]'
+                                    : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground border border-transparent'
+                                }
+                            `}
                         >
                             <HelpCircle className="w-5 h-5" />
                             <span className="font-medium">Help & FAQ</span>
+                        </motion.button>
+
+                        {/* ── NEW: Contact Support link ── */}
+                        <motion.button
+                            whileHover={{ scale: 1.02, x: 4 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => navigate('/app/contact')}
+                            className={`
+                                w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left relative
+                                ${activeTab === 'contact'
+                                    ? 'bg-white/[0.06] text-white border border-white/[0.08]'
+                                    : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground border border-transparent'
+                                }
+                            `}
+                        >
+                            <Mail className="w-5 h-5" />
+                            <span className="font-medium">Contact Support</span>
                         </motion.button>
                     </nav>
 
@@ -343,10 +366,31 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
                                     {/* ── NEW: FAQ link ── */}
                                     <button
                                         onClick={() => { navigate('/app/faq'); setSidebarOpen(false); }}
-                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left text-muted-foreground hover:bg-white/[0.04] hover:text-foreground border border-transparent"
+                                        className={`
+                                            w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left
+                                            ${activeTab === 'faq'
+                                                ? 'bg-white/[0.06] text-white border border-white/[0.08]'
+                                                : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground border border-transparent'
+                                            }
+                                        `}
                                     >
                                         <HelpCircle className="w-5 h-5" />
                                         <span className="font-medium">Help & FAQ</span>
+                                    </button>
+
+                                    {/* ── NEW: Contact Support link ── */}
+                                    <button
+                                        onClick={() => { navigate('/app/contact'); setSidebarOpen(false); }}
+                                        className={`
+                                            w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left
+                                            ${activeTab === 'contact'
+                                                ? 'bg-white/[0.06] text-white border border-white/[0.08]'
+                                                : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground border border-transparent'
+                                            }
+                                        `}
+                                    >
+                                        <Mail className="w-5 h-5" />
+                                        <span className="font-medium">Contact Support</span>
                                     </button>
                                 </nav>
 

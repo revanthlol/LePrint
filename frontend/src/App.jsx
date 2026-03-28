@@ -144,6 +144,16 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/app/contact"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout activeTab="contact">
+                    <Contact inApp={true} />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />

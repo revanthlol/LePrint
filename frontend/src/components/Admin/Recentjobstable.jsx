@@ -304,8 +304,9 @@ export function RecentJobsTable({ jobs, loading }) {
                                     </div>
 
                                     {/* Kiosk */}
-                                    <div>
-                                        <span className="text-foreground font-medium">{job.kioskName || job.kioskId}</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-foreground font-medium truncate">{job.kioskName || 'Unknown'}</span>
+                                        <span className="text-[10px] text-muted-foreground font-mono uppercase">{job.kioskId}</span>
                                     </div>
 
                                     {/* File */}

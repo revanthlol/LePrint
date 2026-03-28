@@ -69,7 +69,7 @@ SELECT table_name FROM information_schema.views WHERE table_schema = 'public';
 
 ```bash
 # Backend should respond
-curl http://localhost:3001/api/status
+curl http://localhost:3002/api/status
 ```
 
 ### 2.2 Kiosk Connection

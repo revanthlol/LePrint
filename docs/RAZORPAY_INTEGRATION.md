@@ -346,7 +346,7 @@ Any UPI ID works in test mode and simulates success.
 Use ngrok to expose your local backend:
 
 ```bash
-ngrok http 3001
+ngrok http 3002
 # Set the ngrok URL as webhook URL in Razorpay dashboard
 ```
 

@@ -101,7 +101,7 @@ app.use((error, req, res, next) => {
 startScheduledTasks();
 
 // ==================== STARTUP ====================
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 async function startServer() {
     try {

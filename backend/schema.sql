@@ -111,6 +111,16 @@ CREATE TABLE IF NOT EXISTS admin_actions (
     FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- System Settings
+CREATE TABLE IF NOT EXISTS settings (
+    key VARCHAR(255) PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Initialize default settings
+INSERT INTO settings (key, value) VALUES ('allow_public_test_kiosk', 'false'::jsonb) ON CONFLICT (key) DO NOTHING;
+
 -- ==================== INDEXES ====================
 
 -- Users

@@ -84,25 +84,23 @@ router.post('/connect', optionalAuth, async (req, res) => {
         // Restriction Check: Test kiosk is admin-only (unless public access is enabled)
         if (TEST_KIOSK_ID && kiosk_id === TEST_KIOSK_ID) {
             const allowPublic = await db.getSetting('allow_public_test_kiosk', false);
+            const isAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'superadmin');
             
-            if (!allowPublic) {
-                // Must be logged in
-                if (!req.user || req.user.isGuest) {
-                    return res.status(403).json({ 
-                        status: 'error', 
-                        message: 'Admin access required to use the test kiosk. Please login as an admin.' 
-                    });
-                }
-
-                // Must have admin role in DB
-                const user = await db.getUser(req.user.uid);
-                if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) {
-                    return res.status(403).json({ 
-                        status: 'error', 
-                        message: 'Access Denied: Test kiosk is reserved for administrators.' 
-                    });
-                }
+            if (!allowPublic && !isAdmin) {
+                return res.status(403).json({ 
+                    status: 'error', 
+                    message: 'Admin access required to use the test kiosk. Please login as an admin.' 
+                });
             }
+
+            // Success response for mock kiosk
+            return res.json({
+                status: 'connected',
+                message: 'Mock kiosk connected',
+                kiosk_name: 'Test Kiosk',
+                printer: 'Mock Printer',
+                paper_count: 999
+            });
         }
 
         const kiosk = await db.getKiosk(kiosk_id);

@@ -148,8 +148,9 @@ router.use('/jobs/create', (req, res, next) => {
 // ===============================
 // Create Print Job
 // ===============================
-router.post('/jobs/create', async (req, res) => {
-    console.log("🔥 CREATE HIT");
+router.post('/jobs/create', upload.single('file'), async (req, res) => {
+    console.log("🔥 MULTER HIT");
+    console.log("file:", req.file);
     res.json({ ok: true });
 });
 

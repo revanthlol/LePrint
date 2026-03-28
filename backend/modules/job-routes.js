@@ -2,7 +2,8 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
-const { verifyToken, optionalAuth, ensureUserExists } = require('../auth-middleware');
+const { optionalAuth, ensureUserExists } = require('../auth-middleware');
+const verifyToken = require('../middleware/verifyToken');
 const { upload, generateJobId, generatePrintToken, countPDFPages, PRICE_PER_PAGE } = require('./utils');
 const socketManager = require('./socket-manager');
 const log = require('./logger');
@@ -148,11 +149,15 @@ router.use('/jobs/create', (req, res, next) => {
 // ===============================
 // Create Print Job
 // ===============================
-router.post('/jobs/create', upload.single('file'), async (req, res) => {
-    console.log("🔥 MULTER HIT");
-    console.log("file:", req.file);
-    res.json({ ok: true });
-});
+router.post(
+  '/jobs/create',
+  verifyToken,
+  upload.single('file'),
+  async (req, res) => {
+      console.log("🔥 FULL ROUTE HIT");
+      res.json({ ok: true });
+  }
+);
 
 
 

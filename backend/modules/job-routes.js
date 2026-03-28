@@ -19,11 +19,8 @@ router.post('/test-simple', (req, res) => {
 // Simple ping to verify router mount
 router.get('/ping', (req, res) => res.json({ status: 'ok', message: 'Job router is alive' }));
 
-// Debug middleware to log all requests to this router
+// Debug middleware to provide a stable user context since auth is currently broken/missing
 router.use((req, res, next) => {
-    log.info(`[DEBUG] JOB-ROUTER | Request: ${req.method} ${req.url}`);
-    
-    // MOCK USER: Provide a stable user context since auth is currently broken/missing
     req.user = req.user || {
         uid: 'test-user-123',
         email: 'test@leprint.in',
@@ -31,7 +28,6 @@ router.use((req, res, next) => {
         isGuest: false,
         role: 'admin'
     };
-    
     next();
 });
 
@@ -155,11 +151,7 @@ router.post('/connect', optionalAuth, async (req, res) => {
 });
 
 
-// DEBUG: Catch-all to see if it hits
-router.use('/jobs/create', (req, res, next) => {
-    log.info(`[DEBUG] HIT /jobs/create | Method: ${req.method} | Content-Type: ${req.headers['content-type']}`);
-    next();
-});
+
 
 // ===============================
 // Create Print Job

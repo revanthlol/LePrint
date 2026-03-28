@@ -9,6 +9,12 @@ const log = require('./logger');
 
 const router = express.Router();
 
+router.post('/test-simple', (req, res) => {
+    console.log("🔥 TEST ROUTE HIT");
+    res.json({ success: true });
+});
+
+
 // Simple ping to verify router mount
 router.get('/ping', (req, res) => res.json({ status: 'ok', message: 'Job router is alive' }));
 

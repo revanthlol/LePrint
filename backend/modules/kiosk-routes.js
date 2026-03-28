@@ -160,4 +160,55 @@ function buildStatusMessage(printerStatus, detail) {
     return 'Printer status could not be verified automatically.';
 }
 
+
+/**
+ * GET /api/kiosks/public
+ * 
+ * Returns a list of all kiosks currently online, with their locations for the map.
+ * PUBLIC - no auth required.
+ */
+router.get('/public', async (req, res) => {
+    try {
+        const db = req.app.get('db');
+        const testKioskId = process.env.TEST_KIOSK_ID || 'kiosk_test';
+        
+        // Fetch all kiosks that were seen in the last 10 minutes
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        
+        const result = await db.query(`
+            SELECT 
+                id,
+                location_name,
+                status,
+                printer_status,
+                printer_status_detail,
+                latitude,
+                longitude,
+                current_paper_count,
+                last_seen
+            FROM kiosks
+            WHERE (status = 'online' AND last_seen > $1)
+               OR id = $2
+            ORDER BY location_name ASC
+        `, [tenMinutesAgo, testKioskId]);
+
+        const kiosks = result.rows.map(k => ({
+            id: k.id,
+            location_name: k.location_name || (k.id === testKioskId ? 'System Test Lab' : 'Unnamed Kiosk'),
+            status: k.status,
+            printer_status: k.printer_status,
+            printer_status_detail: k.printer_status_detail,
+            latitude: k.latitude ? parseFloat(k.latitude) : null,
+            longitude: k.longitude ? parseFloat(k.longitude) : null,
+            current_paper_count: k.current_paper_count,
+            is_online: k.id === testKioskId || (k.last_seen && new Date(k.last_seen) > tenMinutesAgo)
+        }));
+
+        res.json({ kiosks });
+    } catch (err) {
+        console.error('[Public Kiosks] DB error:', err.message);
+        res.status(500).json({ error: 'Failed to fetch kiosks' });
+    }
+});
+
 module.exports = router;

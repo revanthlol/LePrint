@@ -40,6 +40,12 @@ enforce_env_defaults() {
     if ! grep -qE "^QR_SERVER_PORT=" .env; then
         upsert_env_var "QR_SERVER_PORT" "3000"
     fi
+    if ! grep -qE "^LATITUDE=" .env; then
+        upsert_env_var "LATITUDE" ""
+    fi
+    if ! grep -qE "^LONGITUDE=" .env; then
+        upsert_env_var "LONGITUDE" ""
+    fi
 }
 
 generate_env_file() {
@@ -62,6 +68,13 @@ generate_env_file() {
     read -p "Printer name -(leave blank for auto-detect): " PRINTER_NAME
     PRINTER_NAME=${PRINTER_NAME:-auto}
 
+    echo ""
+    echo -e "${CYAN}Optional: GPS Coordinates for Public Map${NC}"
+    echo -e "${WHITE}If you don't know them now, you can set them later in the Admin Dashboard.${NC}"
+    read -p "Latitude (e.g. 12.9716): " LATITUDE
+    read -p "Longitude (e.g. 77.5946): " LONGITUDE
+    echo ""
+
     cat > .env << EOF
 # Cloud Backend
 CLOUD_URL=$CLOUD_URL
@@ -78,6 +91,10 @@ POLL_INTERVAL=5000
 
 # QR Server
 QR_SERVER_PORT=3000
+
+# Map Coordinates (Optional)
+LATITUDE=$LATITUDE
+LONGITUDE=$LONGITUDE
 EOF
 
     enforce_env_defaults

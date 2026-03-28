@@ -40,6 +40,10 @@ CREATE TABLE IF NOT EXISTS kiosks (
     -- Display
     location_name TEXT,
 
+    -- Phase D: Map & Location
+    latitude NUMERIC(10,8),
+    longitude NUMERIC(11,8),
+
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -140,6 +144,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(job_type);
 CREATE INDEX IF NOT EXISTS idx_kiosks_status ON kiosks(status);
 CREATE INDEX IF NOT EXISTS idx_kiosks_last_seen ON kiosks(last_seen DESC);
 CREATE INDEX IF NOT EXISTS idx_kiosks_printer_status ON kiosks(printer_status);
+CREATE INDEX IF NOT EXISTS idx_kiosks_location ON kiosks(latitude, longitude) WHERE latitude IS NOT NULL AND longitude IS NOT NULL;
 
 -- Admin Actions
 CREATE INDEX IF NOT EXISTS idx_admin_actions_admin ON admin_actions(admin_id);

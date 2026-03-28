@@ -79,7 +79,7 @@ initSocketServer(io);
 // ==================== ROUTES ====================
 app.use('/api', jobRoutes);
 app.use('/api', adminRoutes);
-app.use('/api/kiosk', kioskRoutes);
+app.use('/api/kiosks', kioskRoutes);
 app.use('/api', contactRoutes);
 // Global Error Handler for Multer
 app.use((error, req, res, next) => {

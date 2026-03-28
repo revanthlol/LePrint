@@ -5,7 +5,7 @@ import FadeInSection from "./FadeInSection";
 
 export default function ServicesPricing() {
   return (
-    <section className="py-24 md:py-32">
+    <section id="pricing" className="py-24 md:py-32">
       <div className="max-w-6xl mx-auto px-6">
         <FadeInSection className="text-center mb-16 md:mb-20">
           <span className="block text-[10px] md:text-xs uppercase tracking-[0.3em] text-muted-foreground font-bold mb-4">

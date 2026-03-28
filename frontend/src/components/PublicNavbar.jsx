@@ -1,43 +1,114 @@
 // src/components/PublicNavbar.jsx
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { ArrowLeft, Printer, Menu, X, HelpCircle, Mail, Info, Home } from "lucide-react";
+import { ArrowLeft, Printer, Menu, X, HelpCircle, Mail, Info, Home, Map as MapIcon } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 import { motion, AnimatePresence } from "framer-motion";
 
 const navLinks = [
-  { label: "Landing", href: "/", icon: Home },
-  { label: "About", href: "/about", icon: Info },
-  { label: "FAQ", href: "/faq", icon: HelpCircle },
-  { label: "Contact", href: "/contact", icon: Mail },
+  { label: "Home",    href: "/",       icon: Home },
+  { label: "Map",     href: "/map",    icon: MapIcon },
+  { label: "About",   href: "/about",  icon: Info },
+  { label: "FAQ",     href: "/faq",    icon: HelpCircle },
+  { label: "Contact", href: "/contact",icon: Mail },
 ];
 
-export default function PublicNavbar() {
+/**
+ * PublicNavbar
+ * @param {boolean} minimal  — when true, renders inline (not fixed) at full width
+ *                             Use this on pages with their own scroll-less layout like /map
+ */
+export default function PublicNavbar({ minimal = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState(undefined);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Firebase auth listener
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => setUser(firebaseUser));
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
   }, []);
 
-  // Handle scroll for floating effect
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    if (minimal) return;
+    const handler = () => setIsScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handler, { passive: true });
+    return () => window.removeEventListener("scroll", handler);
+  }, [minimal]);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // ── Minimal (inline) variant ──────────────────────────────────────────────
+  if (minimal) {
+    return (
+      <nav className="w-full flex items-center justify-between px-6 h-14 bg-[#0a0a0a] border-b border-white/[0.05]">
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2 group">
+          <div className="w-7 h-7 rounded-lg bg-white/[0.05] flex items-center justify-center text-white/80 group-hover:bg-white/[0.08] border border-white/[0.08] transition-all duration-200">
+            <Printer className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-sm font-bold tracking-tight text-white/90 group-hover:text-white transition-colors">
+            LePrint
+          </span>
+        </Link>
+
+        {/* Desktop links */}
+        <div className="hidden md:flex items-center gap-0.5">
+          {navLinks.map(link => {
+            const active = location.pathname === link.href;
+            return (
+              <Link
+                key={link.label}
+                to={link.href}
+                className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 ${
+                  active ? "text-white" : "text-white/40 hover:text-white/70"
+                }`}
+              >
+                {active && (
+                  <motion.span
+                    layoutId="navbar-mini-pill"
+                    className="absolute inset-0 bg-white/[0.07] rounded-lg border border-white/[0.08]"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10">{link.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Right */}
+        <div className="flex items-center gap-2">
+          {user !== undefined && (
+            <Link
+              to={user ? "/app" : "/login"}
+              className={`hidden sm:flex text-xs font-semibold px-4 py-1.5 rounded-lg transition-all duration-200 ${
+                user
+                  ? "bg-white text-black hover:bg-white/90"
+                  : "border border-white/[0.12] text-white/70 hover:bg-white/[0.06]"
+              }`}
+            >
+              {user ? "Dashboard" : "Sign In"}
+            </Link>
+          )}
+          {/* mobile back gesture */}
+          <button
+            onClick={() => navigate(-1)}
+            className="md:hidden p-2 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-all"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        </div>
+      </nav>
+    );
+  }
+
+  // ── Standard (fixed floating) variant ─────────────────────────────────────
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 flex justify-center p-4">
@@ -48,8 +119,8 @@ export default function PublicNavbar() {
           className={`
             relative flex items-center justify-between w-full max-w-5xl px-4 py-2 
             rounded-2xl transition-all duration-500
-            ${isScrolled 
-              ? "bg-[#0a0a0a]/90 backdrop-blur-lg border-b border-white/[0.08] shadow-2xl shadow-black/30" 
+            ${isScrolled
+              ? "bg-[#0a0a0a]/90 backdrop-blur-lg border border-white/[0.08] shadow-2xl shadow-black/30"
               : "bg-transparent border border-transparent"}
           `}
         >
@@ -85,9 +156,7 @@ export default function PublicNavbar() {
                   to={link.href}
                   className={`
                     relative px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-200 z-10
-                    ${isActive 
-                      ? "text-white" 
-                      : "text-muted-foreground hover:text-foreground"}
+                    ${isActive ? "text-white" : "text-muted-foreground hover:text-foreground"}
                   `}
                 >
                   {isActive && (
@@ -110,8 +179,8 @@ export default function PublicNavbar() {
                 to={user ? "/app" : "/login"}
                 className={`
                   hidden sm:flex text-xs font-semibold px-5 py-2 rounded-xl transition-all duration-200
-                  ${user 
-                    ? "bg-white text-black hover:bg-white/90 shadow-lg shadow-white/5" 
+                  ${user
+                    ? "bg-white text-black hover:bg-white/90 shadow-lg shadow-white/5"
                     : "border border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30 backdrop-blur-md"}
                 `}
               >
@@ -148,15 +217,15 @@ export default function PublicNavbar() {
                     to={link.href}
                     className={`
                       flex items-center gap-4 p-3 rounded-2xl transition-colors group
-                      ${isActive 
-                        ? "bg-white/[0.06] border border-white/[0.08]" 
+                      ${isActive
+                        ? "bg-white/[0.06] border border-white/[0.08]"
                         : "hover:bg-white/[0.04] text-muted-foreground hover:text-foreground"}
                     `}
                   >
                     <div className={`
                       w-10 h-10 rounded-xl flex items-center justify-center transition-colors
-                      ${isActive 
-                        ? "bg-white/10 text-white border border-white/[0.08]" 
+                      ${isActive
+                        ? "bg-white/10 text-white border border-white/[0.08]"
                         : "bg-white/[0.03] text-muted-foreground group-hover:text-foreground border border-white/[0.06]"}
                     `}>
                       <link.icon className="w-5 h-5" />
@@ -174,8 +243,8 @@ export default function PublicNavbar() {
                     to={user ? "/app" : "/login"}
                     className={`
                       flex items-center justify-center w-full py-4 rounded-2xl font-bold text-sm transition-all duration-200
-                      ${user 
-                        ? "bg-white text-black hover:bg-white/90 shadow-lg shadow-white/5" 
+                      ${user
+                        ? "bg-white text-black hover:bg-white/90 shadow-lg shadow-white/5"
                         : "border border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30 backdrop-blur-md"}
                     `}
                   >

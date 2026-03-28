@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthProvider';
 import { useGuest } from '../GuestContext';
-import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield, LogIn, Mail } from 'lucide-react';
+import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield, LogIn, Mail, Map } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Footer from '../Footer';
 
@@ -35,6 +35,7 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
   
     const tabs = [
       { id: 'print', label: 'Print', icon: Printer, path: '/app' },
+      { id: 'map', label: 'Map', icon: Map, path: '/map' },
       // Hide history for guests
       ...(!isGuest ? [{ id: 'history', label: 'History', icon: History, path: '/history' }] : []),
       // Only show admin tab if user is admin

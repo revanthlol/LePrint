@@ -28,12 +28,12 @@ function initSocketServer(io) {
         
         // ===== REGISTER: Initializes kiosk and printer_status =====
         socket.on('register', async (data) => {
-            const { kiosk_id, hostname, printer_name, printer_brand, printer_driver } = data;
+            const { kiosk_id, hostname, printer_name, printer_brand, printer_driver, latitude, longitude } = data;
             try {
                 // Using direct SQL upsert so we can initialize printer_status
                 await db.query(
-                    `INSERT INTO kiosks (id, hostname, printer_name, status, socket_id, last_seen, printer_status, printer_brand, printer_driver)
-                     VALUES ($1, $2, $3, 'online', $4, NOW(), 'unknown', $5, $6)
+                    `INSERT INTO kiosks (id, hostname, printer_name, status, socket_id, last_seen, printer_status, printer_brand, printer_driver, latitude, longitude)
+                     VALUES ($1, $2, $3, 'online', $4, NOW(), 'unknown', $5, $6, $7, $8)
                      ON CONFLICT (id) DO UPDATE SET
                         hostname = EXCLUDED.hostname,
                         printer_name = EXCLUDED.printer_name,
@@ -41,8 +41,19 @@ function initSocketServer(io) {
                         socket_id = EXCLUDED.socket_id,
                         last_seen = NOW(),
                         printer_brand = COALESCE(EXCLUDED.printer_brand, kiosks.printer_brand),
-                        printer_driver = COALESCE(EXCLUDED.printer_driver, kiosks.printer_driver)`,
-                    [kiosk_id, hostname, printer_name, socket.id, printer_brand || null, printer_driver || null]
+                        printer_driver = COALESCE(EXCLUDED.printer_driver, kiosks.printer_driver),
+                        latitude = COALESCE(NULLIF(EXCLUDED.latitude, 0::decimal), kiosks.latitude),
+                        longitude = COALESCE(NULLIF(EXCLUDED.longitude, 0::decimal), kiosks.longitude)`,
+                    [
+                        kiosk_id, 
+                        hostname, 
+                        printer_name, 
+                        socket.id, 
+                        printer_brand || null, 
+                        printer_driver || null,
+                        latitude || null,
+                        longitude || null
+                    ]
                 );
 
                 kioskSockets.set(kiosk_id, socket);
@@ -239,7 +250,9 @@ function initSocketServer(io) {
                         printer_status_detail = $4,
                         last_status_check = NOW(),
                         printer_brand = COALESCE($6, printer_brand),
-                        printer_driver = COALESCE($7, printer_driver)
+                        printer_driver = COALESCE($7, printer_driver),
+                        latitude = COALESCE(NULLIF($8, 0::decimal), latitude),
+                        longitude = COALESCE(NULLIF($9, 0::decimal), longitude)
                      WHERE id = $5`,
                     [
                         data.uptime || 0,
@@ -248,7 +261,9 @@ function initSocketServer(io) {
                         data.printer_ipp_detail || null,
                         data.kiosk_id,
                         data.printer_brand || null,
-                        data.printer_driver || null
+                        data.printer_driver || null,
+                        data.latitude || null,
+                        data.longitude || null
                     ]
                 );
 

@@ -1,0 +1,6 @@
+nohup: ignoring input
+✅ Firebase Admin initialized
+[System] Scheduled tasks started
+✅ Database connected: 2026-03-28T13:15:04.189Z
+[18:45:04] LePrint Server V5 started | Port: 3002 | DB: PostgreSQL | Auth: Firebase | Model: Pull-Based
+[18:52:41] Received SIGTERM...

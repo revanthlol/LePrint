@@ -21,9 +21,11 @@ import RefundPolicy from "./components/RefundPolicy";
 import Contact from "./components/Contact";
 import About from "./components/About";
 import Landing from "./components/Landing";
+import ScrollToTop from "./components/ScrollToTop";
+import MapPage from "./pages/MapPage";
 
 function RootRedirect() {
-  const { currentUser, loading } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -36,41 +38,52 @@ function RootRedirect() {
       navigate('/app' + params, { replace: true });
       return;
     }
-
-    // Priority 2: logged-in user — send to app
-    if (currentUser) {
-      navigate('/app', { replace: true });
-      return;
-    }
-
-    // Priority 3: show landing
-  }, [currentUser, loading, navigate, location.search]);
+  }, [loading, navigate, location.search]);
 
   // Show nothing while auth is resolving, then show Landing
   if (loading) return null;
-  if (!new URLSearchParams(location.search).get('kiosk_id') && !currentUser) {
-    return <Landing />;
-  }
-  return null;
+  
+  // If we had a kiosk_id, the useEffect above would have navigated.
+  // Otherwise, show the landing page.
+  return <Landing />;
 }
 
 function LoginRoute() {
-  const { currentUser, loading } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (loading) return;
-    if (currentUser) navigate('/app', { replace: true });
-  }, [currentUser, loading, navigate]);
+    if (user) navigate('/app', { replace: true });
+  }, [user, loading, navigate]);
 
   if (loading) return null;
-  if (currentUser) return null;
+  if (user) return null;
   return <Login />;
+}
+
+function MapRoute() {
+  const { user, loading } = useAuth();
+  
+  if (loading) return null;
+  
+  if (user) {
+    return (
+      <ProtectedRoute>
+        <DashboardLayout activeTab="map">
+          <MapPage inApp={true} />
+        </DashboardLayout>
+      </ProtectedRoute>
+    );
+  }
+  
+  return <MapPage inApp={false} />;
 }
 
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AuthProvider>
         <GuestProvider>
           <NotificationProvider>
@@ -159,6 +172,7 @@ function App() {
             <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/about" element={<About />} />
+            <Route path="/map" element={<MapRoute />} />
 
             {/* /landing route removed — Landing is now at / */}
             {/* Catch-all */}

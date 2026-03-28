@@ -25,6 +25,8 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
   const [newPaperCount, setNewPaperCount] = useState('');
   const [editingLocation, setEditingLocation] = useState(null);
   const [newLocationName, setNewLocationName] = useState('');
+  const [newLatitude, setNewLatitude] = useState('');
+  const [newLongitude, setNewLongitude] = useState('');
   const [updating, setUpdating] = useState(false);
 
   const handleSetPaper = async () => {
@@ -180,6 +182,8 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                                     onClick={() => {
                                         setEditingLocation(kiosk);
                                         setNewLocationName(kiosk.locationName || '');
+                                        setNewLatitude(kiosk.latitude || '');
+                                        setNewLongitude(kiosk.longitude || '');
                                     }} 
                                     className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
@@ -356,19 +360,49 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
             </DialogDescription>
           </DialogHeader>
           <div className="py-6">
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">
-                Location Name / Alias
-              </label>
-              <Input
-                type="text"
-                value={newLocationName}
-                onChange={(e) => setNewLocationName(e.target.value)}
-                placeholder="e.g. Library Front Desk"
-                className="bg-white/[0.03] border border-white/[0.08] rounded-xl h-12 focus:ring-white/20"
-              />
-              <p className="text-[10px] text-muted-foreground/40 uppercase tracking-wider mt-2">
-                This name will be visible to administrators in this grid
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">
+                  Location Name / Alias
+                </label>
+                <Input
+                  type="text"
+                  value={newLocationName}
+                  onChange={(e) => setNewLocationName(e.target.value)}
+                  placeholder="e.g. Library Front Desk"
+                  className="bg-white/[0.03] border border-white/[0.08] rounded-xl h-12 focus:ring-white/20"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">
+                    Latitude
+                  </label>
+                  <Input
+                    type="text"
+                    value={newLatitude}
+                    onChange={(e) => setNewLatitude(e.target.value)}
+                    placeholder="e.g. 12.9716"
+                    className="bg-white/[0.03] border border-white/[0.08] rounded-xl h-12 focus:ring-white/20 font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">
+                    Longitude
+                  </label>
+                  <Input
+                    type="text"
+                    value={newLongitude}
+                    onChange={(e) => setNewLongitude(e.target.value)}
+                    placeholder="e.g. 77.5946"
+                    className="bg-white/[0.03] border border-white/[0.08] rounded-xl h-12 focus:ring-white/20 font-mono"
+                  />
+                </div>
+              </div>
+              
+              <p className="text-[10px] text-muted-foreground/40 uppercase tracking-wider">
+                Optional: Leave empty if GPS is unavailable. Add coordinates to show on map.
               </p>
             </div>
           </div>
@@ -388,17 +422,32 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                 try {
                   const authHeader = await getAuthHeader();
                   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+                  const lat = newLatitude.trim() === '' ? null : parseFloat(newLatitude);
+                  const lng = newLongitude.trim() === '' ? null : parseFloat(newLongitude);
+                  
+                  if ((newLatitude.trim() !== '' && isNaN(lat)) || (newLongitude.trim() !== '' && isNaN(lng))) {
+                    alert('Invalid coordinates. Please enter valid numbers.');
+                    setUpdating(false);
+                    return;
+                  }
+                  
                   await axios.patch(
                     `${API_URL}/api/admin/kiosks/${editingLocation.id}`,
-                    { location_name: newLocationName.trim() || null },
+                    { 
+                      location_name: newLocationName.trim() || null,
+                      latitude: lat,
+                      longitude: lng
+                    },
                     { headers: { 'Authorization': authHeader } }
                   );
                   setEditingLocation(null);
                   setNewLocationName('');
+                  setNewLatitude('');
+                  setNewLongitude('');
                   onRefresh();
                 } catch (error) {
                   console.error('Failed to update location:', error);
-                  alert(error.response?.data?.message || 'Failed to update location name');
+                  alert(error.response?.data?.message || 'Failed to update location');
                 } finally {
                   setUpdating(false);
                 }

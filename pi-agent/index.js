@@ -27,6 +27,8 @@ const CONFIG = {
   printerName: process.env.PRINTER_NAME || 'auto',
   printerIP: process.env.PRINTER_IP || '192.168.1.100',
   kioskId: process.env.KIOSK_ID || getDefaultKioskId(),
+  latitude: process.env.LATITUDE || null,
+  longitude: process.env.LONGITUDE || null,
   frontendUrl: process.env.FRONTEND_URL || 'https://leprint.in',
   tempDir: './print-queue',
   heartbeatInterval: 30000,
@@ -110,7 +112,9 @@ async function initialize() {
     CONFIG.kioskId,
     os.hostname(),
     STATE,
-    logger
+    logger,
+    CONFIG.latitude,
+    CONFIG.longitude
   );
 
   // Wait for connection then start services
@@ -134,7 +138,9 @@ async function initialize() {
     CONFIG.kioskId,
     CONFIG.heartbeatInterval,
     STATE,
-    logger
+    logger,
+    CONFIG.latitude,
+    CONFIG.longitude
   );
 
   // Start status log

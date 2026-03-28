@@ -53,4 +53,14 @@ export default defineConfig({
     host: true,
     allowedHosts: ["ungrateful-hilly-caridad.ngrok-free.dev"],
   },
+
+  optimizeDeps: {
+    exclude: ["@zxing/library", "@zxing/browser"],
+  },
+
+  build: {
+    rollupOptions: {
+      external: (id) => id.startsWith("@zxing/library"),
+    },
+  },
 })

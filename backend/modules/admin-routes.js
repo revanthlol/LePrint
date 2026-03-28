@@ -120,6 +120,8 @@ router.get('/admin/kiosks', verifyToken, requireAdmin, async (req, res) => {
                 k.location_name,
                 k.printer_brand,
                 k.printer_driver,
+                k.latitude,
+                k.longitude,
                 -- Today's stats for this kiosk
                 COUNT(j.id) FILTER (WHERE j.created_at >= CURRENT_DATE) as jobs_today,
                 COALESCE(
@@ -141,7 +143,7 @@ router.get('/admin/kiosks', verifyToken, requireAdmin, async (req, res) => {
             GROUP BY k.id, k.hostname, k.printer_name, k.status, 
                      k.printer_status, k.printer_status_detail,
                      k.current_paper_count, k.last_seen, k.uptime, k.location_name,
-                     k.printer_brand, k.printer_driver
+                     k.printer_brand, k.printer_driver, k.latitude, k.longitude
             ORDER BY k.id
         `);
 
@@ -150,6 +152,8 @@ router.get('/admin/kiosks', verifyToken, requireAdmin, async (req, res) => {
             name: k.hostname,
             hostname: k.hostname,
             locationName: k.location_name || null,
+            latitude: k.latitude ? parseFloat(k.latitude) : null,
+            longitude: k.longitude ? parseFloat(k.longitude) : null,
             printerName: k.printer_name,
             status: k.status,
             printerStatus: k.printer_status,
@@ -241,12 +245,35 @@ router.post('/admin/kiosks/:id/set-paper', verifyToken, requireAdmin, async (req
 router.patch('/admin/kiosks/:id', verifyToken, requireAdmin, async (req, res) => {
     try {
         const { id: kioskId } = req.params;
-        const { location_name } = req.body;
+        const { location_name, latitude, longitude } = req.body;
+
+        const updates = [];
+        const values = [];
+        let paramCounter = 1;
 
         if (location_name !== undefined) {
+            updates.push(`location_name = $${paramCounter}`);
+            values.push(location_name || null);
+            paramCounter++;
+        }
+
+        if (latitude !== undefined) {
+            updates.push(`latitude = $${paramCounter}`);
+            values.push(latitude === '' ? null : latitude);
+            paramCounter++;
+        }
+
+        if (longitude !== undefined) {
+            updates.push(`longitude = $${paramCounter}`);
+            values.push(longitude === '' ? null : longitude);
+            paramCounter++;
+        }
+
+        if (updates.length > 0) {
+            values.push(kioskId);
             await db.query(
-                'UPDATE kiosks SET location_name = $1, updated_at = NOW() WHERE id = $2',
-                [location_name || null, kioskId]
+                `UPDATE kiosks SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramCounter}`,
+                values
             );
         }
 
@@ -256,7 +283,7 @@ router.patch('/admin/kiosks/:id', verifyToken, requireAdmin, async (req, res) =>
             'UPDATE_KIOSK',
             'kiosk',
             kioskId,
-            { location_name }
+            { location_name, latitude, longitude }
         );
 
         log.info(`[ADMIN] ${adminId} | UPDATE_KIOSK | target: ${kioskId}`);

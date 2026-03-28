@@ -37,7 +37,7 @@ function initSocket(cloudServer, logger) {
 }
 
 // ==================== SOCKET EVENT HANDLERS ====================
-function setupEventHandlers(socket, kioskId, hostname, state, logger) {
+function setupEventHandlers(socket, kioskId, hostname, state, logger, latitude, longitude) {
   
   socket.on('connect', async () => {
     state.socketConnectedAt = Date.now();
@@ -54,7 +54,9 @@ function setupEventHandlers(socket, kioskId, hostname, state, logger) {
       hostname: hostname,
       printer_name: state.printerName || 'unknown',
       printer_brand: printer.CAPABILITIES.brand || null,
-      printer_driver: printer.CAPABILITIES.driver || null
+      printer_driver: printer.CAPABILITIES.driver || null,
+      latitude: latitude || null,
+      longitude: longitude || null
     });
 
     logger.socket(`Registered with cloud — kiosk: ${kioskId}, printer: ${state.printerName || 'unknown'}`);
@@ -130,7 +132,7 @@ function setupEventHandlers(socket, kioskId, hostname, state, logger) {
 }
 
 // ==================== HEARTBEAT ====================
-function startHeartbeat(socket, kioskId, heartbeatInterval, state, logger) {
+function startHeartbeat(socket, kioskId, heartbeatInterval, state, logger, latitude, longitude) {
   let lastPrinterStatus = 'unknown';
 
   // Normal heartbeat — full payload at configured interval
@@ -160,7 +162,9 @@ function startHeartbeat(socket, kioskId, heartbeatInterval, state, logger) {
       conversions_today: state.conversionsToday,
       last_poll: state.lastPollTime,
       printer_brand: printer.CAPABILITIES.brand || null,
-      printer_driver: printer.CAPABILITIES.driver || null
+      printer_driver: printer.CAPABILITIES.driver || null,
+      latitude: latitude || null,
+      longitude: longitude || null
     });
   }, heartbeatInterval);
 

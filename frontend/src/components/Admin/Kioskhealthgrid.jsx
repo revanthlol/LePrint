@@ -26,6 +26,8 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
   const [newPaperCount, setNewPaperCount] = useState('');
   const [editingLocation, setEditingLocation] = useState(null);
   const [newLocationName, setNewLocationName] = useState('');
+  const [newLat, setNewLat] = useState('');
+  const [newLong, setNewLong] = useState('');
   const [updating, setUpdating] = useState(false);
 
   const handleSetPaper = async () => {
@@ -178,6 +180,8 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                             onClick={() => {
                               setEditingLocation(kiosk);
                               setNewLocationName(kiosk.locationName || '');
+                              setNewLat(kiosk.latitude || '');
+                              setNewLong(kiosk.longitude || '');
                             }}
                             className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
@@ -330,7 +334,7 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="w-5 h-5 text-primary" />
-              Set Display Name
+              Configure Location
             </DialogTitle>
             <DialogDescription>
               Set a friendly name for kiosk <span className="font-mono text-xs">{editingLocation?.id}</span>
@@ -346,10 +350,38 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                 value={newLocationName}
                 onChange={(e) => setNewLocationName(e.target.value)}
                 placeholder="e.g. Library Front Desk"
-                className="bg-background/50 h-12"
+                className="bg-background/50 h-10 mb-4"
               />
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-2">
-                This name will be visible to administrators in this grid
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                    Latitude
+                  </label>
+                  <Input
+                    type="text"
+                    value={newLat}
+                    onChange={(e) => setNewLat(e.target.value)}
+                    placeholder="e.g. 12.9716"
+                    className="bg-background/50 h-10 font-mono text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                    Longitude
+                  </label>
+                  <Input
+                    type="text"
+                    value={newLong}
+                    onChange={(e) => setNewLong(e.target.value)}
+                    placeholder="e.g. 77.5946"
+                    className="bg-background/50 h-10 font-mono text-sm"
+                  />
+                </div>
+              </div>
+
+              <p className="text-[10px] text-muted-foreground/50 uppercase tracking-widest mt-4 leading-relaxed">
+                Updating coordinates will move the kiosk marker on the public map.
               </p>
             </div>
           </div>
@@ -370,11 +402,17 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
                   await axios.patch(
                     `${API_URL}/api/admin/kiosks/${editingLocation.id}`,
-                    { location_name: newLocationName.trim() || null },
+                    { 
+                      location_name: newLocationName.trim() || null,
+                      latitude: newLat || null,
+                      longitude: newLong || null
+                    },
                     { headers: { 'Authorization': authHeader } }
                   );
                   setEditingLocation(null);
                   setNewLocationName('');
+                  setNewLat('');
+                  setNewLong('');
                   onRefresh();
                 } catch (error) {
                   console.error('Failed to update location:', error);

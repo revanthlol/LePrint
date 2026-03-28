@@ -9,6 +9,7 @@ const logger = require('./modules/logger');
 const utils = require('./modules/utils');
 const jobHandler = require('./modules/job-handler');
 const socketClient = require('./modules/socket-client');
+const geo = require('./modules/geo');
 const os = require('os');
 
 // ==================== CONFIG ====================
@@ -72,7 +73,16 @@ console.log(`
 
 // ==================== INIT ====================
 async function initialize() {
-  // Check conversion tools
+  // 0. Auto-detect location if not in CONFIG
+  if (!CONFIG.latitude || !CONFIG.longitude) {
+    const detectedGeo = await geo.autoDetect(logger);
+    if (detectedGeo.latitude && detectedGeo.longitude) {
+      CONFIG.latitude = detectedGeo.latitude;
+      CONFIG.longitude = detectedGeo.longitude;
+    }
+  }
+
+  // 1. Check conversion tools
   await utils.checkConversionTools(logger);
 
   // Auto-discover scanner IP if not explicitly set

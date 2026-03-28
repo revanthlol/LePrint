@@ -49,56 +49,22 @@ enforce_env_defaults() {
 }
 
 generate_env_file() {
-    print_step "Creating .env configuration..."
+    print_step "Launching LePrint Setup Wizard..."
     echo ""
-    echo -e "${WHITE}Configuration:${NC}"
-    echo ""
+    
+    if [ ! -f "setup-wizard.js" ]; then
+        print_error "setup-wizard.js not found. Cannot configure agent."
+        return 1
+    fi
 
-    CLOUD_URL="$DEFAULT_CLOUD_URL"
-    FRONTEND_URL="$DEFAULT_FRONTEND_URL"
-
-    print_info "Backend URL: ${CLOUD_URL}"
-    print_info "Frontend URL: ${FRONTEND_URL}"
-    echo ""
-
-    DEFAULT_KIOSK_ID="$(id -un 2>/dev/null || echo "${USER:-kiosk_1}")"
-    read -p "Kiosk ID for printer detection (default: ${DEFAULT_KIOSK_ID}): " KIOSK_ID
-    KIOSK_ID=${KIOSK_ID:-$DEFAULT_KIOSK_ID}
-
-    read -p "Printer name -(leave blank for auto-detect): " PRINTER_NAME
-    PRINTER_NAME=${PRINTER_NAME:-auto}
-
-    echo ""
-    echo -e "${CYAN}Optional: GPS Coordinates for Public Map${NC}"
-    echo -e "${WHITE}If you don't know them now, you can set them later in the Admin Dashboard.${NC}"
-    read -p "Latitude (e.g. 12.9716): " LATITUDE
-    read -p "Longitude (e.g. 77.5946): " LONGITUDE
-    echo ""
-
-    cat > .env << EOF
-# Cloud Backend
-CLOUD_URL=$CLOUD_URL
-
-# Frontend URL for QR code
-FRONTEND_URL=$FRONTEND_URL
-
-# Kiosk Configuration
-KIOSK_ID=$KIOSK_ID
-PRINTER_NAME=$PRINTER_NAME
-
-# Polling Configuration
-POLL_INTERVAL=5000
-
-# QR Server
-QR_SERVER_PORT=3000
-
-# Map Coordinates (Optional)
-LATITUDE=$LATITUDE
-LONGITUDE=$LONGITUDE
-EOF
-
-    enforce_env_defaults
-    print_success "Configuration saved to .env"
+    node setup-wizard.js
+    
+    if [ -f ".env" ]; then
+        print_success "Configuration complete!"
+    else
+        print_error "Setup wizard failed to generate .env file."
+        return 1
+    fi
 }
 
 cleanup_legacy_services() {

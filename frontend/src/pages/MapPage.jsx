@@ -27,17 +27,18 @@ function hasCoordinates(kiosk) {
     && kiosk?.longitude !== null && kiosk?.longitude !== undefined;
 }
 
-
-function ViewModeToggle({ mode, onChange }) {
+function ViewModeToggle({ mode, onChange, isFloating = false }) {
   return (
-    <div className="flex rounded-2xl border border-white/[0.08] bg-white/[0.02] p-1 shadow-xl shadow-black/20">
+    <div className={`flex items-center rounded-full border border-white/[0.08] bg-black/40 p-1 shadow-2xl backdrop-blur-xl transition-all duration-300 ${
+      isFloating ? 'fixed bottom-8 left-1/2 z-[1000] -translate-x-1/2' : ''
+    }`}>
       <button
         type="button"
         onClick={() => onChange('list')}
-        className={`flex items-center gap-2 rounded-[12px] px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
+        className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
           mode === 'list'
-            ? 'bg-white text-black'
-            : 'text-muted-foreground hover:text-foreground'
+            ? 'bg-white text-black shadow-lg'
+            : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]'
         }`}
       >
         <Rows3 className="h-3.5 w-3.5" />
@@ -46,10 +47,10 @@ function ViewModeToggle({ mode, onChange }) {
       <button
         type="button"
         onClick={() => onChange('map')}
-        className={`flex items-center gap-2 rounded-[12px] px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
+        className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
           mode === 'map'
-            ? 'bg-white text-black'
-            : 'text-muted-foreground hover:text-foreground'
+            ? 'bg-white text-black shadow-lg'
+            : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]'
         }`}
       >
         <MapPinned className="h-3.5 w-3.5" />
@@ -58,8 +59,6 @@ function ViewModeToggle({ mode, onChange }) {
     </div>
   );
 }
-
-
 
 function MapShell({
   kiosks,
@@ -76,10 +75,6 @@ function MapShell({
   isDesktop,
   inApp,
 }) {
-  const totalCount = kiosks.length;
-  const onlineCount = kiosks.filter((kiosk) => kiosk.is_online).length;
-  const mappedCount = kiosks.filter(hasCoordinates).length;
-
   return (
     <section className={`relative flex flex-col overflow-hidden rounded-[2.5rem] md:rounded-[3.5rem] border border-white/10 bg-[#0a0a0a] text-foreground shadow-[0_32px_120px_rgba(0,0,0,0.6)] ${
       inApp ? 'min-h-[calc(100vh-12rem)]' : 'mx-auto max-w-7xl min-h-[calc(100vh-10rem)]'
@@ -87,35 +82,40 @@ function MapShell({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_40%)] pointer-events-none" />
       
       <div className="relative flex min-h-full flex-1 flex-col">
-        <header className="px-6 py-5 border-b border-white/[0.08] bg-white/[0.01]">
+        <header className="px-6 py-4 md:py-5 border-b border-white/[0.08] bg-white/[0.01]">
           <div className="flex items-center justify-between gap-6">
             <motion.div 
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.4 }}
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-white/50">
                   <MapPinned className="w-4 h-4" />
                 </div>
                 <div>
-                  <h1 className="text-xl md:text-2xl font-light tracking-tight leading-tight">
-                    Find your <span className="font-bold italic font-serif">LePrint Kiosk</span>
+                  <h1 className="text-lg md:text-2xl font-light tracking-tight leading-tight">
+                    Find <span className="hidden sm:inline">your </span><span className="font-bold italic font-serif">Kiosk</span>
                   </h1>
                 </div>
-                <button
-                  type="button"
-                  onClick={onRefresh}
-                  disabled={refreshing}
-                  className="ml-2 flex items-center justify-center h-8 w-8 rounded-lg border border-white/10 bg-white/[0.03] text-muted-foreground transition hover:text-foreground hover:bg-white/[0.06] active:scale-90 disabled:opacity-50"
-                  title="Refresh status"
-                >
-                  <RefreshCcw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                </button>
               </div>
             </motion.div>
 
-            <ViewModeToggle mode={mobileView} onChange={onMobileViewChange} />
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={refreshing}
+                className="flex items-center justify-center h-9 w-9 md:h-8 md:w-8 rounded-full md:rounded-lg border border-white/10 bg-white/[0.03] text-muted-foreground transition hover:text-foreground hover:bg-white/[0.06] active:scale-90 disabled:opacity-50"
+                title="Refresh status"
+              >
+                <RefreshCcw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+              
+              <div className="hidden lg:block">
+                <ViewModeToggle mode={mobileView} onChange={onMobileViewChange} />
+              </div>
+            </div>
           </div>
         </header>
 
@@ -145,6 +145,20 @@ function MapShell({
             </div>
           </div>
         </div>
+
+        {!isDesktop && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, type: 'spring', damping: 20 }}
+          >
+            <ViewModeToggle 
+              mode={mobileView} 
+              onChange={onMobileViewChange} 
+              isFloating={true} 
+            />
+          </motion.div>
+        )}
       </div>
     </section>
   );

@@ -42,6 +42,51 @@ export function BackConfirmModal({ open, onOpenChange, onConfirm }) {
   );
 }
 
+export function CancelConfirmModal({ open, onOpenChange, onConfirm }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm bg-[#0a0a0a] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/50 p-6">
+        <DialogHeader>
+          <div className="flex flex-col items-center text-center gap-4 mb-2">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500"
+            >
+              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </motion.div>
+            <div className="space-y-1.5">
+              <DialogTitle className="text-xl font-bold tracking-tight text-white">Cancel Job?</DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground/80 leading-relaxed">
+                Are you sure you want to cancel this job? This action cannot be undone and any uploaded file will be deleted from our server.
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3 mt-6">
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="text-muted-foreground hover:text-foreground hover:bg-white/[0.04] rounded-xl"
+          >
+            Keep Job
+          </Button>
+          <motion.div whileTap={{ scale: 0.97 }}>
+            <Button
+              onClick={onConfirm}
+              className="w-full bg-red-500 text-white hover:bg-red-600 rounded-xl font-bold border-none"
+            >
+              Cancel Job
+            </Button>
+          </motion.div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function ExpiryModal({ open, onOpenChange, jobType }) {
   const label = JOB_TYPE_LABELS[jobType] || 'Print';
 

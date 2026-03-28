@@ -12,10 +12,15 @@ import { Button } from '@/components/ui/button';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+import axios from 'axios';
+import { useAuth } from '../AuthProvider';
+
 // ─── Admin Job Detail Modal ─────────────────────────────────
-function AdminJobDetailModal({ job, open, onClose }) {
+function AdminJobDetailModal({ job, open, onClose, onJobUpdated }) {
   const [copied, setCopied] = useState(false);
   const [metaExpanded, setMetaExpanded] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const { getAuthHeader } = useAuth();
 
   if (!job) return null;
 
@@ -25,15 +30,34 @@ function AdminJobDetailModal({ job, open, onClose }) {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const handleAdminCancel = async () => {
+    if (!window.confirm(`ADMIN ACTION: Are you sure you want to cancel job ${job.id}? This will stop any active mock simulation and delete the associated file.`)) return;
+    
+    try {
+      setIsCancelling(true);
+      const authHeader = await getAuthHeader();
+      await axios.post(`${API_URL}/api/admin/jobs/${job.id}/cancel`, {}, {
+        headers: { 'Authorization': authHeader }
+      });
+      alert('Job cancelled by admin');
+      if (onJobUpdated) onJobUpdated(job.id, 'CANCELLED');
+      onClose();
+    } catch (err) {
+      alert('Admin cancel failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const jobType = job.jobType || 'print';
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-lg bg-[#0a0a0a] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/50 max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg tracking-tight">
+      <DialogContent className="w-[92vw] sm:max-w-lg bg-[#0a0a0a] border border-white/[0.08] rounded-3xl shadow-2xl shadow-black/50 max-h-[85vh] overflow-y-auto p-6 fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] outline-none">
+        <DialogHeader className="text-left items-start">
+          <DialogTitle className="flex items-start gap-2 text-lg tracking-tight min-w-0">
             <span>{jobType === 'scan' ? '📄' : jobType === 'xerox' ? '📋' : '🖨️'}</span>
-            <span className="truncate">{job.filename || 'Untitled'}</span>
+            <span className="break-words leading-tight">{job.filename || 'Untitled'}</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -42,14 +66,14 @@ function AdminJobDetailModal({ job, open, onClose }) {
           <section className="space-y-2">
             <h4 className="text-[10px] lowercase text-muted-foreground uppercase tracking-[0.2em] font-bold">Job Info</h4>
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Job ID</span>
-                <div className="flex items-center gap-1.5">
-                  <code className="text-xs font-mono text-foreground bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded">{job.id}</code>
-                  <button onClick={() => copyText(job.id)} className="text-muted-foreground hover:text-foreground hover:bg-white/[0.06] rounded p-1 transition-colors" title="Copy ID">
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-muted-foreground shrink-0">Job ID</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <code className="text-[10px] md:text-xs font-mono text-foreground bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded break-all text-right">{job.id}</code>
+                  <button onClick={() => copyText(job.id)} className="text-muted-foreground hover:text-foreground hover:bg-white/[0.06] rounded p-1 transition-colors shrink-0" title="Copy ID">
                     <Copy className="w-3 h-3" />
                   </button>
-                  {copied && <span className="text-[11px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">Copied!</span>}
+                  {copied && <span className="text-[11px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full shrink-0">Copied!</span>}
                 </div>
               </div>
               <div className="flex items-center justify-between">
@@ -82,9 +106,9 @@ function AdminJobDetailModal({ job, open, onClose }) {
                     <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-[11px] px-2 py-0.5 font-medium">Guest</span>
                   </div>
                   {job.guestId && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Guest ID</span>
-                      <code className="text-xs font-mono text-foreground bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded">{job.guestId}</code>
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="text-muted-foreground shrink-0 mt-0.5">Guest ID</span>
+                      <code className="text-[10px] md:text-xs font-mono text-foreground bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded break-all text-right flex-1 min-w-0">{job.guestId}</code>
                     </div>
                   )}
                 </>
@@ -95,9 +119,9 @@ function AdminJobDetailModal({ job, open, onClose }) {
                     <span className="text-foreground text-xs font-medium">{job.userEmail || '—'}</span>
                   </div>
                   {job.userId && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">User ID</span>
-                      <code className="text-xs font-mono text-foreground bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded truncate max-w-[180px]">{job.userId}</code>
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="text-muted-foreground shrink-0 mt-0.5">User ID</span>
+                      <code className="text-[10px] md:text-xs font-mono text-foreground bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded break-all text-right flex-1 min-w-0">{job.userId}</code>
                     </div>
                   )}
                 </>
@@ -109,9 +133,9 @@ function AdminJobDetailModal({ job, open, onClose }) {
           <section className="space-y-2">
             <h4 className="text-[10px] lowercase text-muted-foreground uppercase tracking-[0.2em] font-bold">Document</h4>
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Filename</span>
-                <span className="text-foreground truncate max-w-[200px] text-xs font-medium" title={job.filename}>{job.filename || '—'}</span>
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-muted-foreground shrink-0">Filename</span>
+                <span className="text-foreground text-[11px] font-medium break-words leading-normal text-right min-w-0" title={job.filename}>{job.filename || '—'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Pages</span>
@@ -128,9 +152,9 @@ function AdminJobDetailModal({ job, open, onClose }) {
           <section className="space-y-2">
             <h4 className="text-[10px] lowercase text-muted-foreground uppercase tracking-[0.2em] font-bold">Kiosk</h4>
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Kiosk ID</span>
-                <code className="text-[11px] font-mono text-foreground bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded">{job.kioskId || '—'}</code>
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-muted-foreground shrink-0">Kiosk ID</span>
+                <code className="text-[10px] md:text-[11px] font-mono text-foreground bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded break-all text-right">{job.kioskId || '—'}</code>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Name</span>
@@ -151,6 +175,23 @@ function AdminJobDetailModal({ job, open, onClose }) {
                   </div>
                 </div>
               </div>
+            </section>
+          )}
+
+          {/* Admin Controls */}
+          {['PENDING', 'PAID', 'PRINTING', 'SCANNING', 'XEROXING', 'QUEUED'].includes(job.status) && (
+            <section className="space-y-2 pt-4 border-t border-white/[0.06]">
+              <h4 className="text-[10px] uppercase tracking-[0.2em] text-red-400 font-bold">Admin Controls</h4>
+              <Button 
+                onClick={handleAdminCancel}
+                disabled={isCancelling}
+                variant="outline"
+                className="w-full border-red-500/20 text-red-500 hover:bg-red-500/10 rounded-xl py-6 font-bold flex items-center justify-center gap-2"
+              >
+                {isCancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                FORCE CANCEL JOB
+              </Button>
+              <p className="text-[10px] text-muted-foreground/50 text-center italic">Use only for stuck jobs or requested refunds.</p>
             </section>
           )}
 
@@ -220,7 +261,7 @@ const formatTimeAgo = (date) => {
 };
 
 // ─── Main Table Component ───────────────────────────────────
-export function RecentJobsTable({ jobs, loading }) {
+export function RecentJobsTable({ jobs, loading, onJobUpdated }) {
   const [selectedJob, setSelectedJob] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
@@ -419,6 +460,7 @@ export function RecentJobsTable({ jobs, loading }) {
         job={selectedJob}
         open={!!selectedJob}
         onClose={() => setSelectedJob(null)}
+        onJobUpdated={onJobUpdated}
       />
     </div>
   );

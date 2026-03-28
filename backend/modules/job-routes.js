@@ -301,6 +301,13 @@ function startMockSimulation(job, startTime) {
                             message: 'Mock: print completed',
                             pages_printed: latestJob.pages || 1
                         });
+
+                        // Decrement paper count
+                        const pagesToSubtract = latestJob.pages || 1;
+                        await db.query(
+                            "UPDATE kiosks SET current_paper_count = GREATEST(0, current_paper_count - $1) WHERE id = $2",
+                            [pagesToSubtract, latestJob.kiosk_id]
+                        );
                     });
                 }, MOCK_COMPLETE_DELAY_MS - MOCK_STEP_DELAY_MS);
 
@@ -359,6 +366,13 @@ function startMockSimulation(job, startTime) {
                                 message: 'Mock: xerox completed',
                                 pages_printed: copies
                             });
+
+                            // Decrement paper count
+                            const pagesToSubtract = latestJob.metadata?.copies || 1;
+                            await db.query(
+                                "UPDATE kiosks SET current_paper_count = GREATEST(0, current_paper_count - $1) WHERE id = $2",
+                                [pagesToSubtract, latestJob.kiosk_id]
+                            );
                         });
                     }, MOCK_COMPLETE_DELAY_MS - MOCK_STEP_DELAY_MS * 1.5);
 
@@ -369,6 +383,63 @@ function startMockSimulation(job, startTime) {
         }, MOCK_STEP_DELAY_MS * 0.5);
     }
 }
+
+
+// ===============================
+// Cancel Job (User)
+// ===============================
+router.post('/jobs/:job_id/cancel', verifyToken, async (req, res) => {
+    const { job_id } = req.params;
+
+    try {
+        const job = await db.getJob(job_id);
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        // Verify ownership
+        const isOwner = !job.user_id && job.metadata?.guestId === req.user.guestId;
+        const isAuthUser = job.user_id === req.user.uid;
+
+        if (!isOwner && !isAuthUser) {
+            return res.status(403).json({ error: 'Forndidden', message: 'You do not have permission to cancel this job' });
+        }
+
+        // Status check - only PENDING jobs can be cancelled by users
+        if (job.status !== 'PENDING') {
+            return res.status(400).json({ 
+                error: 'INVALID_STATUS', 
+                message: `Job cannot be cancelled in "${job.status}" status. Only PENDING jobs are cancellable.` 
+            });
+        }
+
+        // Update status to CANCELLED
+        await db.updateJob(job_id, { 
+            status: 'CANCELLED', 
+            status_message: 'Cancelled by user',
+            last_status_update: new Date() 
+        });
+
+        // Cleanup file if it exists
+        if (job.file_path && fs.existsSync(job.file_path)) {
+            try {
+                fs.unlinkSync(job.file_path);
+                log.info(`[JOB] ${job_id} | File deleted after cancellation`);
+            } catch (err) {
+                log.error(`[JOB] ${job_id} | Failed to delete file: ${err.message}`);
+            }
+        }
+
+        log.job(`${job_id} | ${job.job_type || 'print'} | CANCELLED | user:${req.user.uid || 'guest'}`);
+
+        res.json({ success: true, message: 'Job cancelled successfully' });
+
+    } catch (error) {
+        log.error('[JOB] ERROR | route: /api/jobs/:job_id/cancel | reason: ' + error.message);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 
 // ===============================

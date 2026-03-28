@@ -249,7 +249,14 @@ export function AdminDashboard() {
         />
 
         {/* Global Activity Feed */}
-        <RecentJobsTable jobs={recentJobs} loading={loadingJobs} />
+        <RecentJobsTable 
+          jobs={recentJobs} 
+          loading={loadingJobs} 
+          onJobUpdated={(id, newStatus) => {
+            setRecentJobs(prev => prev.map(j => j.id === id ? { ...j, status: newStatus } : j));
+            fetchMetrics();
+          }}
+        />
       </div>
     </div>
   );

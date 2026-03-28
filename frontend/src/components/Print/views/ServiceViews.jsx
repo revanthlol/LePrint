@@ -4,7 +4,7 @@ import { Printer, ScanLine, Copy, ArrowLeft, FileUp, Loader2 } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { getFileIcon, getFileExt } from '../printUtils';
 
-export function ServiceSelectView({ selectService, setScanKioskMode }) {
+export function ServiceSelectView({ selectService, switchToNewKiosk }) {
     const services = [
         {
             type: 'print',
@@ -65,7 +65,7 @@ export function ServiceSelectView({ selectService, setScanKioskMode }) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setScanKioskMode(true)}
+                onClick={() => switchToNewKiosk()}
                 className="w-full text-muted-foreground hover:text-foreground hover:bg-white/[0.04] rounded-xl mt-3"
               >
                 <ArrowLeft className="mr-1 w-4 h-4" /> Scan Different Kiosk

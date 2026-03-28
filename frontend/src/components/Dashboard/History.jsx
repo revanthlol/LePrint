@@ -37,9 +37,11 @@ function StatusBadge({ status }) {
 }
 
 // ─── Job Detail Modal ───────────────────────────────────────
-function JobDetailModal({ job, open, onClose }) {
+function JobDetailModal({ job, open, onClose, onJobUpdated }) {
   const [copied, setCopied] = useState(false);
   const [metaExpanded, setMetaExpanded] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const { getAuthHeader } = useAuth();
 
   if (!job) return null;
 
@@ -52,13 +54,31 @@ function JobDetailModal({ job, open, onClose }) {
   const jobType = job.job_type || 'print';
   const printSettings = job.metadata?.print_settings;
 
+  const handleCancel = async () => {
+    if (!window.confirm('Are you sure you want to cancel this job?')) return;
+    try {
+      setIsCancelling(true);
+      const authHeader = await getAuthHeader();
+      await axios.post(`${API_URL}/api/jobs/${job.id}/cancel`, {}, {
+        headers: { 'Authorization': authHeader }
+      });
+      alert('Job cancelled successfully');
+      if (onJobUpdated) onJobUpdated(job.id, 'CANCELLED');
+      onClose();
+    } catch (err) {
+      alert('Failed to cancel job: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-md bg-[#0a0a0a] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/50 max-h-[85vh] overflow-y-auto p-0">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="flex items-center gap-2 tracking-tight text-lg">
-            <span>{JOB_TYPE_ICONS[jobType] || '🖨️'}</span>
-            <span className="truncate">{job.filename || 'Untitled'}</span>
+      <DialogContent className="w-[92vw] sm:max-w-lg bg-[#0a0a0a] border border-white/[0.08] rounded-3xl shadow-2xl shadow-black/50 max-h-[85vh] overflow-y-auto p-6 fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] outline-none">
+        <DialogHeader className="text-left items-start">
+          <DialogTitle className="flex items-start gap-2 text-lg tracking-tight min-w-0">
+            <span className="shrink-0 mt-0.5">{JOB_TYPE_ICONS[jobType] || '🖨️'}</span>
+            <span className="break-words leading-snug">{job.filename || 'Untitled'}</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -67,14 +87,14 @@ function JobDetailModal({ job, open, onClose }) {
           <section className="space-y-2">
             <h4 className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">Job Info</h4>
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Job ID</span>
-                <div className="flex items-center gap-1.5">
-                  <code className="text-xs font-mono text-foreground bg-white/5 px-1.5 py-0.5 rounded border border-white/10">{job.id}</code>
-                  <button onClick={copyId} className="text-muted-foreground hover:text-white hover:bg-white/[0.06] rounded p-1 transition-colors">
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-muted-foreground shrink-0 mt-0.5">Job ID</span>
+                <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
+                  <code className="text-[10px] md:text-xs font-mono text-foreground bg-white/5 px-1.5 py-0.5 rounded border border-white/10 break-all text-right leading-tight">{job.id}</code>
+                  <button onClick={copyId} className="text-muted-foreground hover:text-white hover:bg-white/[0.06] rounded p-1 transition-colors shrink-0">
                     <Copy className="w-3 h-3" />
                   </button>
-                  {copied && <span className="text-[11px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">Copied!</span>}
+                  {copied && <span className="text-[11px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full shrink-0">Copied!</span>}
                 </div>
               </div>
               <div className="flex items-center justify-between">
@@ -98,9 +118,9 @@ function JobDetailModal({ job, open, onClose }) {
           <section className="space-y-2">
             <h4 className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">Document</h4>
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Filename</span>
-                <span className="text-foreground truncate font-medium text-xs text-right" title={job.filename}>{job.filename || '—'}</span>
+              <div className="flex items-start justify-between gap-4">
+                <span className="text-muted-foreground shrink-0 mt-0.5">Filename</span>
+                <span className="text-foreground font-medium text-xs text-right break-all leading-relaxed flex-1 min-w-0" title={job.filename}>{job.filename || '—'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Pages</span>
@@ -137,6 +157,20 @@ function JobDetailModal({ job, open, onClose }) {
                   Download Files
                 </Button>
               </a>
+            </motion.div>
+          )}
+
+          {/* Cancellation Control */}
+          {job.status === 'PENDING' && (
+            <motion.div whileTap={{ scale: 0.98 }}>
+              <Button 
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="w-full bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 font-bold rounded-2xl py-6 shadow-xl"
+              >
+                {isCancelling ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : null}
+                Cancel Job
+              </Button>
             </motion.div>
           )}
 
@@ -319,11 +353,11 @@ export function History() {
       <div className="space-y-6">
         <div className="flex flex-col gap-6">
           <Tabs value={filter} onValueChange={(v) => { setFilter(v); setCurrentPage(1); }} className="w-full">
-            <TabsList className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-1 flex w-full overflow-x-auto scrollbar-hide">
+            <TabsList className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-1.5 flex w-full sm:w-fit items-center gap-1.5 overflow-x-auto scrollbar-hide">
               {['all', 'COMPLETED', 'PRINTING', 'FAILED'].map((s) => (
                 <TabsTrigger 
                   key={s} value={s} 
-                  className="flex-1 data-[state=active]:bg-white data-[state=active]:text-black rounded-xl transition-all font-bold text-[10px] sm:text-[11px] uppercase tracking-wider h-10 px-3 sm:px-6 whitespace-nowrap"
+                  className="data-[state=active]:bg-white data-[state=active]:text-black rounded-xl transition-all font-bold text-[10px] sm:text-[11px] uppercase tracking-wider h-10 px-5 sm:px-6 whitespace-nowrap"
                 >
                   {s.replace('COMPLETED', 'Success').replace('all', 'All Jobs')}
                 </TabsTrigger>
@@ -462,6 +496,9 @@ export function History() {
         job={selectedJob}
         open={!!selectedJob}
         onClose={() => setSelectedJob(null)}
+        onJobUpdated={(id, newStatus) => {
+          setJobs(prev => prev.map(j => j.id === id ? { ...j, status: newStatus } : j));
+        }}
       />
     </motion.div>
   );

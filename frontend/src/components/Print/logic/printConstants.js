@@ -16,6 +16,7 @@ export const NAV_STEPS = [
 
 // Map viewStatus values → canonical nav step id
 export const VIEW_TO_NAV_STEP = {
+    'SELECTING_KIOSK':   null,  // No nav step shown during kiosk selection
     'SERVICE_SELECT':    'SERVICE_SELECT',
     'CONNECTED':         'UPLOAD',
     'SCAN_OPTIONS':      'UPLOAD',

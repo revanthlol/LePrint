@@ -72,8 +72,13 @@ export function usePrint() {
     const [showBackConfirmModal, setShowBackConfirmModal] = useState(false);
     const [showExpiryModal, setShowExpiryModal] = useState(null); // jobId or null
 
-    // Scan kiosk mode (Bug 4)
-    const [scanKioskMode, setScanKioskMode] = useState(false);
+    // Derived: current active job (or null)
+    const activeJob = useMemo(() => jobs[activeJobIndex] || null, [jobs, activeJobIndex]);
+
+    // Derived: is the active job in kiosk selection mode?
+    const isSelectingKiosk = useMemo(() => {
+        return activeJob?.status === 'SELECTING_KIOSK';
+    }, [activeJob]);
 
     // Kiosk session decoupling (Task 5)
     const sessionKioskId = useRef(null);
@@ -83,15 +88,16 @@ export function usePrint() {
     // Kiosk Choice Modal (Refactor Part 2)
     const [showKioskChoiceModal, setShowKioskChoiceModal] = useState(false);
 
-    // Derived: current active job (or null)
-    const activeJob = useMemo(() => jobs[activeJobIndex] || null, [jobs, activeJobIndex]);
+    // Cancellation Modal
+    const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
+    const [cancelJobIndex, setCancelJobIndex] = useState(null);
 
     // Derived: effective status for UI rendering
     const status = useMemo(() => {
         if (activeJob) {
             // If the active job has a real in-flight status, show that
             const jobStatus = activeJob.status;
-            if (['PRINTING', 'SCANNING', 'XEROXING', 'COMPLETED', 'SCAN_COMPLETE', 'ERROR', 'PAYMENT', 'CALCULATING'].includes(jobStatus)) {
+            if (['SELECTING_KIOSK', 'PRINTING', 'SCANNING', 'XEROXING', 'COMPLETED', 'SCAN_COMPLETE', 'ERROR', 'PAYMENT', 'CALCULATING'].includes(jobStatus)) {
                 return jobStatus;
             }
         }
@@ -696,39 +702,55 @@ export function usePrint() {
         const kioskId = getCurrentKioskId();
         setShowKioskChoiceModal(false);
 
-        // If all current jobs are done, we are effectively starting a fresh session on this kiosk
+        // If all current jobs are done, clear old jobs
         if (allJobsDone) {
             clearSession();
             setJobs([]);
-            setActiveJobIndex(0);
         }
 
-        // Add a new IDLE job entry for the same kiosk
+        // Create a new IDLE job for the same kiosk
         const newJob = createJobEntry({
             status: 'IDLE',
             kiosk_id: kioskId,
         });
 
-        setJobs(prev => [...prev, newJob]);
-        setActiveJobIndex(prev => jobs.length); // point to new job
+        setJobs(prev => {
+            const updated = allJobsDone ? [newJob] : [...prev, newJob];
+            // Set activeJobIndex to the new job AFTER state update
+            setTimeout(() => setActiveJobIndex(updated.length - 1), 0);
+            return updated;
+        });
+
         setViewStatus('SERVICE_SELECT');
         setScanOptions({ resolution: 300, colorMode: 'RGB24' });
         setXeroxCopies(1);
-
-        addLog(`Continuing on kiosk ${kioskId}`);
-    }, [addLog, getCurrentKioskId, allJobsDone, jobs.length]);
+        addLog(`New job on kiosk ${kioskId}`);
+    }, [getCurrentKioskId, allJobsDone, addLog]);
 
     const switchToNewKiosk = useCallback(() => {
         setShowKioskChoiceModal(false);
-        // If we have active jobs, we just want to scan a new kiosk for the NEXT job
-        // If no jobs, we reset everything
-        if (jobs.length > 0 && !allJobsDone) {
-            setScanKioskMode(true);
-            addLog('Please scan the new kiosk QR code');
-        } else {
+
+        // If no active jobs or all done, reset completely
+        if (jobs.length === 0 || allJobsDone) {
             resetFlow();
+            return;
         }
-    }, [resetFlow, jobs.length, allJobsDone, addLog]);
+
+        // Create a new job in SELECTING_KIOSK state
+        const newJob = createJobEntry({
+            status: 'SELECTING_KIOSK',
+            kiosk_id: null,
+        });
+
+        setJobs(prev => {
+            const updated = [...prev, newJob];
+            setTimeout(() => setActiveJobIndex(updated.length - 1), 0);
+            return updated;
+        });
+
+        setViewStatus('SELECTING_KIOSK');
+        addLog('Scan a new kiosk QR code.');
+    }, [jobs.length, allJobsDone, resetFlow, addLog]);
 
     const backToServiceSelect = useCallback(() => {
         clearSession();
@@ -740,97 +762,134 @@ export function usePrint() {
 
     // ---- Multi-job: Add another job ----
     const addAnotherJob = useCallback(() => {
-        console.log('[DEBUG] addAnotherJob called, isGuest:', isGuest, 'jobs:', jobs.length);
-        // Don't exceed max
-        if (jobs.length >= MAX_JOBS) return;
-        // Guests capped at 1
-        if (isGuest === true) return;
+        // Max tabs check
+        if (jobs.length >= MAX_JOBS) {
+            addLog(`Maximum ${MAX_JOBS} jobs allowed. Complete or cancel a job first.`);
+            return;
+        }
 
-        // NEW: If a kiosk is already connected, show the choice modal
-        const hasKiosk = sessionKioskId.current || config?.kiosk_id;
-        if (hasKiosk) {
+        // Guests limited to 1 job at a time
+        if (isGuest === true && jobs.length >= 1) {
+            addLog('Guests can only have 1 active job. Sign in for multiple jobs.');
+            return;
+        }
+
+        // If a kiosk is already connected, show choice modal
+        const currentKioskId = sessionKioskId.current || config?.kiosk_id;
+        if (currentKioskId) {
             setShowKioskChoiceModal(true);
             return;
         }
 
-        // OLD: If no kiosk, activate scan mode
-        setScanKioskMode(true);
+        // No kiosk connected — create a SELECTING_KIOSK job directly
+        const newJob = createJobEntry({
+            status: 'SELECTING_KIOSK',
+            kiosk_id: null,
+        });
+        setJobs(prev => [...prev, newJob]);
+        setActiveJobIndex(jobs.length); // Point to the new job
+        setViewStatus('SELECTING_KIOSK');
+        addLog('Scan a kiosk QR code to continue.');
     }, [jobs.length, isGuest, config, addLog]);
 
     // ---- Scan Kiosk Mode: connect to scanned kiosk ----
+    // Called when a QR is scanned while in SELECTING_KIOSK state.
+    // Updates the ACTIVE job (which should be in SELECTING_KIOSK state), not creating a new one.
     const handleScanKioskConnect = useCallback(async (kioskId) => {
         if (!kioskId) return;
 
-        addLog(`Connecting to new kiosk: ${kioskId}...`);
+        addLog(`Connecting to kiosk: ${kioskId}...`);
 
         try {
+            const headers = await buildHeaders();
             const response = await axios.post(`${API_URL}/api/connect`, {
                 kiosk_id: kioskId
-            }, { timeout: 5000 });
+            }, {
+                headers,
+                timeout: 5000
+            });
 
             if (response.data.status === 'connected') {
-                // Update kiosk session
-                setNewKioskId(kioskId);
+                // Update session kiosk
                 sessionKioskId.current = kioskId;
                 setConfig(prev => ({ ...prev, kiosk_id: kioskId }));
 
-                // Exit scan mode
-                setScanKioskMode(false);
+                // Update the ACTIVE job (which should be in SELECTING_KIOSK state)
+                setJobs(prev => prev.map((j, i) =>
+                    i === activeJobIndex
+                        ? { ...j, status: 'IDLE', kiosk_id: kioskId }
+                        : j
+                ));
+
+                setViewStatus('SERVICE_SELECT');
                 setScanOptions({ resolution: 300, colorMode: 'RGB24' });
                 setXeroxCopies(1);
 
-                // Check if current active job is still IDLE (not yet submitted)
-                const currentActiveJob = jobs[activeJobIndex];
-                if (currentActiveJob && !currentActiveJob.jobId) {
-                    // Reuse the existing IDLE job entry — just update its kiosk_id
-                    setJobs(prev => prev.map((j, i) =>
-                        i === activeJobIndex ? { ...j, kiosk_id: kioskId } : j
-                    ));
-                    setViewStatus('SERVICE_SELECT');
-                } else {
-                    // Active job already submitted — create a new job entry
-                    const newJob = createJobEntry({ status: 'IDLE', kiosk_id: kioskId });
-                    setJobs(prev => [...prev, newJob]);
-                    setActiveJobIndex(jobs.length);
-                    setViewStatus('SERVICE_SELECT');
-                }
-
                 addLog(`✓ Connected to "${response.data.kiosk_name || kioskId}"`);
-                setNewKioskId(null); // consumed
+            } else {
+                addLog(`✗ Failed to connect: ${response.data.message || 'Unknown error'}`);
             }
         } catch (e) {
-            addLog(`✗ Failed to connect to ${kioskId}: ${e.message}`);
+            addLog(`✗ Connection failed: ${e.message}`);
+            // Don't change job state — user can retry scanning
         }
-    }, [API_URL, addLog, jobs, activeJobIndex]);
+    }, [API_URL, addLog, buildHeaders, activeJobIndex]);
 
     // ---- Cancel a pending job ----
     const cancelJob = useCallback((jobIndex) => {
-        const job = jobs[jobIndex];
-        if (!job) return;
-        // Only allow cancelling jobs that haven't been paid
-        const cancellable = ['IDLE', 'PAYMENT', 'CALCULATING', 'ERROR'];
-        if (!cancellable.includes(job.status)) return;
+        setCancelJobIndex(jobIndex);
+        setShowCancelConfirmModal(true);
+    }, []);
 
+    const confirmCancelJob = useCallback(async () => {
+        if (cancelJobIndex === null) return;
+        const job = jobs[cancelJobIndex];
+        if (!job) return;
+
+        // If job has a real ID, call API to cancel on server
+        if (job.jobId) {
+            try {
+                const headers = await buildHeaders();
+                await axios.post(`${API_URL}/api/jobs/${job.jobId}/cancel`, {}, { headers });
+                addLog(`Job ${job.jobId} cancelled.`);
+            } catch (err) {
+                console.error('Failed to cancel job on server:', err);
+                addLog(`⚠ Server cancel failed. Removing locally.`);
+            }
+        }
+
+        // Remove job from array
         setJobs(prev => {
-            const filtered = prev.filter((_, i) => i !== jobIndex);
-            // If no jobs left, reset to scanner
+            const filtered = prev.filter((_, i) => i !== cancelJobIndex);
+
+            // If no jobs left, reset to initial scanner state
             if (filtered.length === 0) {
                 setViewStatus('IDLE');
                 setConfig(null);
                 sessionKioskId.current = null;
+            } else {
+                // Switch to another job
+                const newIndex = Math.min(cancelJobIndex, filtered.length - 1);
+                setActiveJobIndex(newIndex);
+
+                // Update viewStatus based on the new active job
+                const newActiveJob = filtered[newIndex];
+                if (newActiveJob) {
+                    if (newActiveJob.status === 'SELECTING_KIOSK') {
+                        setViewStatus('SELECTING_KIOSK');
+                    } else if (newActiveJob.status === 'IDLE') {
+                        setViewStatus('SERVICE_SELECT');
+                    }
+                    // Other statuses will be handled by the status useMemo
+                }
             }
+
             return filtered;
         });
 
-        // Adjust activeJobIndex
-        setActiveJobIndex(prev => {
-            if (jobIndex < prev) return prev - 1;
-            if (jobIndex === prev) return Math.max(0, prev - 1);
-            return prev;
-        });
-
-        addLog(`Job cancelled`);
-    }, [jobs, addLog]);
+        setShowCancelConfirmModal(false);
+        setCancelJobIndex(null);
+    }, [jobs, cancelJobIndex, buildHeaders, API_URL, addLog]);
 
     // ==========================================
     // 6. Return
@@ -870,10 +929,12 @@ export function usePrint() {
         confirmGoBack,
         showExpiryModal,
         setShowExpiryModal,
+        showCancelConfirmModal,
+        setShowCancelConfirmModal,
+        confirmCancelJob,
 
-        // Scan Kiosk Mode
-        scanKioskMode,
-        setScanKioskMode,
+        // Kiosk selection
+        isSelectingKiosk,
         handleScanKioskConnect,
 
         // Print settings

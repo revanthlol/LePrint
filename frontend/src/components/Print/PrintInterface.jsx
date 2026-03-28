@@ -20,7 +20,7 @@ import { PrintSettingsView } from './views/SettingsView';
 import { ScanOptionsView, ScanningView, ScanCompleteView, XeroxOptionsView, XeroxingView } from './views/ScanXeroxViews';
 import { PaymentView, JobProgressView, CompletedView } from './views/ProgressViews';
 import { AllJobsSummaryView } from './views/SummaryView';
-import { BackConfirmModal, ExpiryModal, KioskChoiceModal } from './views/Modals';
+import { BackConfirmModal, ExpiryModal, KioskChoiceModal, CancelConfirmModal } from './views/Modals';
 
 // ─── Job Tab Bar ───────────────────────────────────────────
 const JOB_ICONS = { print: '🖨️', scan: '📄', xerox: '📋' };
@@ -64,7 +64,7 @@ function CountdownTimer({ expiresAt }) {
   return <span className="text-[10px] text-muted-foreground tabular-nums">{timeLeft}</span>;
 }
 
-function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, scanKioskMode, setScanKioskMode, cancelJob }) {
+function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, cancelJob }) {
   return (
     <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-1 py-2 border-b border-white/[0.06] -mx-6 px-6">
       {/* Placeholder tab when no jobs exist yet */}
@@ -76,14 +76,19 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
       )}
 
       {jobs.map((job, i) => {
-        const isActive = i === activeJobIndex && !scanKioskMode;
+        const isActive = i === activeJobIndex;
         const isExpired = job.locallyExpired;
-        const isCancellable = ['IDLE', 'PAYMENT', 'CALCULATING', 'ERROR'].includes(job.status) && !isExpired;
+        const isSelectingKiosk = job.status === 'SELECTING_KIOSK';
+        const isCancellable = ['IDLE', 'SELECTING_KIOSK', 'PAYMENT', 'CALCULATING', 'ERROR'].includes(job.status) && !isExpired;
+
+        // Determine icon and label based on status
+        const tabIcon = isExpired ? '⚠' : isSelectingKiosk ? '📡' : (JOB_ICONS[job.jobType] || '🖨️');
+        const tabLabel = isExpired ? 'Expired' : isSelectingKiosk ? 'New Kiosk' : (JOB_LABELS[job.jobType] || 'Job');
 
         return (
           <motion.button
-            key={job.jobId || i}
-            onClick={() => { setActiveJobIndex(i); setScanKioskMode(false); }}
+            key={job.jobId || `job-${i}`}
+            onClick={() => setActiveJobIndex(i)}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
             className={`relative flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-colors ${
@@ -104,9 +109,16 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
             )}
 
             <div className="relative flex items-center gap-2">
-              <span>{isExpired ? '⚠' : (JOB_ICONS[job.jobType] || '🖨️')}</span>
-              <span>{isExpired ? 'Expired' : (JOB_LABELS[job.jobType] || 'Job')}</span>
-              {!isExpired && <StatusDot status={job.status} />}
+              <span>{tabIcon}</span>
+              <span>{tabLabel}</span>
+              {!isExpired && !isSelectingKiosk && <StatusDot status={job.status} />}
+              {/* Show pulsing dot for SELECTING_KIOSK */}
+              {isSelectingKiosk && (
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-400" />
+                </span>
+              )}
               {isCancellable && (
                 <motion.span
                   role="button"
@@ -126,24 +138,6 @@ function JobTabBar({ jobs, activeJobIndex, setActiveJobIndex, onAddJob, canAdd, 
           </motion.button>
         );
       })}
-
-      {/* Scan kiosk tab — shown when scanKioskMode is active */}
-      {scanKioskMode && (
-        <motion.button
-          onClick={() => setScanKioskMode(true)}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-colors text-white border border-white/[0.08]"
-        >
-          <motion.div
-            layoutId="active-job-tab"
-            className="absolute inset-0 rounded-lg bg-white/[0.06]"
-            transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-          />
-          <span className="relative">📡</span>
-          <span className="relative">New Kiosk</span>
-        </motion.button>
-      )}
 
       {/* Add another job "+" tab */}
       {canAdd && (
@@ -348,8 +342,7 @@ export function PrintInterface() {
     confirmGoBack,
     showExpiryModal,
     setShowExpiryModal,
-    scanKioskMode,
-    setScanKioskMode,
+    isSelectingKiosk,
     handleScanKioskConnect,
     cancelJob,
     updatePrintSettings,
@@ -360,12 +353,17 @@ export function PrintInterface() {
     setShowKioskChoiceModal,
     continueOnSameKiosk,
     switchToNewKiosk,
+
+    // Cancellation
+    showCancelConfirmModal,
+    setShowCancelConfirmModal,
+    confirmCancelJob,
   } = printState;
 
   const isConnected = ['SERVICE_SELECT', 'CONNECTED', 'SCAN_OPTIONS',
     'XEROX_OPTIONS', 'CALCULATING', 'SETTINGS_PREVIEW', 'PAYMENT', 'PRINTING', 'SCANNING',
-    'XEROXING', 'COMPLETED', 'SCAN_COMPLETE', 'ERROR'].includes(status);
-  const canAddJob = jobs.length < 5 && !isGuest && isConnected;
+    'XEROXING', 'COMPLETED', 'SCAN_COMPLETE', 'ERROR', 'SELECTING_KIOSK'].includes(status);
+  const canAddJob = jobs.length < 5 && !isGuest && isConnected && !isSelectingKiosk;
 
   const expiredJob = showExpiryModal ? jobs.find(j => j.jobId === showExpiryModal) : null;
 
@@ -379,11 +377,10 @@ export function PrintInterface() {
   };
 
   const showTabBar = jobs.length >= 1
-    || scanKioskMode
     || ['SERVICE_SELECT', 'CONNECTED', 'SCAN_OPTIONS', 'XEROX_OPTIONS',
-        'CALCULATING', 'SETTINGS_PREVIEW', 'PAYMENT'].includes(status);
+        'CALCULATING', 'SETTINGS_PREVIEW', 'PAYMENT', 'SELECTING_KIOSK'].includes(status);
 
-  const showSummary = allJobsDone && jobs.length > 0 && !scanKioskMode;
+  const showSummary = allJobsDone && jobs.length > 0;
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -408,14 +405,12 @@ export function PrintInterface() {
               setActiveJobIndex={setActiveJobIndex}
               onAddJob={addAnotherJob}
               canAdd={canAddJob}
-              scanKioskMode={scanKioskMode}
-              setScanKioskMode={setScanKioskMode}
               cancelJob={cancelJob}
             />
           )}
 
-          {/* Navigation bar — back + step dots (hidden during scan kiosk mode) */}
-          {!showSummary && !scanKioskMode && (
+          {/* Navigation bar — back + step dots (hidden during kiosk selection) */}
+          {!showSummary && !isSelectingKiosk && (
             <NavigationBar
               canGoBack={canGoBack}
               goBack={goBack}
@@ -426,25 +421,26 @@ export function PrintInterface() {
 
           {/* ─── Views with AnimatePresence transitions ─────────── */}
           <AnimatePresence mode="wait">
-            {scanKioskMode ? (
-              <motion.div key="kiosk-scanner" {...viewTransition}>
-                <KioskScannerInline
-                  handleScanKioskConnect={handleScanKioskConnect}
-                  scannerActive={printState.scannerActive}
-                  setScannerActive={printState.setScannerActive}
-                  cameraError={printState.cameraError}
-                  setCameraError={printState.setCameraError}
-                  handleScanError={printState.handleScanError}
-                  addLog={printState.addLog}
-                />
-              </motion.div>
-            ) : showSummary ? (
+            {showSummary ? (
               <motion.div key="summary" {...viewTransition}>
                 <AllJobsSummaryView {...viewProps} />
               </motion.div>
             ) : (
               <motion.div key={status} {...viewTransition}>
-                {/* VIEW: QR Scanner */}
+                {/* VIEW: Kiosk Selection (QR Scanner) */}
+                {status === 'SELECTING_KIOSK' && (
+                  <KioskScannerInline
+                    handleScanKioskConnect={handleScanKioskConnect}
+                    scannerActive={printState.scannerActive}
+                    setScannerActive={printState.setScannerActive}
+                    cameraError={printState.cameraError}
+                    setCameraError={printState.setCameraError}
+                    handleScanError={printState.handleScanError}
+                    addLog={printState.addLog}
+                  />
+                )}
+
+                {/* VIEW: QR Scanner (initial, no jobs) */}
                 {status === 'IDLE' && <QRScannerView {...viewProps} />}
 
                 {/* VIEW: Checking kiosk / printer status */}
@@ -550,6 +546,12 @@ export function PrintInterface() {
         onOpenChange={setShowKioskChoiceModal}
         onContinue={continueOnSameKiosk}
         onSwitch={switchToNewKiosk}
+      />
+
+      <CancelConfirmModal
+        open={showCancelConfirmModal}
+        onOpenChange={setShowCancelConfirmModal}
+        onConfirm={confirmCancelJob}
       />
     </div>
   );

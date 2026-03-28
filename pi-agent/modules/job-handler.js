@@ -183,7 +183,7 @@ async function processJob(jobId, state, socket, logger) {
     safeEmit(socket, state, "print_complete", {
       job_id: jobId,
       success: true,
-      pages_printed: printResult.pages,
+      pages_printed: printResult.pages * (settings.copies || 1),
     });
 
     logger.job(`[PRINT] ${jobId} COMPLETED — total time: ${elapsedSince(jobStartTime)}`);

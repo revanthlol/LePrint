@@ -364,6 +364,65 @@ router.get('/admin/recent-jobs', verifyToken, requireAdmin, async (req, res) => 
     }
 });
 
+/**
+ * POST /admin/jobs/:job_id/cancel
+ * Admin can cancel any PENDING or PAID job.
+ */
+router.post('/admin/jobs/:job_id/cancel', verifyToken, requireAdmin, async (req, res) => {
+    const { job_id: jobId } = req.params;
+
+    try {
+        const job = await db.getJob(jobId);
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        // Status check: Admin can only cancel jobs that are not completed or already cancelled/failed.
+        if (job.status === 'COMPLETED' || job.status === 'FAILED' || job.status === 'CANCELLED') {
+            return res.status(400).json({
+                error: 'INVALID_STATUS',
+                message: `Admin cannot cancel a job in "${job.status}" status.`
+            });
+        }
+
+        // Update status in DB
+        await db.updateJob(jobId, {
+            status: 'CANCELLED',
+            status_message: 'Cancelled by Administrator',
+            last_status_update: new Date()
+        });
+
+        // Delete file if it exists
+        const fs = require('fs');
+        if (job.file_path && fs.existsSync(job.file_path)) {
+            try {
+                fs.unlinkSync(job.file_path);
+            } catch (err) {
+                log.error(`[ADMIN] ${jobId} | Failed to delete file: ${err.message}`);
+            }
+        }
+
+        // Log admin action
+        const adminId = req.user ? req.user.uid : 'system';
+        await logAdminAction(
+            adminId,
+            'CANCEL_JOB',
+            'job',
+            jobId,
+            { oldStatus: job.status, filename: job.filename }
+        );
+
+        log.info(`[ADMIN] ${adminId} | CANCEL_JOB | target: ${jobId} (status: ${job.status} → CANCELLED)`);
+
+        res.json({ success: true, message: 'Job cancelled by administrator' });
+
+    } catch (error) {
+        log.error('[ADMIN] ERROR | route: /api/admin/jobs/:id/cancel | reason: ' + error.message);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ==================== SYSTEM SETTINGS ====================
 
 /**

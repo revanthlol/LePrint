@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LePrint Revamp Checklist</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f4f7f6; }
+        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .phase { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #2980b9; font-size: 1.25rem; }
+        .task { display: flex; align-items: center; margin-bottom: 10px; }
+        input[type="checkbox"] { margin-right: 15px; transform: scale(1.2); }
+        .completed { text-decoration: line-through; color: #888; }
+        .tag { font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; font-weight: bold; text-transform: uppercase; }
+        .tag-backend { background: #e1f5fe; color: #0288d1; }
+        .tag-frontend { background: #f3e5f5; color: #7b1fa2; }
+        .tag-pi { background: #fff3e0; color: #ef6c00; }
+        .status-done { color: #27ae60; font-weight: bold; float: right; }
+    </style>
+</head>
+<body>
+    <h1>🖨️ LePrint Implementation Roadmap</h1>
+
+    <div class="phase">
+        <span class="status-done">✓ COMPLETED</span>
+        <h2 class="completed">Phase A: Paper Count Auto-Decrement</h2>
+        <div class="task"><input type="checkbox" checked disabled> <span class="completed">Update pi-agent/job-handler to calculate total sheets (pages * copies)</span> <span class="tag tag-pi">PI</span></div>
+        <div class="task"><input type="checkbox" checked disabled> <span class="completed">Update backend/job-routes mock simulation decrement logic</span> <span class="tag tag-backend">Backend</span></div>
+        <div class="task"><input type="checkbox" checked disabled> <span class="completed">Remove test kiosk skip in socket-manager.js</span> <span class="tag tag-backend">Backend</span></div>
+    </div>
+
+    <div class="phase">
+        <h2>Phase B: Job Cancellation</h2>
+        <div class="task"><input type="checkbox"> <span>Add <code>POST /api/jobs/:id/cancel</code> (Check status = 'PENDING')</span> <span class="tag tag-backend">Backend</span></div>
+        <div class="task"><input type="checkbox"> <span>Implement User ownership check vs Admin role for cancellation</span> <span class="tag tag-backend">Backend</span></div>
+        <div class="task"><input type="checkbox"> <span>Create <code>useCancelJob</code> hook in frontend</span> <span class="tag tag-frontend">Frontend</span></div>
+        <div class="task"><input type="checkbox"> <span>Add Cancel button to Job Tabs/Admin Table with confirmation dialog</span> <span class="tag tag-frontend">Frontend</span></div>
+    </div>
+
+    <div class="phase">
+        <h2>Phase C: Multi-Job Tab State Machine</h2>
+        <div class="task"><input type="checkbox"> <span>Refactor "+" button to use improved Kiosk Choice Dialog</span> <span class="tag tag-frontend">Frontend</span></div>
+        <div class="task"><input type="checkbox"> <span>Implement Tab redirection logic (Same Kiosk vs Different Kiosk)</span> <span class="tag tag-frontend">Frontend</span></div>
+        <div class="task"><input type="checkbox"> <span>Add Max-Tab limit (5) with warning UI</span> <span class="tag tag-frontend">Frontend</span></div>
+        <div class="task"><input type="checkbox"> <span>Clean up 'Orphan/Ghost' tab states on session refresh</span> <span class="tag tag-frontend">Frontend</span></div>
+    </div>
+
+    <div class="phase">
+        <h2>Phase D: Map Feature</h2>
+        <div class="task"><input type="checkbox"> <span>Backend: Add GPS coordinates/status to Kiosk schema</span> <span class="tag tag-backend">Backend</span></div>
+        <div class="task"><input type="checkbox"> <span>Frontend: Create <code>/map</code> route with Sidebar/Navbar links</span> <span class="tag tag-frontend">Frontend</span></div>
+        <div class="task"><input type="checkbox"> <span>Frontend: Integrate MapLibre/Leaflet for kiosk visualization</span> <span class="tag tag-frontend">Frontend</span></div>
+        <div class="task"><input type="checkbox"> <span>Pi-Agent: Optional dynamic location reporting support</span> <span class="tag tag-pi">PI</span></div>
+    </div>
+</body>
+</html>

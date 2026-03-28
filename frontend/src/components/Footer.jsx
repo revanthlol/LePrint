@@ -16,7 +16,7 @@ const footerSections = [
       { label: "About Us", href: "/about" },
       { label: "FAQ", href: "/faq" },
       { label: "Contact Us", href: "/contact" },
-      { label: "Pricing", href: "/#pricing" }, // Added a logical 6th link for symmetry
+      { label: "Kiosk Map", href: "/map" },
     ],
     isTwoColumn: true,
   },

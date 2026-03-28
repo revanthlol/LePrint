@@ -9,6 +9,15 @@ const log = require('./logger');
 
 const router = express.Router();
 
+// Simple ping to verify router mount
+router.get('/ping', (req, res) => res.json({ status: 'ok', message: 'Job router is alive' }));
+
+// Debug middleware to log all requests to this router
+router.use((req, res, next) => {
+    log.info(`[DEBUG] JOB-ROUTER | Request: ${req.method} ${req.url}`);
+    next();
+});
+
 
 // ===============================
 // User's Job History
@@ -124,16 +133,31 @@ router.post('/connect', optionalAuth, async (req, res) => {
 });
 
 
+// DEBUG: Catch-all to see if it hits
+router.use('/jobs/create', (req, res, next) => {
+    log.info(`[DEBUG] HIT /jobs/create | Method: ${req.method} | Content-Type: ${req.headers['content-type']}`);
+    next();
+});
+
 // ===============================
 // Create Print Job
 // ===============================
-router.post('/jobs/create', verifyToken, upload.single('file'), async (req, res) => {
-
+router.post('/jobs/create', (req, res, next) => {
+    log.info(`[DEBUG] /jobs/create | Reached verifyToken step`);
+    verifyToken(req, res, next);
+}, (req, res, next) => {
+    log.info(`[DEBUG] /jobs/create | Reached upload.single('file') step`);
+    upload.single('file')(req, res, next);
+}, async (req, res) => {
+    log.info(`[DEBUG] /jobs/create | Reached final handler`);
+    
     if (!req.file) {
+        log.warn(`[DEBUG] /jobs/create | No file in request! | Headers: ${JSON.stringify(req.headers)}`);
         return res.status(400).json({ error: 'No file uploaded' });
     }
 
     const { kiosk_id } = req.body;
+    log.info(`[DEBUG] /jobs/create | Incoming kiosk_id: ${kiosk_id} | File: ${req.file.originalname}`);
 
     if (!kiosk_id) {
         fs.unlinkSync(req.file.path);

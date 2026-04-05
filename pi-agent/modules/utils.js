@@ -91,32 +91,46 @@ async function convertDocumentToPDF(inputPath, logger) {
 }
 
 // ==================== IMAGE CONVERSION ====================
-async function convertImageToPDF(inputPath, logger) {
+async function convertImageToPDF(inputPath, logger, settings = {}) {
   return new Promise((resolve, reject) => {
     logger.info('   🔄 Converting image to PDF...');
-    logger.info(`   Input: ${inputPath}`);
+    logger.debug(`   Input: ${inputPath}`);
+    logger.debug(`   Settings: ${JSON.stringify(settings)}`);
 
     if (!fs.existsSync(inputPath)) {
       return reject(new ConversionError("Input image does not exist", 'image'));
     }
 
     const ext = path.extname(inputPath).toLowerCase();
-    if (![".png", ".jpg", ".jpeg"].includes(ext)) {
+    if (![".png", ".jpg", ".jpeg", ".bmp"].includes(ext)) {
       return reject(new ConversionError(`Unsupported image format: ${ext}`, 'image'));
     }
 
-    const outputPath = inputPath.replace(ext, ".pdf");
-
+    const outputPath = inputPath.replace(ext, "_final.pdf");
+    const A4_WIDTH = 1240;
+    const A4_HEIGHT = 1754;
+    
+    const isFit = (settings.scaling || 'fit') === 'fit';
+    
+    // Order of arguments: Global settings -> Input file -> Operators -> Output file
     const args = [
-      inputPath,
-      "-resize", "1240x1754>",
+      "-density", "150",
+      inputPath
+    ];
+
+    if (isFit) {
+      args.push("-resize", `${A4_WIDTH}x${A4_HEIGHT}`);
+    } else {
+      args.push("-resize", `${A4_WIDTH}x${A4_HEIGHT}>`);
+    }
+
+    args.push(
       "-gravity", "center",
       "-background", "white",
-      "-extent", "1240x1754",
+      "-extent", `${A4_WIDTH}x${A4_HEIGHT}`,
       "-units", "PixelsPerInch",
-      "-density", "150",
       outputPath
-    ];
+    );
 
     const tryMagickV7 = () => {
       logger.info('   🔍 Trying ImageMagick v7 (magick)...');
@@ -128,7 +142,7 @@ async function convertImageToPDF(inputPath, logger) {
         }
 
         execFile('magick', args, { timeout: CONVERSION_TIMEOUT }, (error, stdout, stderr) => {
-          if (stderr && stderr.trim()) {
+          if (stderr && stderr.trim() && !stderr.includes('Warning')) {
             logger.warn(`   ImageMagick stderr: ${stderr.trim()}`);
           }
 
@@ -137,14 +151,7 @@ async function convertImageToPDF(inputPath, logger) {
             return tryMagickV6();
           }
 
-          if (!fs.existsSync(outputPath)) {
-            logger.error('   PDF output not created');
-            return tryMagickV6();
-          }
-
-          const outputSize = fs.statSync(outputPath).size;
-          logger.info(`   ✓ Converted to PDF (${(outputSize / 1024).toFixed(1)} KB)`);
-          resolve(outputPath);
+          verifyAndResolve(outputPath, resolve, reject);
         });
       });
     };
@@ -161,7 +168,7 @@ async function convertImageToPDF(inputPath, logger) {
         }
 
         execFile('convert', args, { timeout: CONVERSION_TIMEOUT }, (error, stdout, stderr) => {
-          if (stderr && stderr.trim()) {
+          if (stderr && stderr.trim() && !stderr.includes('Warning')) {
             logger.warn(`   ImageMagick stderr: ${stderr.trim()}`);
           }
 
@@ -170,15 +177,23 @@ async function convertImageToPDF(inputPath, logger) {
             return reject(new ConversionError(`Image conversion failed: ${error.message}`, 'image'));
           }
 
-          if (!fs.existsSync(outputPath)) {
-            return reject(new ConversionError('PDF output not created by ImageMagick', 'image'));
-          }
-
-          const outputSize = fs.statSync(outputPath).size;
-          logger.info(`   ✓ Converted to PDF (${(outputSize / 1024).toFixed(1)} KB)`);
-          resolve(outputPath);
+          verifyAndResolve(outputPath, resolve, reject);
         });
       });
+    };
+
+    const verifyAndResolve = (path, res, rej) => {
+      if (!fs.existsSync(path)) {
+        return rej(new ConversionError('PDF output not created by ImageMagick', 'image'));
+      }
+
+      const outputSize = fs.statSync(path).size;
+      if (outputSize < 100) {
+         return rej(new ConversionError('Generated PDF is nearly empty (corrupt)', 'image'));
+      }
+
+      logger.info(`   ✓ Converted to PDF (${(outputSize / 1024).toFixed(1)} KB)`);
+      res(path);
     };
 
     tryMagickV7();

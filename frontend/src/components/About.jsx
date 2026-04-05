@@ -128,7 +128,7 @@ export default function About() {
               
               <div className="prose prose-invert max-w-none text-muted-foreground space-y-8">
                 <p className="text-lg md:text-xl leading-relaxed">
-                  Founded in 2024, LePrint was born out of the frustration of finding a working printer in a library. 
+                  LePrint was born out of the frustration of finding a working printer in a library. 
                   We realized that the hardware exists, but the software was stuck in the 90s.
                 </p>
 

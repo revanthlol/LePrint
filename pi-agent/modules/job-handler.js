@@ -123,6 +123,11 @@ async function processJob(jobId, state, socket, logger) {
       return;
     }
 
+    // Safety check for filename to prevent path.join(undefined) crash
+    if (!job.filename) {
+      throw new JobError('Missing filename in job data', jobId);
+    }
+
     const originalPath = path.join(tempDir, `${jobId}_${job.filename}`);
 
     // Stream download instead of base64
@@ -152,7 +157,8 @@ async function processJob(jobId, state, socket, logger) {
     safeEmit(socket, state, "job_received", { job_id: jobId });
 
     const fileType = utils.getFileType(job.filename);
-    logger.debug(`File type: ${fileType}`);
+    const settings = job.metadata?.print_settings || {};
+    logger.debug(`File type: ${fileType}, Scaling: ${settings.scaling || 'default'}`);
 
     let finalPdfPath = originalPath;
 
@@ -161,7 +167,8 @@ async function processJob(jobId, state, socket, logger) {
       finalPdfPath = await utils.convertDocumentToPDF(originalPath, logger);
     } else if (fileType === "image") {
       state.conversionsToday++;
-      finalPdfPath = await utils.convertImageToPDF(originalPath, logger);
+      // Pass settings to image conversion for scaling support
+      finalPdfPath = await utils.convertImageToPDF(originalPath, logger, settings);
     } else if (fileType === "pdf") {
       await utils.verifyPDF(originalPath, job.pages, logger);
     } else {
@@ -171,7 +178,6 @@ async function processJob(jobId, state, socket, logger) {
     logger.job(`[PRINT] ${jobId} starting print phase — ${elapsedSince(jobStartTime)} since job start`);
     safeEmit(socket, state, "print_started", { job_id: jobId });
 
-    const settings = job.metadata?.print_settings || {};
     const printResult = await printer.printDocument(
       state.printerName,
       finalPdfPath,
@@ -180,10 +186,15 @@ async function processJob(jobId, state, socket, logger) {
       settings
     );
 
+    // Safety check: printResult should be an object
+    if (!printResult || typeof printResult !== 'object') {
+       throw new JobError('Printer module returned an invalid result', jobId);
+    }
+
     safeEmit(socket, state, "print_complete", {
       job_id: jobId,
       success: true,
-      pages_printed: printResult.pages * (settings.copies || 1),
+      pages_printed: (printResult.pages || job.pages || 1) * (settings.copies || 1),
     });
 
     logger.job(`[PRINT] ${jobId} COMPLETED — total time: ${elapsedSince(jobStartTime)}`);

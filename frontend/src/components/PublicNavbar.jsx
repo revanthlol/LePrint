@@ -92,7 +92,7 @@ export default function PublicNavbar({ minimal = false }) {
                   : "border border-white/[0.12] text-white/70 hover:bg-white/[0.06]"
               }`}
             >
-              {user ? "Dashboard" : "Sign In"}
+              {user ? "Back to App" : "Sign In"}
             </Link>
           )}
           {/* mobile back gesture */}
@@ -184,7 +184,7 @@ export default function PublicNavbar({ minimal = false }) {
                     : "border border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30 backdrop-blur-md"}
                 `}
               >
-                {user ? "Dashboard" : "Sign In"}
+                {user ? "Back to App" : "Sign In"}
               </Link>
             )}
 
@@ -248,7 +248,7 @@ export default function PublicNavbar({ minimal = false }) {
                         : "border border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30 backdrop-blur-md"}
                     `}
                   >
-                    {user ? "Dashboard" : "Sign In"}
+                    {user ? "Back to App" : "Sign In"}
                   </Link>
                 )}
               </div>

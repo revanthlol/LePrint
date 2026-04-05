@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../db');
 const { verifyToken, optionalAuth, ensureUserExists } = require('../auth-middleware');
-const { upload, generateJobId, generatePrintToken, countPDFPages, PRICE_PER_PAGE } = require('./utils');
+const { upload, generateJobId, generatePrintToken, countPDFPages, countPagesInRange, PRICE_PER_PAGE } = require('./utils');
 const socketManager = require('./socket-manager');
 const log = require('./logger');
 
@@ -468,8 +468,14 @@ router.post('/jobs/:job_id/verify-payment', verifyToken, async (req, res) => {
         const { token, timestamp } = generatePrintToken(job_id, job.kiosk_id);
 
         const printSettings = req.body.print_settings || {};
-        const copies = req.body.copies || 1;
+        const copies = Math.max(1, Math.min(parseInt(req.body.copies) || 1, 50)); // Cap at 50 copies for safety
         const existingMetadata = job.metadata || {};
+
+        // Recalculate price if color mode changed or copies changed
+        const colorMode = printSettings.colorMode || 'bw';
+        const pricePerPage = colorMode === 'color' ? 10 : (job.price_per_page || PRICE_PER_PAGE);
+        const effectivePages = countPagesInRange(printSettings.pageRange || 'all', job.pages || 1);
+        const totalCost = effectivePages * copies * pricePerPage;
 
         await db.updateJob(job_id, {
             status: 'PAID',
@@ -478,15 +484,14 @@ router.post('/jobs/:job_id/verify-payment', verifyToken, async (req, res) => {
             paid_at: new Date(),
             print_token: token,
             token_timestamp: timestamp,
+            price_per_page: pricePerPage,
+            total_cost: totalCost,
+            pages: effectivePages,
             metadata: {
                 ...existingMetadata,
                 print_settings: printSettings,
                 copies,
-                total_pages_to_print: (
-                    printSettings.pageRange && printSettings.pageRange !== 'all'
-                        ? Math.max(1, copies)
-                        : (job.pages || 1) * copies
-                )
+                total_pages_to_print: effectivePages * copies
             }
         });
 

@@ -47,10 +47,34 @@ async function countPDFPages(filePath) {
     }
 }
 
+function countPagesInRange(rangeStr, maxPages) {
+    if (!rangeStr || rangeStr === 'all') return maxPages;
+    try {
+        const pages = new Set();
+        const parts = rangeStr.split(',');
+        for (const part of parts) {
+            const trimmed = part.trim();
+            if (trimmed.includes('-')) {
+                const [s, e] = trimmed.split('-');
+                const start = Math.max(1, parseInt(s) || 1);
+                const end = Math.min(maxPages, parseInt(e) || maxPages);
+                for (let i = start; i <= end; i++) pages.add(i);
+            } else {
+                const p = parseInt(trimmed);
+                if (p >= 1 && p <= maxPages) pages.add(p);
+            }
+        }
+        return Math.max(1, pages.size);
+    } catch {
+        return maxPages;
+    }
+}
+
 module.exports = {
     upload,
     generateJobId,
     generatePrintToken,
     countPDFPages,
+    countPagesInRange,
     PRICE_PER_PAGE: 3
 };

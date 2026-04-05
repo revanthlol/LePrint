@@ -87,7 +87,8 @@ async function updateJob(jobId, updates) {
         'token_timestamp', 'error_message', 'pages_printed',
         'paid_at', 'queued_at', 'print_started_at', 'print_completed_at',
         'metadata', 'status_message', 'last_status_update', 'job_type',
-        'output_file_url', 'scan_options', 'retry_count', 'file_path', 'file_size'
+        'output_file_url', 'scan_options', 'retry_count', 'file_path', 'file_size',
+        'total_cost', 'price_per_page', 'pages'
     ];
     
     const setClause = [];

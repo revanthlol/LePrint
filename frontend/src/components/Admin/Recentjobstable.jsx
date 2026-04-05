@@ -148,17 +148,19 @@ function AdminJobDetailModal({ job, open, onClose, onJobUpdated }) {
             </div>
           </section>
 
-          {/* Kiosk */}
+          {/* Dispatch Kiosk */}
           <section className="space-y-2">
-            <h4 className="text-[10px] lowercase text-muted-foreground uppercase tracking-[0.2em] font-bold">Kiosk</h4>
-            <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 space-y-2.5">
-              <div className="flex items-start justify-between gap-4">
-                <span className="text-muted-foreground shrink-0">Kiosk ID</span>
-                <code className="text-[10px] md:text-[11px] font-mono text-foreground bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded break-all text-right">{job.kioskId || '—'}</code>
-              </div>
+            <h4 className="text-[10px] lowercase text-muted-foreground uppercase tracking-[0.2em] font-bold">Dispatch Kiosk</h4>
+            <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-5 space-y-3 shadow-xl">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Name</span>
-                <span className="text-foreground text-xs font-medium">{job.kioskName || job.kioskId || '—'}</span>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-bold mb-1">Primary Identifier</span>
+                  <span className="text-xl font-mono font-black text-primary select-all drop-shadow-[0_0_15px_rgba(59,130,246,0.3)] tracking-tighter">#{job.kioskId}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-bold block mb-1">Friendly Label</span>
+                  <span className="text-[12px] text-foreground font-medium italic opacity-80">{job.kioskName || 'No Name Set'}</span>
+                </div>
               </div>
             </div>
           </section>
@@ -378,8 +380,8 @@ export function RecentJobsTable({ jobs, loading, onJobUpdated }) {
                 {/* Main info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 shrink-0 font-black tracking-wider">#{job.kioskId}</span>
                     <p className="text-[14px] font-medium text-foreground truncate">{job.filename || 'Untitled'}</p>
-                    <span className="text-[10px] font-mono text-muted-foreground/30 uppercase tracking-tight shrink-0">#{job.kioskId}</span>
                   </div>
                   <div className="flex items-center gap-3 text-[12px] text-muted-foreground/70 tracking-tight">
                     <span className="tabular-nums">{formatTimeAgo(job.createdAt)}</span>

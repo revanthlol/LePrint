@@ -168,10 +168,10 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-lg leading-none tracking-tight">
-                            {kiosk.locationName || kiosk.hostname || kiosk.id}
-                            <span className="ml-2 text-xs font-mono font-normal text-muted-foreground/60">
-                              #{kiosk.id}
+                          <h3 className="font-bold text-lg leading-none tracking-tight flex items-center gap-2">
+                            <span className="text-primary font-mono select-all">#{kiosk.id}</span>
+                            <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-[0.1em] truncate max-w-[120px]">
+                              {kiosk.locationName || kiosk.hostname}
                             </span>
                           </h3>
                           <Button
@@ -278,7 +278,10 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
               Set Paper Count
             </DialogTitle>
             <DialogDescription>
-              Update the current paper stack for <span className="font-medium text-foreground">{editingKiosk?.locationName || editingKiosk?.hostname || editingKiosk?.id}</span>
+              Update the current paper stack for kiosk <span className="font-mono text-xs text-primary font-bold">#{editingKiosk?.id}</span> 
+              <span className="text-[10px] text-muted-foreground ml-1 italic">
+                ({editingKiosk?.locationName || editingKiosk?.hostname || 'No Label'})
+              </span>
             </DialogDescription>
           </DialogHeader>
           <div className="py-6">

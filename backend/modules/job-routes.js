@@ -37,12 +37,16 @@ router.get('/users/stats', verifyToken, async (req, res) => {
     try {
         const stats = await db.getUserStats(req.user.uid);
         res.json({
-            totalJobs: parseInt(stats.total_jobs || 0),
-            totalPages: parseInt(stats.total_pages || 0),
-            totalSpent: parseFloat(stats.total_spent || 0),
-            successRate: parseFloat(stats.success_rate || 0),
-            jobsThisMonth: parseInt(stats.jobs_this_month || 0),
-            spentThisMonth: parseFloat(stats.spent_this_month || 0)
+            total_jobs: parseInt(stats.total_jobs || 0),
+            total_pages: parseInt(stats.total_pages || 0),
+            total_spent: parseFloat(stats.total_spent || 0),
+            success_rate: parseFloat(stats.success_rate || 0),
+            completed_count: parseInt(stats.completed_count || 0),
+            failed_count: parseInt(stats.failed_count || 0),
+            active_count: parseInt(stats.active_count || 0),
+            pending_count: parseInt(stats.pending_count || 0),
+            jobs_this_month: parseInt(stats.jobs_this_month || 0),
+            spent_this_month: parseFloat(stats.spent_this_month || 0)
         });
     } catch (error) {
         log.error('[JOB] ERROR | route: /api/users/stats | reason: ' + error.message);

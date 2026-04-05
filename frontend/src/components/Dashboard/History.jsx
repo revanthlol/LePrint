@@ -327,39 +327,41 @@ export function History() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard icon={FileText} label="Jobs" value={stats.total_jobs || 0} color="text-blue-400" delay={0} />
           <StatCard icon={TrendingUp} label="Pages" value={stats.total_pages || 0} color="text-purple-400" delay={0.1} />
-          <StatCard icon={IndianRupee} label="Cost" value={`₹${stats.total_spent || 0}`} color="text-emerald-400" delay={0.2} />
-          <StatCard icon={CheckCircle} label="Rate" value={`${Math.round((stats.success_rate || 0) * 100)}%`} color="text-emerald-400" delay={0.3} />
+          <StatCard icon={IndianRupee} label="Spent" value={`₹${stats.total_spent || 0}`} color="text-emerald-400" delay={0.2} />
+          <StatCard icon={CheckCircle} label="Success" value={`${Math.round((stats.success_rate || 0) * 100)}%`} color="text-emerald-400" delay={0.3} />
         </div>
       )}
 
       <div className="space-y-6">
-        <div className="flex flex-col gap-6">
-          <div className="relative bg-white/[0.02] border border-white/[0.08] rounded-3xl p-2 sm:p-2.5 overflow-hidden">
-             {/* Animated Tab Background Indicator */}
-             <div className="absolute top-2 bottom-2 left-2 flex transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
+        <div className="flex flex-col gap-5">
+          <div className="relative bg-white/[0.03] border border-white/[0.08] rounded-[1.25rem] p-1.5 overflow-hidden">
+             {/* Animated Tab Background Indicator (Sleeker Pill) */}
+             <div className="absolute top-1.5 bottom-1.5 left-1.5 flex transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
                   style={{ 
-                    width: filter === 'all' ? '25%' : filter === 'COMPLETED' ? '25%' : filter === 'PRINTING' ? '25%' : '25%',
-                    left: filter === 'all' ? '0.5rem' : filter === 'COMPLETED' ? 'calc(25% + 0.5rem)' : filter === 'PRINTING' ? 'calc(50% + 0.5rem)' : 'calc(75% + 0.5rem)'
+                    width: 'calc(25% - 0.375rem)',
+                    left: filter === 'all' ? '0.375rem' : 
+                          filter === 'COMPLETED' ? '25%' : 
+                          filter === 'PRINTING' ? '50%' : '75%'
                   }}>
-               <div className="w-full h-full bg-white rounded-2xl shadow-[0_8px_30px_rgb(255,255,255,0.12)]" />
+               <div className="w-full h-full bg-white rounded-xl shadow-[0_4px_20px_rgb(255,255,255,0.1)]" />
              </div>
 
              <div className="relative flex items-center justify-between w-full">
                {[
-                 { id: 'all', label: 'All Jobs', count: stats?.total_jobs || 0, color: 'bg-white/10 text-white' },
-                 { id: 'COMPLETED', label: 'Success', count: stats?.completed_count || 0, color: 'bg-emerald-500/20 text-emerald-400' },
-                 { id: 'PRINTING', label: 'Active', count: stats?.active_count || 0, color: 'bg-blue-500/20 text-blue-400' },
-                 { id: 'FAILED', label: 'Failed', count: stats?.failed_count || 0, color: 'bg-red-500/20 text-red-400' },
+                 { id: 'all', label: 'Overview', count: stats?.total_jobs || 0, color: 'text-white/40' },
+                 { id: 'COMPLETED', label: 'Success', count: stats?.completed_count || 0, color: 'text-emerald-500/50' },
+                 { id: 'PRINTING', label: 'Active', count: stats?.active_count || 0, color: 'text-blue-500/50' },
+                 { id: 'FAILED', label: 'Failed', count: stats?.failed_count || 0, color: 'text-red-500/50' },
                ].map((tab) => (
                  <button
                    key={tab.id}
                    onClick={() => { setFilter(tab.id); setCurrentPage(1); }}
-                   className={`flex-1 relative py-3 sm:py-4 px-2 sm:px-4 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2.5 transition-all duration-500 group`}
+                   className={`flex-1 relative py-2.5 h-10 flex items-center justify-center gap-2 transition-all duration-500`}
                  >
-                   <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-[0.1em] transition-all duration-500 ${filter === tab.id ? 'text-black' : 'text-muted-foreground group-hover:text-white'}`}>
+                   <span className={`text-[10px] font-black uppercase tracking-[0.08em] transition-all duration-500 ${filter === tab.id ? 'text-black' : 'text-muted-foreground/60'}`}>
                      {tab.label}
                    </span>
-                   <span className={`px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-mono font-bold transition-all duration-500 ${filter === tab.id ? 'bg-black/10 text-black/60' : `${tab.color}`}`}>
+                   <span className={`text-[9px] font-mono font-bold transition-all duration-500 ${filter === tab.id ? 'text-black/40' : tab.color}`}>
                      {tab.count}
                    </span>
                  </button>

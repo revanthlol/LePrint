@@ -37,44 +37,6 @@ LePrint is a three-component kiosk system for libraries, universities, coworking
 
 ---
 
-## ✨ Features
-
-### Print
-- 📄 **Multi-format support** — PDF, DOCX, TXT, PNG, JPG (auto-converted to PDF)
-- 💳 **Pay per page** — **Razorpay** integration with configurable pricing
-- 🔄 **Real-time status** — Live job tracking via WebSocket
-- 🔒 **Row locking** — `FOR UPDATE SKIP LOCKED` prevents duplicate dispatch
-- 🔁 **Auto-retry** — Failed jobs retry up to 3 times
-- 📥 **File streaming** — Download URLs instead of base64 encoding
-- 🗑️ **Auto-cleanup** — Print queue files cleaned up after 30 minutes
-- 💾 **Disk protection** — 500MB limit on print queue directory
-- 📑 **Multi-job** — Tab bar appears from the first job onwards (max 5 per session)
-- 📊 **Job summary screen** — On completion showing per-job outcomes and timings
-
-### Scan & Xerox
-- 🔍 **eSCL scanning** — Works with any AirScan/eSCL-compatible printer
-- 📤 **Cloud upload** — Scanned PDFs uploaded to backend automatically
-- 📋 **Scan → Print pipeline** — Photocopy mode with up to 20 copies
-- 🔄 **Real-time progress** — Status updates via WebSocket for all phases
-
-### Smart Kiosk Logic
-- 🖨️ **Capability Awareness** — Automatic brand detection (Epson) and capability profiling
-- 🔋 **Heartbeat Resilience** — `safeEmit` queuing for offline recovery and fast heartbeats during jobs
-- 📊 **Step indicators** — Visual progress tracking (Paid → Sent → Queued → Printing → Done)
-- 💡 **Fun facts ticker** — Educational content displayed during processing
-
-### Guest Mode & Security
-- 👤 **Continue as Guest** — UUID-based identity with 3 jobs/day device limit
-- 🛡️ **Firebase Auth** — Secure Google OAuth login for registered users
-- 👥 **Role-based access** — Multi-tier access control (User, Admin, Superadmin)
-
-### Admin & Monitoring
-- 📊 **Dashboard** — System-wide revenue, jobs, and success metrics
-- 🖨️ **Health Grid** — Card-based real-time monitor with **Epson branding** and driver detection
-- 📋 **Job Audit** — Full history with user/guest isolation and filtering
-
----
-
 ## 🏗️ Architecture
 
 ```

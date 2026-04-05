@@ -454,6 +454,10 @@ async function getUserStats(userId) {
                 COUNT(*) as total_jobs,
                 COALESCE(SUM(pages), 0) as total_pages,
                 COALESCE(SUM(total_cost), 0) as total_spent,
+                COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) as completed_count,
+                COUNT(CASE WHEN status = 'FAILED' THEN 1 END) as failed_count,
+                COUNT(CASE WHEN status IN ('PRINTING', 'QUEUED') THEN 1 END) as active_count,
+                COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pending_count,
                 COALESCE(
                     COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END)::float / NULLIF(COUNT(*), 0),
                     0

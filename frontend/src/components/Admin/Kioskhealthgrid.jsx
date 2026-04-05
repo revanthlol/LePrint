@@ -154,15 +154,17 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             <AnimatePresence mode="popLayout">
               {kiosks.map((kiosk, index) => (
-                <motion.div
-                  key={kiosk.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2, delay: index * 0.05 }}
-                  className={`relative overflow-hidden bg-card/60 backdrop-blur-md border border-border rounded-xl shadow-sm hover:brightness-105 transition-all group ${getCardBorderClass(kiosk)}`}
-                >
+                  <motion.div
+                    key={kiosk.id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.4, delay: index * 0.05, ease: "circOut" }}
+                    className={`relative overflow-hidden bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] rounded-[2rem] shadow-2xl hover:bg-white/[0.05] transition-all duration-500 group ${getCardBorderClass(kiosk)}`}
+                  >
+                    {/* Glass Glow effect */}
+                    <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/10 blur-[80px] rounded-full group-hover:bg-primary/20 transition-all duration-700" />
                   <div className="p-5 space-y-4">
                     {/* Header: Location & Online Status */}
                     <div className="flex items-start justify-between gap-4">
@@ -248,11 +250,17 @@ export function KioskHealthGrid({ kiosks, loading, onRefresh, getAuthHeader }) {
                     </div>
 
                     {/* Footer: Last Seen */}
-                    <div className="pt-2 text-[10px] uppercase tracking-widest font-bold text-center">
+                    <div className="pt-2 text-[10px] uppercase tracking-[0.2em] font-black text-center">
                       {kiosk.isOnline ? (
-                        <span className="text-green-500/80 animate-pulse">● System Active</span>
+                        <div className="flex items-center justify-center gap-2">
+                           <span className="relative flex h-2 w-2">
+                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                           </span>
+                           <span className="text-emerald-400/80">Kiosk Active</span>
+                        </div>
                       ) : (
-                        <span className="text-muted-foreground flex items-center justify-center gap-1">
+                        <span className="text-muted-foreground/60 flex items-center justify-center gap-1.5 bg-white/5 py-1 px-3 rounded-full w-fit mx-auto">
                           <XCircle className="w-2.5 h-2.5" />
                           {kiosk.lastSeen 
                             ? `LAST SEEN: ${new Date(kiosk.lastSeen).toLocaleTimeString()}`

@@ -7,7 +7,7 @@ import axios from 'axios';
 import { 
   FileText, Clock, CheckCircle, XCircle, Loader2, Calendar, 
   IndianRupee, TrendingUp, Copy, Download, ExternalLink,
-  ChevronDown, ChevronRight
+  ChevronDown, ChevronRight, Printer, Scissors, QrCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -36,10 +36,9 @@ function StatusBadge({ status }) {
   );
 }
 
-// ─── Job Detail Modal ───────────────────────────────────────
+// ─── Job Detail Modal (Receipt Aesthetic) ──────────────────────────────────
 function JobDetailModal({ job, open, onClose, onJobUpdated }) {
   const [copied, setCopied] = useState(false);
-  const [metaExpanded, setMetaExpanded] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const { getAuthHeader } = useAuth();
 
@@ -53,6 +52,10 @@ function JobDetailModal({ job, open, onClose, onJobUpdated }) {
 
   const jobType = job.job_type || 'print';
   const printSettings = job.metadata?.print_settings;
+
+  const handlePrintReceipt = () => {
+    window.print();
+  };
 
   const handleCancel = async () => {
     if (!window.confirm('Are you sure you want to cancel this job?')) return;
@@ -74,134 +77,113 @@ function JobDetailModal({ job, open, onClose, onJobUpdated }) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="w-[92vw] sm:max-w-lg bg-[#0a0a0a] border border-white/[0.08] rounded-3xl shadow-2xl shadow-black/50 max-h-[85vh] overflow-y-auto p-6 fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] outline-none">
-        <DialogHeader className="text-left items-start">
-          <DialogTitle className="flex items-start gap-2 text-lg tracking-tight min-w-0">
-            <span className="shrink-0 mt-0.5">{JOB_TYPE_ICONS[jobType] || '🖨️'}</span>
-            <span className="break-words leading-snug">{job.filename || 'Untitled'}</span>
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="p-0 border-none bg-transparent shadow-none w-[95vw] sm:max-w-md print:max-w-none print:w-full print:m-0 print:bg-white print:text-black">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className="relative bg-[#0d0d0d] border border-white/[0.08] rounded-[2.5rem] overflow-hidden shadow-2xl print:bg-white print:shadow-none print:border-none print:rounded-none"
+        >
+          {/* Paper Texture Overlay */}
+          <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] mix-blend-overlay print:hidden" />
+          
+          <div className="relative p-8 space-y-8">
+            {/* Receipt Header */}
+            <header className="text-center space-y-4">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-white text-black mb-2 shadow-lg shadow-white/10 print:bg-black print:text-white">
+                <Printer className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-2xl font-black tracking-tight text-white print:text-black">Leprint Official Receipt</h2>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold">Transaction Confirmed</p>
+              </div>
+            </header>
 
-        <div className="p-6 space-y-5 text-sm">
-          {/* Job Info */}
-          <section className="space-y-2">
-            <h4 className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">Job Info</h4>
-            <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <span className="text-muted-foreground shrink-0 mt-0.5">Job ID</span>
-                <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
-                  <code className="text-[10px] md:text-xs font-mono text-foreground bg-white/5 px-1.5 py-0.5 rounded border border-white/10 break-all text-right leading-tight">{job.id}</code>
-                  <button onClick={copyId} className="text-muted-foreground hover:text-white hover:bg-white/[0.06] rounded p-1 transition-colors shrink-0">
-                    <Copy className="w-3 h-3" />
-                  </button>
-                  {copied && <span className="text-[11px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full shrink-0">Copied!</span>}
-                </div>
+            {/* Status Stamp */}
+            {job.status === 'COMPLETED' && (
+              <div className="absolute top-10 right-[-20px] rotate-[25deg] border-4 border-emerald-500/30 px-4 py-1 rounded-xl pointer-events-none print:border-emerald-600 print:text-emerald-600">
+                <span className="text-2xl font-black text-emerald-500/40 uppercase tracking-widest print:text-emerald-600">SUCCESS</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Type</span>
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-white/5 border border-white/10 text-foreground capitalize">
-                  {JOB_TYPE_LABELS[jobType] || 'Print'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Status</span>
-                <StatusBadge status={job.status} />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Created</span>
-                <span className="text-foreground text-xs font-medium tabular-nums">{new Date(job.created_at).toLocaleString()}</span>
-              </div>
+            )}
+
+            {/* Tear line */}
+            <div className="flex items-center gap-2 overflow-hidden px-4">
+              <Scissors className="w-3 h-3 text-white/20 shrink-0 print:hidden" />
+              <div className="h-[1px] w-full border-t border-dashed border-white/20 print:border-black/20" />
             </div>
-          </section>
 
-          {/* Document Section */}
-          <section className="space-y-2">
-            <h4 className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">Document</h4>
-            <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <span className="text-muted-foreground shrink-0 mt-0.5">Filename</span>
-                <span className="text-foreground font-medium text-xs text-right break-all leading-relaxed flex-1 min-w-0" title={job.filename}>{job.filename || '—'}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Pages</span>
-                <span className="text-foreground font-bold tabular-nums">{job.pages || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Amount Paid</span>
-                <span className="text-emerald-400 font-bold text-base tabular-nums">₹{job.total_cost || 0}</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Settings Section (only for relevant types) */}
-          {printSettings && (jobType === 'print' || jobType === 'xerox') && (
-            <section className="space-y-2">
-              <h4 className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60 font-bold">Print Details</h4>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 grid grid-cols-2 gap-y-3 gap-x-6">
-                {Object.entries(printSettings).map(([key, value]) => (
-                  <div key={key} className="space-y-0.5">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50">{key.replace('_', ' ')}</p>
-                    <p className="text-[13px] font-bold text-foreground capitalize">{value === 'bw' ? 'B&W' : value}</p>
+            {/* Main Content */}
+            <div className="space-y-6 font-mono text-[13px]">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start gap-4">
+                  <span className="text-muted-foreground uppercase text-[10px]">Job ID</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-white font-bold select-all print:text-black">#{job.id.substring(0, 12)}...</span>
+                    <button onClick={copyId} className="text-[9px] text-primary hover:underline print:hidden">
+                      {copied ? 'Copied' : 'Copy Full ID'}
+                    </button>
                   </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Download Support */}
-          {jobType === 'scan' && job.status === 'COMPLETED' && (
-            <motion.div whileTap={{ scale: 0.98 }}>
-              <a href={`${API_URL}/api/jobs/${job.id}/download`} target="_blank" rel="noopener noreferrer" className="block">
-                <Button className="w-full bg-white text-black hover:bg-neutral-200 font-bold rounded-2xl py-6 shadow-xl shadow-white/5">
-                  <Download className="mr-2 h-5 w-5" />
-                  Download Files
-                </Button>
-              </a>
-            </motion.div>
-          )}
-
-          {/* Cancellation Control */}
-          {job.status === 'PENDING' && (
-            <motion.div whileTap={{ scale: 0.98 }}>
-              <Button 
-                onClick={handleCancel}
-                disabled={isCancelling}
-                className="w-full bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 font-bold rounded-2xl py-6 shadow-xl"
-              >
-                {isCancelling ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : null}
-                Cancel Job
-              </Button>
-            </motion.div>
-          )}
-
-          {/* Refund Call for Failures */}
-          {job.status === 'FAILED' && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 space-y-3">
-              <div className="flex gap-3">
-                <XCircle className="w-5 h-5 text-red-400 shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-red-100">Job failed during processing</p>
-                  <p className="text-[11px] text-red-200/60 font-mono mt-1 leading-relaxed">
-                    {job.error_message || 'System error. You were not charged for this failure.'}
-                  </p>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground uppercase text-[10px]">Date</span>
+                  <span className="text-white font-bold print:text-black">{new Date(job.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground uppercase text-[10px]">Time</span>
+                  <span className="text-white font-bold print:text-black">{new Date(job.created_at).toLocaleTimeString()}</span>
                 </div>
               </div>
-              <Button 
-                variant="outline" 
-                className="w-full border-red-500/30 text-red-300 hover:bg-red-500/20 hover:text-red-100 rounded-xl font-bold py-5"
-                onClick={() => window.location.href = '/contact?subject=Refund%20Request'}
-              >
-                Request Support →
-              </Button>
-            </div>
-          )}
-        </div>
 
-        <DialogFooter className="p-6 pt-0">
-          <Button variant="ghost" onClick={onClose} className="w-full text-muted-foreground hover:text-white rounded-xl py-5 transition-colors">
-            Back to History
-          </Button>
-        </DialogFooter>
+              <div className="h-[1px] border-t border-white/10 print:border-black/10" />
+
+              <div className="space-y-2.5">
+                <p className="text-muted-foreground uppercase text-[10px] tracking-widest mb-2">Itemized Details</p>
+                <div className="flex justify-between items-center bg-white/[0.03] p-3 rounded-xl print:bg-gray-50">
+                  <span className="text-white/80 font-medium truncate max-w-[180px]">{job.filename}</span>
+                  <span className="text-white font-bold tabular-nums">×{job.pages}</span>
+                </div>
+                {printSettings && (
+                   <div className="grid grid-cols-2 gap-2 text-[11px] mt-2">
+                     <span className="bg-white/5 px-2 py-1 rounded text-muted-foreground italic">Mode: {printSettings.colorMode === 'color' ? 'Color' : 'B&W'}</span>
+                     <span className="bg-white/5 px-2 py-1 rounded text-muted-foreground italic">Paper: A4 Standard</span>
+                   </div>
+                )}
+              </div>
+
+              <div className="h-[1px] border-t border-dashed border-white/20 pt-4 print:border-black/20" />
+
+              <div className="flex justify-between items-center py-2">
+                <span className="text-xl font-black text-white uppercase print:text-black">TOTAL</span>
+                <span className="text-3xl font-black text-emerald-400 print:text-emerald-700">₹{job.total_cost || 0}</span>
+              </div>
+            </div>
+
+            {/* Receipt Footer */}
+            <footer className="pt-4 space-y-6">
+              <div className="flex justify-center flex-col items-center gap-3">
+                 <div className="p-3 bg-white rounded-2xl print:invert print:p-1">
+                   <QrCode className="w-16 h-16 text-black" />
+                 </div>
+                 <p className="text-[9px] text-muted-foreground/60 text-center uppercase tracking-[2px]">Scan to re-order • Thank you for choosing Leprint</p>
+              </div>
+
+              <div className="flex gap-3 print:hidden">
+                <Button 
+                   onClick={handlePrintReceipt}
+                   className="flex-1 bg-white text-black hover:bg-neutral-200 h-12 rounded-2xl font-black italic shadow-xl"
+                >
+                  <Download className="mr-2 h-4 w-4" /> Download
+                </Button>
+                <Button 
+                   variant="outline"
+                   onClick={onClose}
+                   className="flex-1 border-white/10 text-white hover:bg-white/5 h-12 rounded-2xl font-bold"
+                >
+                  Close
+                </Button>
+              </div>
+            </footer>
+          </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );
@@ -343,27 +325,47 @@ export function History() {
 
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard icon={FileText} label="Jobs" value={stats.totalJobs || 0} color="text-blue-400" delay={0} />
-          <StatCard icon={TrendingUp} label="Pages" value={stats.totalPages || 0} color="text-purple-400" delay={0.1} />
-          <StatCard icon={IndianRupee} label="Cost" value={`₹${stats.totalSpent || 0}`} color="text-emerald-400" delay={0.2} />
-          <StatCard icon={CheckCircle} label="Rate" value={`${Math.round((stats.successRate || 0) * 100)}%`} color="text-emerald-400" delay={0.3} />
+          <StatCard icon={FileText} label="Jobs" value={stats.total_jobs || 0} color="text-blue-400" delay={0} />
+          <StatCard icon={TrendingUp} label="Pages" value={stats.total_pages || 0} color="text-purple-400" delay={0.1} />
+          <StatCard icon={IndianRupee} label="Cost" value={`₹${stats.total_spent || 0}`} color="text-emerald-400" delay={0.2} />
+          <StatCard icon={CheckCircle} label="Rate" value={`${Math.round((stats.success_rate || 0) * 100)}%`} color="text-emerald-400" delay={0.3} />
         </div>
       )}
 
       <div className="space-y-6">
         <div className="flex flex-col gap-6">
-          <Tabs value={filter} onValueChange={(v) => { setFilter(v); setCurrentPage(1); }} className="w-full">
-            <TabsList className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-1.5 flex w-full sm:w-fit items-center gap-1.5 overflow-x-auto scrollbar-hide">
-              {['all', 'COMPLETED', 'PRINTING', 'FAILED'].map((s) => (
-                <TabsTrigger 
-                  key={s} value={s} 
-                  className="data-[state=active]:bg-white data-[state=active]:text-black rounded-xl transition-all font-bold text-[10px] sm:text-[11px] uppercase tracking-wider h-10 px-5 sm:px-6 whitespace-nowrap"
-                >
-                  {s.replace('COMPLETED', 'Success').replace('all', 'All Jobs')}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          <div className="relative bg-white/[0.02] border border-white/[0.08] rounded-3xl p-2 sm:p-2.5 overflow-hidden">
+             {/* Animated Tab Background Indicator */}
+             <div className="absolute top-2 bottom-2 left-2 flex transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
+                  style={{ 
+                    width: filter === 'all' ? '25%' : filter === 'COMPLETED' ? '25%' : filter === 'PRINTING' ? '25%' : '25%',
+                    left: filter === 'all' ? '0.5rem' : filter === 'COMPLETED' ? 'calc(25% + 0.5rem)' : filter === 'PRINTING' ? 'calc(50% + 0.5rem)' : 'calc(75% + 0.5rem)'
+                  }}>
+               <div className="w-full h-full bg-white rounded-2xl shadow-[0_8px_30px_rgb(255,255,255,0.12)]" />
+             </div>
+
+             <div className="relative flex items-center justify-between w-full">
+               {[
+                 { id: 'all', label: 'All Jobs', count: stats?.total_jobs || 0, color: 'bg-white/10 text-white' },
+                 { id: 'COMPLETED', label: 'Success', count: stats?.completed_count || 0, color: 'bg-emerald-500/20 text-emerald-400' },
+                 { id: 'PRINTING', label: 'Active', count: stats?.active_count || 0, color: 'bg-blue-500/20 text-blue-400' },
+                 { id: 'FAILED', label: 'Failed', count: stats?.failed_count || 0, color: 'bg-red-500/20 text-red-400' },
+               ].map((tab) => (
+                 <button
+                   key={tab.id}
+                   onClick={() => { setFilter(tab.id); setCurrentPage(1); }}
+                   className={`flex-1 relative py-3 sm:py-4 px-2 sm:px-4 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2.5 transition-all duration-500 group`}
+                 >
+                   <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-[0.1em] transition-all duration-500 ${filter === tab.id ? 'text-black' : 'text-muted-foreground group-hover:text-white'}`}>
+                     {tab.label}
+                   </span>
+                   <span className={`px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-mono font-bold transition-all duration-500 ${filter === tab.id ? 'bg-black/10 text-black/60' : `${tab.color}`}`}>
+                     {tab.count}
+                   </span>
+                 </button>
+               ))}
+             </div>
+          </div>
 
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-0.5">
             <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/40 font-bold shrink-0 mr-1 ml-1">Sort by</span>

@@ -9,6 +9,7 @@ const logger = require('./modules/logger');
 const utils = require('./modules/utils');
 const jobHandler = require('./modules/job-handler');
 const socketClient = require('./modules/socket-client');
+const geo = require('./modules/geo');
 const os = require('os');
 
 // ==================== CONFIG ====================
@@ -72,13 +73,16 @@ console.log(`
 
 // ==================== INIT ====================
 async function initialize() {
-  // 0. Location check — GPS coords must be configured in .env or via setup-wizard.
-  //    IP-based geolocation is NOT used (inaccurate at city-level).
-  if (!CONFIG.latitude || !CONFIG.longitude) {
-    logger.warn('⚠️  No GPS coordinates configured. Kiosk will start, but will NOT appear on the map.');
-    logger.info('   → Run "node setup-wizard.js" to configure GPS location, or set LATITUDE/LONGITUDE in .env manually.');
+  // 0. Location check — Hybrid system (ENV -> Backend -> GPS)
+  const location = await geo.resolveLocation(logger);
+  STATE.latitude = location.latitude;
+  STATE.longitude = location.longitude;
+
+  if (!STATE.latitude || !STATE.longitude) {
+    logger.warn('⚠️  No location coordinates configured. Kiosk will start, but will NOT appear on the map.');
+    logger.info('   → Run "node setup-wizard.js" or register kiosk in backend.');
   } else {
-    logger.success(`📍 Kiosk location: ${CONFIG.latitude}, ${CONFIG.longitude}`);
+    logger.success(`📍 Kiosk location: ${STATE.latitude}, ${STATE.longitude} (source: ${location.source})`);
   }
 
   // 1. Check conversion tools
@@ -122,8 +126,8 @@ async function initialize() {
     os.hostname(),
     STATE,
     logger,
-    CONFIG.latitude,
-    CONFIG.longitude
+    STATE.latitude,
+    STATE.longitude
   );
 
   // Wait for connection then start services
@@ -148,8 +152,8 @@ async function initialize() {
     CONFIG.heartbeatInterval,
     STATE,
     logger,
-    CONFIG.latitude,
-    CONFIG.longitude
+    STATE.latitude,
+    STATE.longitude
   );
 
   // Start status log

@@ -85,10 +85,10 @@ app.get('/', async (req, res) => {
                 border: 1px solid var(--card-border);
                 border-radius: var(--radius);
                 width: 100%;
-                max-width: 1100px;
-                min-height: 640px;
+                max-width: 1200px;
+                min-height: 700px;
                 display: grid;
-                grid-template-columns: 1.1fr 0.9fr;
+                grid-template-columns: 1.2fr 0.8fr;
                 gap: 20px;
                 padding: 24px;
                 box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
@@ -108,21 +108,21 @@ app.get('/', async (req, res) => {
                 justify-content: space-between;
                 background: rgba(255, 255, 255, 0.01);
                 border-radius: 24px;
-                border: 1px solid rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.01);
             }
 
             .brand-logo {
                 display: flex;
                 align-items: center;
                 gap: 16px;
-                margin-bottom: 64px;
+                margin-bottom: 48px;
             }
 
             .logo-icon {
-                width: 56px;
-                height: 56px;
+                width: 52px;
+                height: 52px;
                 background: #ffffff;
-                border-radius: 16px;
+                border-radius: 14px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -131,9 +131,9 @@ app.get('/', async (req, res) => {
             }
 
             .brand-name {
-                font-size: 28px;
+                font-size: 24px;
                 font-weight: 900;
-                letter-spacing: -1.5px;
+                letter-spacing: -1.2px;
             }
 
             .hero-text h1 {
@@ -141,74 +141,83 @@ app.get('/', async (req, res) => {
                 font-weight: 800;
                 letter-spacing: -2.5px;
                 line-height: 1.1;
-                margin-bottom: 24px;
-                background: linear-gradient(to bottom right, #fff, rgba(255, 255, 255, 0.5));
+                margin-bottom: 20px;
+                background: linear-gradient(to bottom right, #fff, rgba(255, 255, 255, 0.6));
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
             }
 
-            .hero-text p {
-                font-size: 18px;
-                color: var(--text-muted);
-                max-width: 400px;
-                line-height: 1.6;
+            /* Kiosk ID Block */
+            .id-container {
+                margin: 32px 0;
             }
 
-            /* Dashboard Style Info Pill */
-            .kiosk-badge {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 12px 20px;
-                background: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 20px;
-                width: fit-content;
-                margin-bottom: 40px;
-            }
-
-            .kiosk-id {
-                font-family: ui-monospace, monospace;
-                font-weight: 700;
-                font-size: 14px;
-                letter-spacing: 1px;
+            .id-label {
+                font-size: 11px;
+                font-weight: 800;
                 text-transform: uppercase;
-                color: var(--text-main);
-            }
-
-            .status-dot {
-                width: 8px;
-                height: 8px;
-                background: var(--success);
-                border-radius: 50%;
-                box-shadow: 0 0 12px var(--success);
-                animation: pulse 2s infinite;
-            }
-
-            @keyframes pulse {
-                0% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.5); opacity: 0.5; }
-                100% { transform: scale(1); opacity: 1; }
-            }
-
-            .footer-meta {
-                display: flex;
-                flex-direction: column;
-                gap: 16px;
-            }
-
-            .location-meta {
-                font-size: 14px;
+                letter-spacing: 2px;
                 color: var(--text-muted);
-                display: flex;
-                gap: 12px;
-                font-weight: 500;
+                margin-bottom: 12px;
+                display: block;
             }
 
-            .location-meta span {
-                display: flex;
-                align-items: center;
-                gap: 6px;
+            .id-value {
+                font-family: ui-monospace, monospace;
+                font-size: 32px;
+                font-weight: 900;
+                background: rgba(255, 255, 255, 0.05);
+                padding: 8px 20px;
+                border-radius: 12px;
+                border-left: 4px solid var(--success);
+                width: fit-content;
+                color: #fff;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            }
+
+            /* Instructions Grid */
+            .instructions-container {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 24px;
+                margin-top: 40px;
+            }
+
+            .step-card {
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                padding: 24px;
+                border-radius: 20px;
+                transition: background 0.3s ease;
+            }
+
+            .step-card:hover {
+                background: rgba(255, 255, 255, 0.04);
+            }
+
+            .step-icon {
+                width: 32px;
+                height: 32px;
+                color: var(--text-muted);
+                margin-bottom: 16px;
+            }
+
+            .step-title {
+                font-size: 15px;
+                font-weight: 700;
+                margin-bottom: 8px;
+                color: #fff;
+            }
+
+            .step-desc {
+                font-size: 13px;
+                color: var(--text-muted);
+                line-height: 1.5;
+            }
+
+            .step-highlight {
+                color: var(--success);
+                font-weight: 600;
             }
 
             /* Right QR Section */
@@ -218,13 +227,15 @@ app.get('/', async (req, res) => {
                 align-items: center;
                 justify-content: center;
                 position: relative;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 0 32px 32px 0;
             }
 
             .qr-outer-glow {
                 position: absolute;
-                width: 400px;
-                height: 400px;
-                background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+                width: 500px;
+                height: 500px;
+                background: radial-gradient(circle, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
                 pointer-events: none;
             }
 
@@ -232,59 +243,48 @@ app.get('/', async (req, res) => {
                 background: #ffffff;
                 padding: 32px;
                 border-radius: 40px;
-                box-shadow: 0 32px 80px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
-                transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
+                transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 cursor: pointer;
             }
 
             .qr-display-case:hover {
-                transform: scale(1.05) translateY(-5px);
+                transform: scale(1.04) rotate(1deg);
             }
 
             .qr-img {
-                width: 300px;
-                height: 300px;
+                width: 320px;
+                height: 320px;
                 display: block;
             }
 
-            .scan-tooltip {
-                margin-top: 32px;
-                font-size: 14px;
-                font-weight: 700;
-                letter-spacing: 2px;
+            .scan-badge {
+                margin-top: 40px;
+                padding: 10px 24px;
+                background: #fff;
+                color: #000;
+                font-size: 12px;
+                font-weight: 900;
                 text-transform: uppercase;
-                color: var(--text-muted);
-                display: flex;
-                align-items: center;
-                gap: 12px;
-            }
-
-            .scan-tooltip::before, .scan-tooltip::after {
-                content: '';
-                width: 20px;
-                height: 1px;
-                background: rgba(255, 255, 255, 0.1);
+                letter-spacing: 2px;
+                border-radius: 99px;
+                box-shadow: 0 8px 24px rgba(255, 255, 255, 0.1);
             }
 
             /* Responsive */
-            @media (max-width: 1000px) {
+            @media (max-width: 1100px) {
                 .main-card { grid-template-columns: 1fr; max-width: 600px; min-height: auto; padding: 20px; }
-                .content-area { padding: 32px; align-items: center; text-align: center; }
+                .content-area { padding: 40px; }
+                .instructions-container { grid-template-columns: 1fr; }
+                .qr-section { padding: 60px 0; border-radius: 24px; margin-top: 20px; }
                 .hero-text h1 { font-size: 40px; }
-                .hero-text p { margin: 0 auto 24px; }
-                .kiosk-badge { margin: 0 auto 32px; }
-                .brand-logo { margin-bottom: 40px; }
-                .qr-section { padding: 40px 0; }
-                body { padding: 20px; }
             }
 
-            @media (max-height: 700px) and (orientation: landscape) {
-                body { padding: 10px; }
-                .main-card { min-height: 90vh; }
-                .hero-text h1 { font-size: 32px; }
-                .content-area { padding: 24px; }
-                .brand-logo { margin-bottom: 20px; }
-                .qr-img { width: 220px; height: 220px; }
+            @media (max-height: 800px) and (orientation: landscape) {
+                .main-card { min-height: 95vh; }
+                .hero-text h1 { font-size: 42px; }
+                .content-area { padding: 32px; }
+                .qr-img { width: 240px; height: 240px; }
             }
         </style>
     </head>
@@ -294,7 +294,7 @@ app.get('/', async (req, res) => {
                 <div class="top-meta">
                     <div class="brand-logo">
                         <div class="logo-icon">
-                            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <svg viewBox="0 0 24 24" width="26" height="26" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
                                 <path d="M6 9V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v5"/>
                                 <rect width="12" height="8" x="6" y="14" rx="1"/>
@@ -303,14 +303,36 @@ app.get('/', async (req, res) => {
                         <span class="brand-name">LePrint</span>
                     </div>
 
-                    <div class="kiosk-badge">
-                        <span class="status-dot"></span>
-                        <span class="kiosk-id">${KIOSK_ID}</span>
+                    <div class="hero-text">
+                        <h1>Ready to print?</h1>
+                        <div class="id-container">
+                            <span class="id-label">Current Kiosk ID</span>
+                            <div class="id-value">${KIOSK_ID}</div>
+                        </div>
                     </div>
 
-                    <div class="hero-text">
-                        <h1>Print your docs <br>in seconds.</h1>
-                        <p>Self-service kiosk system. Upload from mobile, pay securely, and collect your prints instantly.</p>
+                    <div class="instructions-container">
+                        <div class="step-card">
+                            <div class="step-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                                </svg>
+                            </div>
+                            <div class="step-title">Option 1: Quick Scan</div>
+                            <div class="step-desc">Open your camera or <span class="step-highlight">Google Lens</span> and point it at the QR code on the right.</div>
+                        </div>
+                        <div class="step-card">
+                            <div class="step-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                </svg>
+                            </div>
+                            <div class="step-title">Option 2: Direct URL</div>
+                            <div class="step-desc">Go to <span class="step-highlight">leprint.in</span> in your browser and enter this Kiosk ID when prompted.</div>
+                        </div>
                     </div>
                 </div>
 
@@ -320,7 +342,7 @@ app.get('/', async (req, res) => {
                         <span>•</span>
                         <span>Floor ${FLOOR}</span>
                     </div>
-                    <div style="font-size: 11px; opacity: 0.2; letter-spacing: 0.5px;">SYSTEM v${QR_SERVER_VERSION} — 0.0.0.0:${PORT}</div>
+                    <div style="font-size: 11px; opacity: 0.1; letter-spacing: 0.5px;">SYSTEM v${QR_SERVER_VERSION} — 0.0.0.0:${PORT}</div>
                 </div>
             </div>
 
@@ -329,15 +351,13 @@ app.get('/', async (req, res) => {
                 <div class="qr-display-case" onclick="window.open('${qrUrl}', '_blank')">
                     <img src="${qrDataUrl}" alt="Scan to Print" class="qr-img">
                 </div>
-                <div class="scan-tooltip">Scan to Start</div>
+                <div class="scan-badge">Scan to Start</div>
             </div>
         </div>
 
         <script>
             // Refresh logic to keep kiosk state current
             setTimeout(() => location.reload(), 300000);
-            
-            // Console identify
             console.log("LePrint Kiosk Display v${QR_SERVER_VERSION}");
         </script>
     </body>

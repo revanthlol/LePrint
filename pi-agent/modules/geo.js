@@ -1,9 +1,12 @@
 // pi-agent/modules/geo.js
-// GPS-first location detection for the kiosk Pi agent.
-// Uses gpspipe (gpsd) to read actual GPS hardware.
-// IP-based fallback has been intentionally removed — it is too inaccurate.
+// Hybrid location detection for the kiosk Pi agent.
+// Priority: ENV > Backend API > GPS hardware
 
 const { exec } = require('child_process');
+const axios = require('axios');
+
+// In-memory cache for location after first successful detection
+let cachedLocation = null;
 
 /**
  * Attempt to get precise location from GPS hardware via gpspipe.
@@ -59,6 +62,89 @@ async function getGPSLocation(logger, timeoutMs = 8000) {
 }
 
 /**
+ * Fetch location from the backend API based on Kiosk ID.
+ *
+ * @param {string} kioskId Unique identifier for this kiosk
+ * @returns {Promise<{latitude: number, longitude: number, source: 'backend'}|null>}
+ */
+async function fetchLocationFromBackend(kioskId) {
+  const cloudUrl = process.env.CLOUD_URL || 'https://justpri.duckdns.org';
+  try {
+    const response = await axios.get(`${cloudUrl}/api/kiosks/${kioskId}/location`, {
+      timeout: 3000,
+      headers: { 'X-Kiosk-ID': kioskId }
+    });
+
+    if (response.data && response.data.latitude && response.data.longitude) {
+      return {
+        latitude: response.data.latitude,
+        longitude: response.data.longitude,
+        source: 'backend'
+      };
+    }
+  } catch (error) {
+    // Silence errors to move to next fallback
+  }
+  return null;
+}
+
+/**
+ * Main function: Resolve location using hybrid tiered detection.
+ * Priority: ENV > Backend > GPS
+ *
+ * @param {Object} logger
+ * @returns {Promise<{latitude: number|null, longitude: number|null, source: string}>}
+ */
+async function resolveLocation(logger) {
+  // 0. Cache check
+  if (cachedLocation) return cachedLocation;
+
+  // 1. ENV CONFIG (Highest Priority)
+  const latEnv = process.env.LATITUDE;
+  const lonEnv = process.env.LONGITUDE;
+  if (latEnv && lonEnv) {
+    logger.info('📍 Using location from ENV');
+    cachedLocation = {
+      latitude: parseFloat(latEnv),
+      longitude: parseFloat(lonEnv),
+      source: 'env'
+    };
+    return cachedLocation;
+  }
+
+  // 2. BACKEND FETCH (Primary real-world solution)
+  const kioskId = process.env.KIOSK_ID;
+  if (kioskId) {
+    logger.info('🌐 Fetching location from backend...');
+    const backendLoc = await fetchLocationFromBackend(kioskId);
+    if (backendLoc) {
+      cachedLocation = backendLoc;
+      return cachedLocation;
+    }
+  }
+
+  // 3. GPS (Optional fallback)
+  logger.info('🛰️ Trying GPS fallback...');
+  const gpsLoc = await getGPSLocation(logger, 8000);
+  if (gpsLoc.latitude && gpsLoc.longitude) {
+    cachedLocation = {
+      latitude: gpsLoc.latitude,
+      longitude: gpsLoc.longitude,
+      source: 'gps'
+    };
+    return cachedLocation;
+  }
+
+  // 4. FAILURE
+  logger.error('❌ No location available. Configure LATITUDE/LONGITUDE or register kiosk.');
+  return {
+    latitude: null,
+    longitude: null,
+    source: 'none'
+  };
+}
+
+/**
  * Check if gpsd / gpspipe are available on this system.
  * @returns {Promise<boolean>}
  */
@@ -71,26 +157,19 @@ function isGPSAvailable() {
 }
 
 /**
- * Main entry point — try GPS only.
- * If no GPS found, returns nulls (caller should skip or prompt user).
+ * Backward compatible entry point — now uses robust resolveLocation logic.
  *
  * @param {Object} logger
  * @returns {Promise<{latitude: number|null, longitude: number|null, source: string}>}
  */
 async function autoDetect(logger) {
-  const gpsAvail = await isGPSAvailable();
-
-  if (!gpsAvail) {
-    logger.warn('⚠️  gpspipe not found. Install gpsd + gpsd-clients to enable GPS tracking.');
-    logger.info('   → Kiosk will start without a map location. Set LATITUDE/LONGITUDE in .env to pin it manually.');
-    return { latitude: null, longitude: null, source: 'none' };
-  }
-
-  return getGPSLocation(logger);
+  return resolveLocation(logger);
 }
 
 module.exports = {
   autoDetect,
+  resolveLocation,
   getGPSLocation,
+  fetchLocationFromBackend,
   isGPSAvailable,
 };

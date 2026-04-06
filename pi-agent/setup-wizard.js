@@ -1,6 +1,6 @@
 // pi-agent/setup-wizard.js
 // Interactive CLI to configure the LePrint Pi-Agent
-// Location setup: GPS-first via gpspipe, manual input as fallback
+// Location setup: Hybrid (GPS-first, Backend sync, or Manual)
 
 const fs = require('fs');
 const path = require('path');
@@ -57,7 +57,7 @@ async function setupLocation(config) {
   // Manual entry or skip
   console.log('\nOptions:');
   console.log('  [1] Enter coordinates manually');
-  console.log('  [2] Skip — kiosk will not appear on the map');
+  console.log('  [2] Skip — use Hybrid Detection (Backend/GPS) later');
   const choice = await question('Choose [1/2]: ');
 
   if (choice.trim() === '1') {
@@ -74,8 +74,9 @@ async function setupLocation(config) {
       logger.warn('Invalid coordinates entered — skipping location.');
     }
   } else {
-    logger.info('Skipping location. The kiosk will not appear on the public map.');
-    logger.info('You can add coordinates later by editing .env and restarting the agent.');
+    logger.info('Skipping local configuration.');
+    logger.info('💡 Note: The agent will still attempt to fetch location from the backend');
+    logger.info('   or GPS hardware during startup.');
   }
 }
 

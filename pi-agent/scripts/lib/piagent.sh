@@ -40,6 +40,8 @@ enforce_env_defaults() {
     if ! grep -qE "^QR_SERVER_PORT=" .env; then
         upsert_env_var "QR_SERVER_PORT" "3000"
     fi
+    # Location (Optional)
+    # Priority: 1. ENV | 2. Backend Sync | 3. Hardware GPS
     if ! grep -qE "^LATITUDE=" .env; then
         upsert_env_var "LATITUDE" ""
     fi

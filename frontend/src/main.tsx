@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.jsx'
+import App from './App'
 
 // Hide the loading splash once React mounts
 const splash = document.getElementById('app-loading')
@@ -13,6 +13,6 @@ if (splash) {
   })
 }
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('root')!).render(
   <App />
 )

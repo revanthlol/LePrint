@@ -9,7 +9,6 @@ const logger = require('./modules/logger');
 const utils = require('./modules/utils');
 const jobHandler = require('./modules/job-handler');
 const socketClient = require('./modules/socket-client');
-const geo = require('./modules/geo');
 const os = require('os');
 
 // ==================== CONFIG ====================
@@ -73,13 +72,13 @@ console.log(`
 
 // ==================== INIT ====================
 async function initialize() {
-  // 0. Auto-detect location if not in CONFIG
+  // 0. Location check — GPS coords must be configured in .env or via setup-wizard.
+  //    IP-based geolocation is NOT used (inaccurate at city-level).
   if (!CONFIG.latitude || !CONFIG.longitude) {
-    const detectedGeo = await geo.autoDetect(logger);
-    if (detectedGeo.latitude && detectedGeo.longitude) {
-      CONFIG.latitude = detectedGeo.latitude;
-      CONFIG.longitude = detectedGeo.longitude;
-    }
+    logger.warn('⚠️  No GPS coordinates configured. Kiosk will start, but will NOT appear on the map.');
+    logger.info('   → Run "node setup-wizard.js" to configure GPS location, or set LATITUDE/LONGITUDE in .env manually.');
+  } else {
+    logger.success(`📍 Kiosk location: ${CONFIG.latitude}, ${CONFIG.longitude}`);
   }
 
   // 1. Check conversion tools

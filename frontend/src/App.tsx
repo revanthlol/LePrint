@@ -70,7 +70,7 @@ function MapRoute() {
   if (user) {
     return (
       <ProtectedRoute>
-        <DashboardLayout activeTab="map">
+        <DashboardLayout activeTab="map" noPadding hideFooter>
           <MapPage inApp={true} />
         </DashboardLayout>
       </ProtectedRoute>

@@ -7,7 +7,7 @@ import { Printer, History, LogOut, User, Menu, X, HelpCircle, Shield, LogIn, Mai
 import { motion, AnimatePresence } from 'framer-motion';
 import Footer from '../Footer';
 
-export function DashboardLayout({ children, activeTab = 'print' }) {
+export function DashboardLayout({ children, activeTab = 'print', noPadding = false, hideFooter = false }) {
     const { user, role, signOut } = useAuth();
     const { isGuest: guestCtxIsGuest, endGuestSession, jobsToday } = useGuest();
     const navigate = useNavigate();
@@ -441,18 +441,18 @@ export function DashboardLayout({ children, activeTab = 'print' }) {
             </AnimatePresence>
 
             {/* Main Content */}
-            <main className="lg:ml-72 min-h-screen flex flex-col">
+            <main className={`${noPadding ? '' : 'lg:ml-72'} min-h-screen flex flex-col`}>
                 <motion.div
                     key={activeTab}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
-                    className="p-6 lg:p-10 pt-28 lg:pt-10 flex-1"
+                    className={`${noPadding ? 'p-0 pt-0 lg:pt-0' : 'p-6 lg:p-10 pt-28 lg:pt-10'} flex-1`}
                 >
                     {children}
                 </motion.div>
-                <Footer />
+                {!hideFooter && <Footer />}
             </main>
         </div>
     );

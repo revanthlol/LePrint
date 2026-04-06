@@ -44,398 +44,301 @@ app.get('/', async (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>LePrint - ${KIOSK_ID}</title>
-        <!-- LePrint QR Server v${QR_SERVER_VERSION} -->
+        <title>LePrint Kiosk — ${KIOSK_ID}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
         <style>
-            /* Shadcn UI Dark Theme Variables */
             :root {
-                --background: #000000;
-                --card: #111111;
-                --foreground: #ffffff;
-                --muted: #262626;
-                --muted-foreground: #a3a3a3;
-                --border: #27272a;
+                --bg: #0a0a0a;
+                --card-bg: rgba(255, 255, 255, 0.03);
+                --card-border: rgba(255, 255, 255, 0.08);
+                --text-main: rgba(255, 255, 255, 0.95);
+                --text-muted: rgba(255, 255, 255, 0.4);
+                --accent: #ffffff;
                 --success: #10b981;
-                --success-bg: rgba(16, 185, 129, 0.1);
-                --radius: 24px;
-                
-                /* Responsive spacing */
-                --spacing-unit: clamp(4px, 1vw, 8px);
-                --padding-base: clamp(16px, 3vw, 40px);
-                --padding-card: clamp(24px, 4vw, 32px);
+                --radius: 32px;
             }
-    
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-    
+
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+
             body {
-                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                background-color: var(--background);
-                color: var(--foreground);
+                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                background-color: var(--bg);
+                background-image: 
+                    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+                background-size: 32px 32px;
+                color: var(--text-main);
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                padding: var(--padding-base);
-                line-height: 1.5;
+                padding: 40px;
+                overflow: hidden;
                 -webkit-font-smoothing: antialiased;
             }
-    
-            .container {
-                background-color: var(--card);
-                border: 1px solid var(--border);
+
+            .main-card {
+                background: var(--card-bg);
+                backdrop-filter: blur(40px);
+                -webkit-backdrop-filter: blur(40px);
+                border: 1px solid var(--card-border);
                 border-radius: var(--radius);
-                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-                padding: var(--padding-card);
-                text-align: center;
                 width: 100%;
-                max-width: 420px;
+                max-width: 1100px;
+                min-height: 640px;
+                display: grid;
+                grid-template-columns: 1.1fr 0.9fr;
+                gap: 20px;
+                padding: 24px;
+                box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+                animation: float 8s ease-in-out infinite;
+            }
+
+            @keyframes float {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-10px); }
+            }
+
+            /* Left Info Section */
+            .content-area {
+                padding: 48px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                background: rgba(255, 255, 255, 0.01);
+                border-radius: 24px;
+                border: 1px solid rgba(255, 255, 255, 0.02);
+            }
+
+            .brand-logo {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                margin-bottom: 64px;
+            }
+
+            .logo-icon {
+                width: 56px;
+                height: 56px;
+                background: #ffffff;
+                border-radius: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #000;
+                box-shadow: 0 8px 32px rgba(255, 255, 255, 0.1);
+            }
+
+            .brand-name {
+                font-size: 28px;
+                font-weight: 900;
+                letter-spacing: -1.5px;
+            }
+
+            .hero-text h1 {
+                font-size: 56px;
+                font-weight: 800;
+                letter-spacing: -2.5px;
+                line-height: 1.1;
+                margin-bottom: 24px;
+                background: linear-gradient(to bottom right, #fff, rgba(255, 255, 255, 0.5));
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+
+            .hero-text p {
+                font-size: 18px;
+                color: var(--text-muted);
+                max-width: 400px;
+                line-height: 1.6;
+            }
+
+            /* Dashboard Style Info Pill */
+            .kiosk-badge {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 20px;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 20px;
+                width: fit-content;
+                margin-bottom: 40px;
+            }
+
+            .kiosk-id {
+                font-family: ui-monospace, monospace;
+                font-weight: 700;
+                font-size: 14px;
+                letter-spacing: 1px;
+                text-transform: uppercase;
+                color: var(--text-main);
+            }
+
+            .status-dot {
+                width: 8px;
+                height: 8px;
+                background: var(--success);
+                border-radius: 50%;
+                box-shadow: 0 0 12px var(--success);
+                animation: pulse 2s infinite;
+            }
+
+            @keyframes pulse {
+                0% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(1.5); opacity: 0.5; }
+                100% { transform: scale(1); opacity: 1; }
+            }
+
+            .footer-meta {
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .location-meta {
+                font-size: 14px;
+                color: var(--text-muted);
+                display: flex;
+                gap: 12px;
+                font-weight: 500;
+            }
+
+            .location-meta span {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            /* Right QR Section */
+            .qr-section {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                gap: clamp(16px, 3vh, 24px);
-            }
-    
-            /* Landscape orientation - switch to horizontal layout for larger screens */
-            @media (orientation: landscape) and (min-width: 768px) and (min-height: 400px) {
-                .container {
-                    max-width: 90vw;
-                    max-height: 90vh;
-                    flex-direction: row;
-                    text-align: left;
-                    gap: clamp(24px, 4vw, 48px);
-                }
-    
-                .left-section {
-                    flex: 1;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                    gap: clamp(16px, 2vh, 24px);
-                }
-    
-                .right-section {
-                    flex: 0 0 auto;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                }
-    
-                .header {
-                    text-align: left;
-                    margin-bottom: 0;
-                }
-    
-                .logo {
-                    margin: 0 0 12px 0;
-                }
-    
-                .info-card {
-                    margin-bottom: 0;
-                }
-    
-                .footer {
-                    margin-top: 0;
-                    text-align: left;
-                }
-            }
-    
-            /* Very large displays (kiosks, digital signage) */
-            @media (min-width: 1400px) and (min-height: 900px) {
-                .container {
-                    max-width: 1200px;
-                    padding: clamp(40px, 5vw, 60px);
-                }
-                
-                .qr-wrapper {
-                    max-width: 400px;
-                }
-            }
-    
-            /* Portrait tablets and large phones */
-            @media (max-width: 767px) and (orientation: portrait) {
-                .container {
-                    max-width: 95vw;
-                }
-            }
-    
-            /* Small phones */
-            @media (max-width: 380px) {
-                .container {
-                    padding: clamp(16px, 4vw, 24px);
-                }
-            }
-    
-            .header {
-                margin-bottom: 0;
-            }
-    
-            .logo {
-                background-color: var(--foreground);
-                color: var(--background);
-                width: clamp(40px, 10vw, 56px);
-                height: clamp(40px, 10vw, 56px);
-                border-radius: 12px;
-                display: flex;
-                align-items: center;
                 justify-content: center;
-                margin: 0 auto 16px;
-                box-shadow: 0 4px 6px -1px rgba(255, 255, 255, 0.1);
+                position: relative;
             }
-    
-            .logo svg {
-                width: 60%;
-                height: 60%;
-                stroke: currentColor;
+
+            .qr-outer-glow {
+                position: absolute;
+                width: 400px;
+                height: 400px;
+                background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+                pointer-events: none;
             }
-    
-            h1 {
-                font-size: clamp(20px, 4.5vw, 28px);
-                font-weight: 600;
-                letter-spacing: -0.025em;
-                margin-bottom: 4px;
-            }
-    
-            .subtitle {
-                font-size: clamp(12px, 2.5vw, 14px);
-                color: var(--muted-foreground);
-            }
-    
-            .qr-wrapper {
+
+            .qr-display-case {
                 background: #ffffff;
-                padding: clamp(12px, 2.5vw, 20px);
-                border-radius: 16px;
-                width: 100%;
-                max-width: min(90vw, 300px);
-                aspect-ratio: 1 / 1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 4px 12px rgba(255, 255, 255, 0.08);
+                padding: 32px;
+                border-radius: 40px;
+                box-shadow: 0 32px 80px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+                transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                cursor: pointer;
             }
-    
-            /* Larger QR codes for landscape kiosks */
-            @media (orientation: landscape) and (min-width: 768px) {
-                .qr-wrapper {
-                    max-width: min(40vh, 350px);
-                }
+
+            .qr-display-case:hover {
+                transform: scale(1.05) translateY(-5px);
             }
-    
-            /* Even larger for big displays */
-            @media (min-width: 1400px) and (min-height: 900px) {
-                .qr-wrapper {
-                    max-width: min(45vh, 400px);
-                }
-            }
-    
-            .qr-code {
-                width: 100%;
-                height: 100%;
-                object-fit: contain;
-            }
-    
-            .info-card {
-                background-color: rgba(255, 255, 255, 0.03);
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                padding: clamp(12px, 3vw, 20px);
-                width: 100%;
-                margin-bottom: 0;
-            }
-    
-            .kiosk-id-label {
-                font-size: clamp(10px, 2vw, 12px);
-                color: var(--muted-foreground);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                margin-bottom: 4px;
-            }
-    
-            .kiosk-id-value {
-                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-                font-size: clamp(16px, 4vw, 24px);
-                font-weight: 700;
-                letter-spacing: 0.05em;
-                margin-bottom: 12px;
-                word-break: break-all;
-            }
-    
-            .location-info {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-wrap: wrap;
-                gap: clamp(6px, 1.5vw, 10px);
-                font-size: clamp(11px, 2.2vw, 14px);
-                color: var(--muted-foreground);
-            }
-    
-            @media (orientation: landscape) and (min-width: 768px) {
-                .location-info {
-                    justify-content: flex-start;
-                }
-            }
-    
-            .divider {
-                color: var(--border);
-            }
-    
-            .status-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-                background-color: var(--success-bg);
-                color: var(--success);
-                border: 1px solid rgba(16, 185, 129, 0.2);
-                padding: clamp(4px, 1vw, 6px) clamp(10px, 2vw, 14px);
-                border-radius: 9999px;
-                font-size: clamp(11px, 2vw, 13px);
-                font-weight: 500;
-                margin-top: clamp(12px, 2vh, 16px);
-            }
-    
-            .status-dot {
-                width: clamp(5px, 1vw, 7px);
-                height: clamp(5px, 1vw, 7px);
-                background-color: var(--success);
-                border-radius: 50%;
-                animation: pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
-            }
-    
-            @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.5; }
-            }
-    
-            .instructions {
-                font-size: clamp(12px, 2.5vw, 15px);
-                color: var(--muted-foreground);
-                margin-bottom: 0;
-            }
-    
-            .instructions strong {
-                color: var(--foreground);
+
+            .qr-img {
+                width: 300px;
+                height: 300px;
                 display: block;
-                margin-bottom: 4px;
-                font-size: clamp(13px, 2.8vw, 16px);
             }
-    
-            .url-display {
-                background-color: rgba(0, 0, 0, 0.4);
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                padding: clamp(8px, 2vw, 12px);
-                font-size: clamp(9px, 1.8vw, 11px);
-                color: var(--muted-foreground);
-                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-                word-break: break-all;
-                width: 100%;
-                line-height: 1.4;
+
+            .scan-tooltip {
+                margin-top: 32px;
+                font-size: 14px;
+                font-weight: 700;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+                color: var(--text-muted);
+                display: flex;
+                align-items: center;
+                gap: 12px;
             }
-    
-            .footer {
-                margin-top: 0;
-                padding-top: clamp(12px, 2vh, 16px);
-                border-top: 1px solid var(--border);
-                font-size: clamp(10px, 2vw, 12px);
-                color: var(--muted-foreground);
-                width: 100%;
+
+            .scan-tooltip::before, .scan-tooltip::after {
+                content: '';
+                width: 20px;
+                height: 1px;
+                background: rgba(255, 255, 255, 0.1);
             }
-    
-            /* Specific adjustments for very small screens */
-            @media (max-height: 600px) and (orientation: portrait) {
-                .container {
-                    gap: clamp(8px, 2vh, 12px);
-                }
-                
-                .qr-wrapper {
-                    max-width: min(50vw, 200px);
-                    padding: 8px;
-                }
+
+            /* Responsive */
+            @media (max-width: 1000px) {
+                .main-card { grid-template-columns: 1fr; max-width: 600px; min-height: auto; padding: 20px; }
+                .content-area { padding: 32px; align-items: center; text-align: center; }
+                .hero-text h1 { font-size: 40px; }
+                .hero-text p { margin: 0 auto 24px; }
+                .kiosk-badge { margin: 0 auto 32px; }
+                .brand-logo { margin-bottom: 40px; }
+                .qr-section { padding: 40px 0; }
+                body { padding: 20px; }
             }
-    
-            /* Ultra-wide displays */
-            @media (min-aspect-ratio: 21/9) {
-                .container {
-                    max-width: 70vw;
-                }
-            }
-    
-            /* Vertical kiosk displays (portrait digital signage) */
-            @media (orientation: portrait) and (min-height: 1200px) {
-                .container {
-                    max-width: 600px;
-                    padding: 48px 40px;
-                }
-                
-                .qr-wrapper {
-                    max-width: 400px;
-                }
+
+            @media (max-height: 700px) and (orientation: landscape) {
+                body { padding: 10px; }
+                .main-card { min-height: 90vh; }
+                .hero-text h1 { font-size: 32px; }
+                .content-area { padding: 24px; }
+                .brand-logo { margin-bottom: 20px; }
+                .qr-img { width: 220px; height: 220px; }
             }
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="left-section">
-                <div class="header">
-                    <h1>LePrint Kiosk</h1>
-                    <p class="subtitle">Fast & Easy Document Printing</p>
+        <div class="main-card">
+            <div class="content-area">
+                <div class="top-meta">
+                    <div class="brand-logo">
+                        <div class="logo-icon">
+                            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                                <path d="M6 9V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v5"/>
+                                <rect width="12" height="8" x="6" y="14" rx="1"/>
+                            </svg>
+                        </div>
+                        <span class="brand-name">LePrint</span>
+                    </div>
+
+                    <div class="kiosk-badge">
+                        <span class="status-dot"></span>
+                        <span class="kiosk-id">${KIOSK_ID}</span>
+                    </div>
+
+                    <div class="hero-text">
+                        <h1>Print your docs <br>in seconds.</h1>
+                        <p>Self-service kiosk system. Upload from mobile, pay securely, and collect your prints instantly.</p>
+                    </div>
                 </div>
-    
-                <div class="info-card">
-                    <div class="kiosk-id-label">Kiosk ID</div>
-                    <div class="kiosk-id-value">${KIOSK_ID}</div>
-                    
-                    <div class="location-info">
+
+                <div class="footer-meta">
+                    <div class="location-meta">
                         <span>📍 ${LOCATION}</span>
-                        <span class="divider">|</span>
+                        <span>•</span>
                         <span>Floor ${FLOOR}</span>
                     </div>
-    
-                    <div class="status-badge">
-                        <span class="status-dot"></span>
-                        Online & Ready
-                    </div>
-                </div>
-    
-                <div class="instructions">
-                    <strong>📱 Scan to Print</strong>
-                    Point your camera at the QR code to connect
-                </div>
-    
-                <div class="url-display">
-                    <a href="${qrUrl}" target="_blank" style="color: inherit; text-decoration: none; display: block; width: 100%;">
-                        ${qrUrl}
-                    </a>
-                </div>
-    
-                <div class="footer">
-                    Powered by LePrint
+                    <div style="font-size: 11px; opacity: 0.2; letter-spacing: 0.5px;">SYSTEM v${QR_SERVER_VERSION} — 0.0.0.0:${PORT}</div>
                 </div>
             </div>
-    
-            <div class="right-section">
-                <div class="qr-wrapper">
-                    <img src="${qrDataUrl}" alt="QR Code" class="qr-code">
+
+            <div class="qr-section">
+                <div class="qr-outer-glow"></div>
+                <div class="qr-display-case" onclick="window.open('${qrUrl}', '_blank')">
+                    <img src="${qrDataUrl}" alt="Scan to Print" class="qr-img">
                 </div>
+                <div class="scan-tooltip">Scan to Start</div>
             </div>
         </div>
-    
+
         <script>
-            // Auto-refresh every 5 minutes to ensure up-to-date status
+            // Refresh logic to keep kiosk state current
             setTimeout(() => location.reload(), 300000);
-    
-            // Log viewport info for debugging (remove in production)
-            console.log('Viewport:', {
-                width: window.innerWidth,
-                height: window.innerHeight,
-                ratio: (window.innerWidth / window.innerHeight).toFixed(2),
-                orientation: window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'
-            });
+            
+            // Console identify
+            console.log("LePrint Kiosk Display v${QR_SERVER_VERSION}");
         </script>
     </body>
     </html>

@@ -18,6 +18,8 @@ import { AdminDashboard } from "./components/Admin/Admindashboard";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import Terms from "./components/Terms";
 import RefundPolicy from "./components/RefundPolicy";
+import ShippingPolicy from "./components/ShippingPolicy";
+import HowItWorks from "./components/HowItWorks";
 import Contact from "./components/Contact";
 import About from "./components/About";
 import Landing from "./components/Landing";
@@ -170,6 +172,8 @@ function App() {
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/shipping-policy" element={<ShippingPolicy />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/about" element={<About />} />
             <Route path="/map" element={<MapRoute />} />

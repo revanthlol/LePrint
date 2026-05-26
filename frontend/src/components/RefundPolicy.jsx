@@ -92,8 +92,8 @@ export default function RefundPolicy() {
           <Section title="1. Overview">
             <p>
               At {BRAND}, we want every transaction to be successful. This policy
-              outlines when and how refunds are issued for print, scan, and xerox
-              (photocopy) services.
+              outlines when and how refunds are issued for print, scan, and
+              photocopy services.
             </p>
             <p>
               Refunds are issued only when a job fails to complete due to a
@@ -106,7 +106,7 @@ export default function RefundPolicy() {
             <p>You are entitled to a full refund if:</p>
             <ul className="space-y-4 mt-6">
               {[
-                "Your print, scan, or xerox job is marked as FAILED by our system after exhausting all automatic retries.",
+                "Your print, scan, or photocopy job is marked as FAILED by our system after exhausting all automatic retries.",
                 "The kiosk goes offline or runs out of paper after your payment is confirmed and the job cannot be rescheduled.",
                 "Your payment was charged but no job was created due to a payment gateway error or duplicate charge.",
                 "A scan job completed but the scanned file was not delivered or available for download."
@@ -156,7 +156,8 @@ export default function RefundPolicy() {
 
           <Section title="5. Refund Timeline">
             <p>
-              Approved refunds are processed within{" "}
+              Refunds are processed only after verification of transaction logs and kiosk job status.
+              Approved refunds are then processed within{" "}
               <strong className="text-white">5–7 business days</strong> to the
               original payment method. The actual credit timeline depends on your
               bank or card issuer and may take up to 10 business days to reflect.

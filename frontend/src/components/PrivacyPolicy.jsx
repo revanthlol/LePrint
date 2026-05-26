@@ -62,9 +62,9 @@ export default function PrivacyPolicy() {
             <ul className="space-y-6 mt-6">
               {[
                 { label: "Account Information", value: "Name, email address, and profile picture obtained via Google OAuth login (Firebase Authentication)." },
-                { label: "Uploaded Documents", value: "Files you upload for printing or xerox (PDF, DOCX, images). These are stored temporarily on our servers and automatically deleted within 2 hours of upload or 30 minutes after job completion." },
+                { label: "Uploaded Documents", value: "Files you upload for printing or photocopy (PDF, DOCX, images). Uploaded documents are stored temporarily only for job processing and are automatically deleted immediately after successful kiosk retrieval, or within a maximum of 2 hours if the job is not completed." },
                 { label: "Payment Information", value: "Transaction IDs and payment status processed through Razorpay. LePrint does not store card or UPI details." },
-                { label: "Usage Data", value: "Job history (print/scan/xerox jobs), timestamps, kiosk IDs, and service preferences." },
+                { label: "Usage Data", value: "Job history (print/scan/photocopy jobs), timestamps, kiosk IDs, and service preferences." },
                 { label: "Device & Technical Data", value: "IP address, browser type, and device information collected automatically for security and service operation." }
               ].map((item, i) => (
                 <li key={i} className="flex gap-4">
@@ -83,7 +83,7 @@ export default function PrivacyPolicy() {
             <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
               {[
                 "Authenticate your identity",
-                "Process print/scan/xerox jobs",
+                "Process print/scan/photocopy jobs",
                 "Process payments and refunds",
                 "Send job status notifications",
                 "Detect fraud or security issues",
@@ -122,9 +122,9 @@ export default function PrivacyPolicy() {
 
           <Section title="5. Data Retention">
             <p>
-              <span className="font-bold text-white">Uploaded files</span> are automatically deleted from our servers within 2
-              hours of upload, or 30 minutes after your print job completes —
-              whichever comes first.
+              <span className="font-bold text-white">Uploaded files</span> are stored temporarily only for job processing
+              and are automatically deleted immediately after successful kiosk retrieval,
+              or within a maximum of 2 hours if the job is not completed.
             </p>
             <p>
               Account information and job history records are retained for up to

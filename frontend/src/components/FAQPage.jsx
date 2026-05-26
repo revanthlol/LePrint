@@ -59,11 +59,11 @@ const faqs = [
     questions: [
       {
         q: 'Are my documents stored on your servers?',
-        a: 'Your uploaded file is stored on our server only long enough to be transferred to the kiosk printer (typically under 60 seconds). It is permanently deleted from the server immediately after the kiosk downloads it. Files are also deleted from the kiosk after printing. We do not retain any copy of your document.'
+        a: 'Your uploaded file is stored on our server only long enough to be transferred to the kiosk printer (typically under 60 seconds). It is automatically deleted immediately after the kiosk retrieves it, or within a maximum of 2 hours if the job is not completed. Files are also deleted from the kiosk after printing. We do not retain any copy of your document.'
       },
       {
         q: 'Who can see my document?',
-        a: 'Nobody. Your file is encrypted in transit (HTTPS), transferred directly to the kiosk, and deleted from our servers the moment the kiosk picks it up. Only the physical printer receives your document. No admin, no employee, and no other user can access your file.'
+        a: 'Your file is encrypted in transit (HTTPS), transferred directly to the kiosk, and deleted from our servers immediately after the kiosk picks it up. Only the physical printer receives your document. Uploaded files are protected through encrypted transfer and restricted access controls. Access is limited only to systems necessary for processing the print job.'
       },
       {
         q: 'Is my payment information secure?',
@@ -83,15 +83,15 @@ const faqs = [
     questions: [
       {
         q: 'How does LePrint work?',
-        a: 'LePrint is a cloud-based kiosk printing system:\n\n1. Scan the QR code at a kiosk with your phone\n2. Log in with Google\n3. Upload your document\n4. Pay per page (₹3/page)\n5. Collect your printout\n\nYour phone controls the kiosk — no USB, no email, no app install required.'
+        a: `LePrint is a cloud-based kiosk printing system:\n\n1. Scan the QR code at a kiosk with your phone\n2. Log in with Google or continue as a guest\n3. Upload your document\n4. Select print settings\n5. Review the final cost displayed before payment\n6. Pay securely through PayU\n7. Collect your printout from the kiosk\n\nYour phone controls the kiosk — no USB, no email, no app install required.`
       },
       {
         q: 'Can I print without creating an account?',
-        a: 'No — a Google account is required. This lets us securely link jobs to you, provide print history, and handle refunds if something goes wrong. Sign-in takes under 5 seconds with your existing Google account.'
+        a: `Yes. LePrint supports guest mode for quick printing without account creation.\n\nHowever, signing in with Google provides additional features including print history, faster reprints, and refund support.`
       },
       {
         q: 'How much does printing cost?',
-        a: 'The current rate is ₹3 per page for black & white printing. The exact page count and total cost are shown on screen before you pay — so there are never any surprises. Color printing and double-sided options are coming in a future update.'
+        a: 'Pricing is displayed before payment confirmation and may vary depending on print type, page count, and kiosk location. The exact page count and total cost are always shown on screen before you pay — so there are never any surprises.'
       }
     ]
   }

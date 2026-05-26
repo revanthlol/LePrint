@@ -54,7 +54,7 @@ export default function Terms() {
           <Section title="2. Description of Service">
             <p>
               {BRAND} provides self-service cloud printing, scanning, and
-              photocopy (xerox) solutions via automated kiosks. Users upload
+              photocopy solutions via automated kiosks. Users upload
               documents via our web interface and execute jobs at physical kiosk
               locations.
             </p>
@@ -102,32 +102,22 @@ export default function Terms() {
                 <thead className="bg-white/[0.04] border-b border-white/[0.08]">
                   <tr>
                     <th className="px-6 py-4 font-bold text-foreground">Service</th>
-                    <th className="px-6 py-4 font-bold text-foreground">Unit</th>
-                    <th className="px-6 py-4 font-bold text-foreground">Base Rate*</th>
+                    <th className="px-6 py-4 font-bold text-foreground">Pricing</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.05]">
                   <tr>
-                    <td className="px-6 py-4 text-muted-foreground">B&W Print</td>
-                    <td className="px-6 py-4 text-muted-foreground">Per Page (A4)</td>
-                    <td className="px-6 py-4 text-foreground font-medium">₹5.00</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-muted-foreground">Color Print</td>
-                    <td className="px-6 py-4 text-muted-foreground">Per Page (A4)</td>
-                    <td className="px-6 py-4 text-foreground font-medium">₹20.00</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-muted-foreground">Scanning</td>
-                    <td className="px-6 py-4 text-muted-foreground">Per Document</td>
-                    <td className="px-6 py-4 text-foreground font-medium">₹10.00</td>
+                    <td className="px-6 py-4 text-muted-foreground">Printing / Scanning / Photocopy Services</td>
+                    <td className="px-6 py-4 text-muted-foreground">
+                      Pricing varies based on paper type, colour mode, page count, and kiosk location.
+                      Final charges are displayed before payment confirmation.
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p className="text-xs text-muted-foreground/60 italic">
-              * Rates may vary by location and paper quality. Final price is
-              calculated and shown before payment.
+              Final price is calculated and displayed before payment. No hidden charges.
             </p>
           </Section>
 

@@ -14,6 +14,7 @@ const footerSections = [
       { label: "Landing", href: "/" },
       { label: "App", href: "/app" },
       { label: "About Us", href: "/about" },
+      { label: "How It Works", href: "/how-it-works" },
       { label: "FAQ", href: "/faq" },
       { label: "Contact Us", href: "/contact" },
       { label: "Kiosk Map", href: "/map" },
@@ -26,6 +27,7 @@ const footerSections = [
       { label: "Privacy Policy", href: "/privacy-policy" },
       { label: "Terms & Conditions", href: "/terms" },
       { label: "Refund Policy", href: "/refund-policy" },
+      { label: "Shipping & Delivery", href: "/shipping-policy" },
     ],
   },
 ];
@@ -93,6 +95,8 @@ export default function Footer() {
             <p className="text-xs text-muted-foreground/40 font-mono tracking-wider">
               {SUPPORT_EMAIL}
             </p>
+            <p className="text-xs text-muted-foreground/40 mt-1">Response Time: 2 business days</p>
+            <p className="text-xs text-muted-foreground/30 mt-1">Bangalore, Karnataka, India</p>
           </div>
 
           {/* Link columns */}
@@ -157,6 +161,9 @@ export default function Footer() {
             </Link>
             <Link to="/refund-policy" className="hover:text-foreground transition-colors">
               Refunds
+            </Link>
+            <Link to="/shipping-policy" className="hover:text-foreground transition-colors">
+              Shipping
             </Link>
           </div>
         </div>

@@ -59,7 +59,7 @@ const faqs = [
     questions: [
       {
         q: 'Are my documents stored on your servers?',
-        a: 'Your uploaded file is stored on our server only long enough to be transferred to the kiosk printer (typically under 60 seconds). It is automatically deleted immediately after the kiosk retrieves it, or within a maximum of 2 hours if the job is not completed. Files are also deleted from the kiosk after printing. We do not retain any copy of your document.'
+        a: 'Your uploaded file is stored on our server only long enough to be transferred to the kiosk printer (typically under 60 seconds). It is automatically deleted immediately after the kiosk retrieves it, or within a maximum of 2 hours if the job is not completed. Files are also deleted from the kiosk after printing. Uploaded documents are not retained longer than necessary for service operation.'
       },
       {
         q: 'Who can see my document?',
@@ -67,7 +67,7 @@ const faqs = [
       },
       {
         q: 'Is my payment information secure?',
-        a: 'Yes. Payments are processed through Razorpay, a PCI DSS compliant payment gateway. LePrint never stores your card details. Only a payment confirmation ID is saved for refund and audit purposes.'
+        a: 'Payments are securely processed through PayU and PCI DSS compliant payment gateway partners. LePrint never stores your card details. Only a payment confirmation ID is saved for refund and audit purposes.'
       },
       {
         q: 'What data does LePrint store about me?',

@@ -40,7 +40,7 @@ export default function HowItWorks() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
       <PublicNavbar />
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 pt-32 pb-20">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 md:px-6 pt-32 pb-20">
         <div className="mb-12">
           <span className="block text-[10px] md:text-xs uppercase tracking-[0.3em] text-muted-foreground font-bold mb-4">GUIDE</span>
           <h1 className="text-4xl md:text-6xl font-light tracking-tight text-foreground mb-4">
@@ -51,7 +51,7 @@ export default function HowItWorks() {
           </p>
         </div>
 
-        <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.05] rounded-[2.5rem] shadow-2xl shadow-black/50 p-8 md:p-16">
+        <div className="md:bg-white/[0.03] md:backdrop-blur-2xl md:border md:border-white/[0.05] md:rounded-[2.5rem] md:shadow-2xl md:shadow-black/50 md:p-16">
           <Section title="Complete Payment Flow">
             <ol className="space-y-8">
               {steps.map((step) => (

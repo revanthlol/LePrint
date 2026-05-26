@@ -30,7 +30,7 @@ export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
       <PublicNavbar />
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 pt-32 pb-20">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 md:px-6 pt-32 pb-20">
         <div className="mb-12">
           <span className="block text-[10px] md:text-xs uppercase tracking-[0.3em] text-muted-foreground font-bold mb-4">LEGAL</span>
           <h1 className="text-4xl md:text-6xl font-light tracking-tight text-foreground mb-4">
@@ -39,7 +39,7 @@ export default function PrivacyPolicy() {
           <p className="text-sm text-muted-foreground/40 font-medium">Last updated: {LAST_UPDATED}</p>
         </div>
 
-        <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.05] rounded-[2.5rem] shadow-2xl shadow-black/50 p-8 md:p-16">
+        <div className="md:bg-white/[0.03] md:backdrop-blur-2xl md:border md:border-white/[0.05] md:rounded-[2.5rem] md:shadow-2xl md:shadow-black/50 md:p-16 space-y-0">
           <Section title="1. Introduction">
             <p>
               {BRAND} ("we", "us", or "our") operates a cloud-based print, scan,
@@ -63,7 +63,7 @@ export default function PrivacyPolicy() {
               {[
                 { label: "Account Information", value: "Name, email address, and profile picture obtained via Google OAuth login (Firebase Authentication)." },
                 { label: "Uploaded Documents", value: "Files you upload for printing or photocopy (PDF, DOCX, images). Uploaded documents are stored temporarily only for job processing and are automatically deleted immediately after successful kiosk retrieval, or within a maximum of 2 hours if the job is not completed." },
-                { label: "Payment Information", value: "Transaction IDs and payment status processed through Razorpay. LePrint does not store card or UPI details." },
+                { label: "Payment Information", value: "Transaction IDs and payment status processed through PayU and PCI DSS compliant payment gateway partners. LePrint does not store card or UPI details." },
                 { label: "Usage Data", value: "Job history (print/scan/photocopy jobs), timestamps, kiosk IDs, and service preferences." },
                 { label: "Device & Technical Data", value: "IP address, browser type, and device information collected automatically for security and service operation." }
               ].map((item, i) => (
@@ -105,7 +105,7 @@ export default function PrivacyPolicy() {
             </p>
             <ul className="space-y-4 mt-6">
               {[
-                { partner: "Razorpay", purpose: "Payment processing (transaction data only)" },
+                { partner: "PayU (Payment Gateway)", purpose: "Payment processing (transaction data only)" },
                 { partner: "Google Firebase", purpose: "Authentication and identity management" },
                 { partner: "Kiosk Operators", purpose: "Job details required for physical printing" },
                 { partner: "Legal Requirements", purpose: "When required by law or government authority" }

@@ -45,7 +45,7 @@ export default function RefundPolicy() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
       <PublicNavbar />
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 pt-32 pb-20">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 md:px-6 pt-32 pb-20">
         <div className="mb-12">
           <span className="block text-[10px] md:text-xs uppercase tracking-[0.3em] text-muted-foreground font-bold mb-4">LEGAL</span>
           <h1 className="text-4xl md:text-6xl font-light tracking-tight text-foreground mb-4">
@@ -54,11 +54,11 @@ export default function RefundPolicy() {
           <p className="text-sm text-muted-foreground/40 font-medium">Last updated: {LAST_UPDATED}</p>
         </div>
 
-        <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.05] rounded-[2.5rem] shadow-2xl shadow-black/50 p-8 md:p-16">
+        <div className="md:bg-white/[0.03] md:backdrop-blur-2xl md:border md:border-white/[0.05] md:rounded-[2.5rem] md:shadow-2xl md:shadow-black/50 md:p-16">
           {/* Quick reference table */}
-          <div className="mb-12 p-8 bg-white/[0.02] rounded-3xl border border-white/[0.05]">
+          <div className="mb-12 md:p-8 bg-white/[0.02] md:rounded-3xl md:border md:border-white/[0.05]">
             <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-muted-foreground/60 mb-6 px-1">Quick Reference Guide</p>
-            <div className="overflow-hidden rounded-2xl border border-white/[0.05] bg-[#0c0c0c]/50">
+            <div className="overflow-x-auto -mx-4 md:mx-0 rounded-2xl border border-white/[0.05] bg-[#0c0c0c]/50">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-white/[0.04] border-b border-white/[0.08]">

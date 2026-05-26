@@ -30,7 +30,7 @@ export default function ShippingPolicy() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
       <PublicNavbar />
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 pt-32 pb-20">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 md:px-6 pt-32 pb-20">
         <div className="mb-12">
           <span className="block text-[10px] md:text-xs uppercase tracking-[0.3em] text-muted-foreground font-bold mb-4">LEGAL</span>
           <h1 className="text-4xl md:text-6xl font-light tracking-tight text-foreground mb-4">
@@ -39,7 +39,7 @@ export default function ShippingPolicy() {
           <p className="text-sm text-muted-foreground/40 font-medium">Last updated: {LAST_UPDATED}</p>
         </div>
 
-        <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.05] rounded-[2.5rem] shadow-2xl shadow-black/50 p-8 md:p-16">
+        <div className="md:bg-white/[0.03] md:backdrop-blur-2xl md:border md:border-white/[0.05] md:rounded-[2.5rem] md:shadow-2xl md:shadow-black/50 md:p-16">
           <Section title="1. Overview">
             <p>
               {BRAND} is a cloud-based digital print service and does not ship physical products
@@ -48,6 +48,9 @@ export default function ShippingPolicy() {
             <p>
               All print, scan, and photocopy services are fulfilled directly at self-service{" "}
               {BRAND} kiosks selected by the user during the checkout process.
+            </p>
+            <p className="italic text-muted-foreground/70">
+              Since services are digitally fulfilled at physical kiosks, no courier delivery timelines apply.
             </p>
           </Section>
 

@@ -4,7 +4,8 @@ import Footer from "./Footer";
 import PublicNavbar from "./PublicNavbar";
 
 const BRAND = "LePrint";
-const LAST_UPDATED = "March 21, 2026";
+const COMPANY_NAME = "FUTURE WAVE IT PVT LTD";
+const LAST_UPDATED = "June 23, 2026";
 
 function Section({ title, children }) {
   return (
@@ -41,7 +42,7 @@ export default function Terms() {
         <div className="md:bg-white/[0.03] md:backdrop-blur-2xl md:border md:border-white/[0.05] md:rounded-[2.5rem] md:shadow-2xl md:shadow-black/50 md:p-16">
           <Section title="1. Agreement to Terms">
             <p>
-              By accessing or using the services provided by {BRAND} ("we", "us",
+              By accessing or using the services provided by LePrint, a service owned and operated by <strong>{COMPANY_NAME}</strong> ("we", "us",
               or "our"), including our kiosks and website (
               <a href="https://leprint.in" className="text-blue-400/80 underline decoration-white/20 underline-offset-4 hover:text-white transition-colors">
                 leprint.in
@@ -146,15 +147,15 @@ export default function Terms() {
 
           <Section title="8. Intellectual Property">
             <p>
-              The {BRAND} name, logo, software, and kiosk hardware design are the
-              exclusive property of {BRAND}. You may not copy, modify, or reverse
+              The {BRAND} name, logo, software, website design, and kiosk hardware design are the
+              exclusive property of <strong>{COMPANY_NAME}</strong>. You may not copy, modify, or reverse
               engineer any part of our service.
             </p>
           </Section>
 
           <Section title="9. Limitation of Liability">
             <p>
-              To the maximum extent permitted by law, {BRAND} shall not be liable
+              To the maximum extent permitted by law, <strong>{COMPANY_NAME}</strong> (operating as {BRAND}) shall not be liable
               for any indirect, incidental, special, consequential, or punitive
               damages, including loss of data or profits, arising from your use
               of the service.
@@ -171,7 +172,7 @@ export default function Terms() {
 
           <Section title="11. Indemnification">
             <p>
-              You agree to indemnify and hold harmless {BRAND} and its employees
+              You agree to indemnify and hold harmless <strong>{COMPANY_NAME}</strong>, the brand {BRAND}, and their respective officers, directors, and employees
               from any claims or damages resulting from your violation of these
               terms or misuse of the service.
             </p>

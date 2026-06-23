@@ -17,6 +17,7 @@ import Footer from "./Footer";
 import PublicNavbar from "./PublicNavbar";
 
 const BRAND = "LePrint";
+const COMPANY_NAME = "FUTURE WAVE IT PVT LTD";
 const SUPPORT_EMAIL = "support@leprint.in";
 
 /* ── animation helpers ── */
@@ -252,8 +253,8 @@ export default function Contact({ inApp = false }) {
             />
             <InfoCard
               icon={MapPin}
-              label="Address"
-              value="J-04 J-Block Zonasha Elegance Apartments Phase-1 DAST Road Haralur Bangalore 560102"
+              label="Legal Entity & Address"
+              value={`${COMPANY_NAME}, J-04 J-Block Zonasha Elegance Apartments Phase-1 DAST Road Haralur Bangalore 560102`}
               delay={0.15}
             />
             <InfoCard

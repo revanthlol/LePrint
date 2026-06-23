@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 
 const BRAND = "LePrint";
+const COMPANY_NAME = "FUTURE WAVE IT PVT LTD";
 const SUPPORT_EMAIL = "support@leprint.in";
 const YEAR = new Date().getFullYear();
 
@@ -91,7 +92,7 @@ export default function Footer() {
             <p className="text-sm leading-relaxed text-muted-foreground/60 max-w-sm mb-4">
               A self-service cloud print kiosk platform. Built for speed, privacy, and reliability.
             </p>
-            <p className="text-xs text-muted-foreground/50 font-semibold mb-3">Operated by {BRAND} · Bangalore, Karnataka, India</p>
+            <p className="text-xs text-muted-foreground/50 font-semibold mb-3">Operated by {COMPANY_NAME} · Bangalore, Karnataka, India</p>
             <p className="text-xs text-muted-foreground/40 font-mono tracking-wider">
               {SUPPORT_EMAIL}
             </p>
@@ -135,7 +136,7 @@ export default function Footer() {
             <p className="text-sm leading-relaxed text-muted-foreground/60 mb-2">
               Self-service print kiosks for everyone.
             </p>
-            <p className="text-xs text-muted-foreground/50 font-semibold">Operated by {BRAND} · Bangalore, Karnataka, India</p>
+            <p className="text-xs text-muted-foreground/50 font-semibold">Operated by {COMPANY_NAME} · Bangalore, Karnataka, India</p>
           </div>
 
           {/* Collapsible sections */}

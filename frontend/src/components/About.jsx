@@ -4,6 +4,9 @@ import { motion } from "framer-motion";
 import PublicNavbar from "./PublicNavbar";
 import Footer from "./Footer";
 
+const BRAND = "LePrint";
+const COMPANY_NAME = "FUTURE WAVE IT PVT LTD";
+
 const features = [
   {
     icon: Zap,
@@ -62,7 +65,7 @@ export default function About() {
                 </p>
                 <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
                   We're on a mission to bring cloud-based, self-service printing to every corner of India, 
-                  reimagining hardware for a mobile-first generation.
+                  reimagining hardware for a mobile-first generation. LePrint is owned and operated by <strong>{COMPANY_NAME}</strong>.
                 </p>
               </div>
             </motion.div>
@@ -128,7 +131,7 @@ export default function About() {
               
               <div className="prose prose-invert max-w-none text-muted-foreground space-y-8">
                 <p className="text-lg md:text-xl leading-relaxed">
-                  LePrint was born out of the frustration of finding a working printer in a library. 
+                  LePrint, a service built and operated by <strong>{COMPANY_NAME}</strong>, was born out of the frustration of finding a working printer in a library. 
                   We realized that the hardware exists, but the software was stuck in the 90s.
                 </p>
 

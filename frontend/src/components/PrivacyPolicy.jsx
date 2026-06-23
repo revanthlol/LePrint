@@ -4,8 +4,9 @@ import Footer from "./Footer";
 import PublicNavbar from "./PublicNavbar";
 
 const BRAND = "LePrint";
+const COMPANY_NAME = "FUTURE WAVE IT PVT LTD";
 const SUPPORT_EMAIL = "support@leprint.in";
-const LAST_UPDATED = "March 21, 2026";
+const LAST_UPDATED = "June 23, 2026";
 
 function Section({ title, children }) {
   return (
@@ -42,8 +43,7 @@ export default function PrivacyPolicy() {
         <div className="md:bg-white/[0.03] md:backdrop-blur-2xl md:border md:border-white/[0.05] md:rounded-[2.5rem] md:shadow-2xl md:shadow-black/50 md:p-16 space-y-0">
           <Section title="1. Introduction">
             <p>
-              {BRAND} ("we", "us", or "our") operates a cloud-based print, scan,
-              and photocopy kiosk service accessible via{" "}
+              {BRAND} is a cloud-based print, scan, and photocopy kiosk service owned and operated by <strong>{COMPANY_NAME}</strong> ("we", "us", or "our"), accessible via{" "}
               <a href="https://leprint.in" className="text-blue-400/80 underline decoration-white/20 underline-offset-4 hover:text-white transition-colors">
                 leprint.in
               </a>
@@ -176,7 +176,8 @@ export default function PrivacyPolicy() {
 
           <Section title="11. Contact">
             <div className="mt-2 p-8 bg-white/[0.04] border border-white/[0.05] rounded-2xl shadow-inner">
-              <p className="font-bold text-white text-lg mb-2">{BRAND}</p>
+              <p className="font-bold text-white text-lg mb-1">{BRAND}</p>
+              <p className="text-xs text-muted-foreground/50 font-semibold mb-4">Owned &amp; Operated by {COMPANY_NAME}</p>
               <p className="mb-4">
                 Email:{" "}
                 <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-400/80 underline decoration-white/20 underline-offset-4 hover:text-white transition-colors">

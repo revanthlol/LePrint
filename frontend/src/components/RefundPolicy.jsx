@@ -4,8 +4,9 @@ import Footer from "./Footer";
 import PublicNavbar from "./PublicNavbar";
 
 const BRAND = "LePrint";
+const COMPANY_NAME = "FUTURE WAVE IT PVT LTD";
 const SUPPORT_EMAIL = "support@leprint.in";
-const LAST_UPDATED = "March 21, 2026";
+const LAST_UPDATED = "June 23, 2026";
 
 function Section({ title, children }) {
   return (
@@ -91,7 +92,7 @@ export default function RefundPolicy() {
 
           <Section title="1. Overview">
             <p>
-              At {BRAND}, we want every transaction to be successful. This policy
+              At LePrint, a service owned and operated by <strong>{COMPANY_NAME}</strong> ("we", "us", or "our"), we want every transaction to be successful. This policy
               outlines when and how refunds are issued for print, scan, and
               photocopy services.
             </p>
@@ -194,7 +195,8 @@ export default function RefundPolicy() {
 
           <Section title="8. Contact">
             <div className="mt-2 p-8 bg-white/[0.04] border border-white/[0.05] rounded-2xl shadow-inner">
-              <p className="font-bold text-white text-lg mb-2">{BRAND} Support</p>
+              <p className="font-bold text-white text-lg mb-1">{BRAND} Support</p>
+              <p className="text-xs text-muted-foreground/50 font-semibold mb-4">Owned &amp; Operated by {COMPANY_NAME}</p>
               <p className="mb-4">
                 Email:{" "}
                 <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-400/80 underline decoration-white/20 underline-offset-4 hover:text-white transition-colors">

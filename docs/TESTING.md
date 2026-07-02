@@ -9,9 +9,9 @@ This guide covers how to test every feature of the JusPri system end-to-end.
 Before testing, make sure these services are running:
 
 ```bash
-# 1. PostgreSQL
-sudo systemctl status postgresql
-# Should show: active (running)
+# 1. Supabase Postgres
+# Use backend/.env DB_* values. On the Supabase free plan, use the shared
+# pooler endpoint because the direct database endpoint is IPv6-only.
 
 # 2. Backend
 cd ~/Documents/projects/j/juspri/backend
@@ -32,16 +32,16 @@ node index.js
 ## 1. Database Verification
 
 ```bash
-# Connect to database
-psql -U printuser -d printkiosk -h localhost
+# Connect to Supabase through the shared pooler
+psql "postgresql://postgres.veyavwgdvzrtrcsywwta:YOUR_PASSWORD@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require"
 
 # Verify tables exist
-\dt
+\dt public.*
 
-# Expected: users, kiosks, jobs, admin_actions
+# Expected: users, kiosks, jobs, admin_actions, settings
 
 # Verify jobs table has all columns
-\d jobs
+\d public.jobs
 
 # Key columns to check:
 #   - retry_count (INTEGER, default 0)

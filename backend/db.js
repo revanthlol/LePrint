@@ -3,13 +3,19 @@ require('dotenv').config();
 const { Pool } = require('pg');
 
 // ==================== CONNECTION POOL ====================
+const useSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
+const dbSchema = process.env.DB_SCHEMA || 'public';
+const poolMax = parseInt(process.env.DB_POOL_MAX || '10', 10);
+
 const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'printkiosk',
     user: process.env.DB_USER || 'printuser',
     password: process.env.DB_PASSWORD,
-    max: 20, // Maximum number of clients in the pool
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
+    options: `-c search_path=${dbSchema}`,
+    max: Number.isNaN(poolMax) ? 10 : poolMax, // Maximum number of clients in the pool
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
 });

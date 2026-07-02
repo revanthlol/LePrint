@@ -11,3 +11,4 @@ node_modules/
 # Backend Secrets
 backend/config/firebase-service-account.json
 plan/
+docs/data_dump.sql
